@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GARCIA MOBILIDADE - Passageiro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDZt7BabbQJ3UaLSQYChtMhieikDlqvpLg&libraries=places"></script>
+    
+    <style>
+        body { font-family: 'Poppins', sans-serif; background-color: #111827; color: white; }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #6d28d9; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .pac-container { background-color: #1F2937; border-radius: 8px; border: 1px solid #4B5563; }
+        .pac-item { padding: 10px; font-size: 14px; color: #D1D5DB; cursor: pointer; border-top: 1px solid #374151;}
+        .pac-item:first-child { border-top: none; }
+        .pac-item:hover { background-color: #374151; }
+        .pac-item-query { font-weight: 600; color: #F3F4F6; }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+
+    <div id="app-container" class="w-full max-w-md mx-auto p-4">
+
+        <div id="loading-screen" class="screen active text-center"><div class="loader mx-auto"></div><p class="mt-4">Carregando...</p></div>
+
+        <div id="login-screen" class="screen space-y-4">
+            <h2 class="text-3xl font-bold text-center">Login</h2>
+            
+            <button onclick="handleSignInWithGoogle()" class="w-full py-3 font-semibold rounded-lg bg-white text-gray-800 hover:bg-gray-200 flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.222,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.988,36.635,44,31.023,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
+                Entrar com Google
+            </button>
+            <div class="relative flex py-2 items-center"><div class="flex-grow border-t border-gray-600"></div><span class="flex-shrink mx-4 text-gray-400">OU</span><div class="flex-grow border-t border-gray-600"></div></div>
+
+            <form id="login-form" class="space-y-4">
+                <div><label for="login-email" class="block mb-2 text-sm font-medium">E-mail</label><input type="email" id="login-email" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
+                <div><label for="login-password" class="block mb-2 text-sm font-medium">Senha</label><input type="password" id="login-password" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
+                <button type="submit" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENTRAR</button>
+            </form>
+            <div class="text-center"><a href="#" onclick="showScreen('forgot-password-screen')" class="text-sm text-indigo-400">Esqueceu a senha?</a></div>
+            <p class="text-center">Não tem uma conta? <a href="#" onclick="showScreen('signup-screen')" class="font-semibold text-indigo-400">Cadastre-se</a></p>
+        </div>
+        
+        <div id="forgot-password-screen" class="screen space-y-4">
+            <h2 class="text-3xl font-bold text-center">Recuperar Senha</h2>
+            <p class="text-center text-gray-400">Digite seu e-mail e enviaremos um link.</p>
+            <form id="forgot-password-form" class="space-y-4">
+                <div><label for="forgot-email" class="block mb-2 text-sm font-medium">E-mail</label><input type="email" id="forgot-email" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
+                <button type="submit" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENVIAR LINK</button>
+            </form>
+            <p class="text-center"><a href="#" onclick="showScreen('login-screen')" class="font-semibold text-indigo-400">Voltar para o Login</a></p>
+        </div>
+        
+        <div id="update-password-screen" class="screen space-y-4">
+            <h2 class="text-3xl font-bold text-center">Crie uma Nova Senha</h2>
+            <form id="update-password-form" class="space-y-4">
+                <div><label for="update-password" class="block mb-2 text-sm font-medium">Nova Senha</label><input type="password" id="update-password" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
+                <button type="submit" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">SALVAR NOVA SENHA</button>
+            </form>
+        </div>
+        
+        <div id="complete-profile-screen" class="screen space-y-4">
+            <h2 class="text-3xl font-bold text-center">Complete seu Perfil</h2>
+            <p class="text-center text-gray-400">Precisamos de mais uma informação para continuar.</p>
+            <form id="complete-profile-form" class="space-y-4">
+                <div>
+                    <label for="profile-phone" class="block mb-2 text-sm font-medium">Telefone</label>
+                    <input type="tel" id="profile-phone" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" placeholder="(XX) XXXXX-XXXX" required>
+                </div>
+                <button type="submit" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">SALVAR E CONTINUAR</button>
+            </form>
+        </div>
+
+        <div id="signup-screen" class="screen space-y-4">
+            <h2 class="text-3xl font-bold text-center">Cadastro</h2>
+            <form id="signup-form" class="space-y-4">
+                <div><label for="signup-fullname" class="block mb-2 text-sm font-medium">Nome Completo</label><input type="text" id="signup-fullname" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
+                <div><label for="signup-email" class="block mb-2 text-sm font-medium">E-mail</label><input type="email" id="signup-email" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
+                <div><label for="signup-phone" class="block mb-2 text-sm font-medium">Telefone</label><input type="tel" id="signup-phone" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" placeholder="(XX) XXXXX-XXXX" required></div>
+                <div><label for="signup-password" class="block mb-2 text-sm font-medium">Senha</label><input type="password" id="signup-password" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
+                <button type="submit" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">CADASTRAR</button>
+            </form>
+            <p class="text-center">Já tem uma conta? <a href="#" onclick="showScreen('login-screen')" class="font-semibold text-indigo-400">Faça o login</a></p>
+        </div>
+
+        <div id="user-screen" class="screen space-y-6">
+            <div class="flex justify-between items-center"><h2 class="text-2xl font-bold">Solicitar Viagem</h2><button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700">Sair</button></div>
+            <p id="welcome-message" class="text-lg"></p>
+            <form id="ride-request-form" class="space-y-4">
+                 <div><label for="origin" class="block mb-2 text-sm font-medium">Origem</label><input type="text" id="origin" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600" placeholder="Digite o endereço de partida" required></div>
+                <div><label for="destination" class="block mb-2 text-sm font-medium">Destino</label><input type="text" id="destination" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600" placeholder="Digite o destino" required></div>
+                <button type="submit" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">SOLICITAR AGORA</button>
+            </form>
+            <div id="ride-status-container" class="hidden"><h3 class="text-xl font-bold">Status da sua Viagem</h3><p id="ride-status-message" class="mt-2 p-4 bg-gray-800 rounded-lg"></p></div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const state = { user: null, profile: null };
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        async function handleSignUp(fullName, email, phone, password) {
+            try {
+                const { data, error } = await supabaseClient.auth.signUp({ email, phone, password, options: { data: { full_name: fullName, user_type: 'passenger' } } });
+                if (error) throw error;
+                alert('Cadastro realizado! Verifique seu e-mail para ativar sua conta.');
+                showScreen('login-screen');
+            } catch (error) { alert('Erro no cadastro: ' + error.message); }
+        }
+
+        async function handleSignIn(email, password) {
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+            } catch (error) { alert('Erro no login: ' + error.message); }
+        }
+        
+        async function handleSignInWithGoogle() {
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithOAuth({ provider: 'google' });
+                if (error) throw error;
+            } catch (error) { alert('Erro ao tentar login com Google: ' + error.message); }
+        }
+
+        async function handleSignOut() { await supabaseClient.auth.signOut(); }
+
+        async function handlePasswordReset(email) {
+            try {
+                const { data, error } = await supabaseClient.auth.resetPasswordForEmail(email);
+                if (error) throw error;
+                alert('Link de recuperação de senha enviado! Verifique seu e-mail.');
+                showScreen('login-screen');
+            } catch (error) { alert('Erro ao enviar e-mail de recuperação: ' + error.message); }
+        }
+        
+        async function handleUpdatePassword(newPassword) {
+            try {
+                const { data, error } = await supabaseClient.auth.updateUser({ password: newPassword });
+                if (error) throw error;
+                alert('Senha atualizada com sucesso!');
+                await handleSignOut();
+            } catch (error) { alert('Erro ao atualizar a senha: ' + error.message); }
+        }
+        
+        async function handleUpdateProfile(userId, phone) {
+            try {
+                const { data, error } = await supabaseClient.from('profiles').update({ phone_number: phone }).eq('id', userId);
+                if (error) throw error;
+                await loadUserProfile(userId);
+            } catch(error) { alert('Erro ao salvar o telefone: ' + error.message); }
+        }
+
+        async function loadUserProfile(userId) {
+            if (!userId) return;
+            try {
+                const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
+                if (error) throw error;
+                state.profile = data;
+                
+                if (!state.profile.phone_number) {
+                    showScreen('complete-profile-screen');
+                } else {
+                    document.getElementById('welcome-message').textContent = `Olá, ${state.profile.full_name}!`;
+                    showScreen('user-screen');
+                }
+            } catch (error) { console.error('Erro ao buscar perfil:', error.message); handleSignOut(); }
+        }
+
+        function initializeAutocomplete() {
+            const originInput = document.getElementById('origin');
+            const destinationInput = document.getElementById('destination');
+            const options = { types: ['address'], componentRestrictions: { 'country': 'br' } };
+            new google.maps.places.Autocomplete(originInput, options);
+            new google.maps.places.Autocomplete(destinationInput, options);
+        }
+
+        async function handleRequestRide(origin, destination) {
+            if (!state.user) { alert("Você precisa estar logado para solicitar uma viagem."); return; }
+            try {
+                const newRide = { passenger_id: state.user.id, origin_address: origin, destinations: [destination], status: 'requested', origin_location: 'POINT(0 0)' };
+                const { data, error } = await supabaseClient.from('rides').insert(newRide).select().single();
+                if (error) throw error;
+                alert("Sua viagem foi solicitada!");
+                document.getElementById('ride-request-form').reset();
+                document.getElementById('ride-status-container').classList.remove('hidden');
+                document.getElementById('ride-status-message').textContent = `Procurando motorista... (ID da Corrida: ${data.id})`;
+            } catch(error) { alert("Erro ao solicitar a viagem: " + error.message); }
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('login-form').addEventListener('submit', (e) => { e.preventDefault(); handleSignIn(document.getElementById('login-email').value, document.getElementById('login-password').value); });
+            document.getElementById('forgot-password-form').addEventListener('submit', (e) => { e.preventDefault(); handlePasswordReset(document.getElementById('forgot-email').value); });
+            document.getElementById('update-password-form').addEventListener('submit', (e) => { e.preventDefault(); handleUpdatePassword(document.getElementById('update-password').value); });
+            document.getElementById('complete-profile-form').addEventListener('submit', (e) => { e.preventDefault(); const phone = document.getElementById('profile-phone').value; handleUpdateProfile(state.user.id, phone); });
+            document.getElementById('signup-form').addEventListener('submit', (e) => { e.preventDefault(); handleSignUp(document.getElementById('signup-fullname').value, document.getElementById('signup-email').value, document.getElementById('signup-phone').value, document.getElementById('signup-password').value); });
+            document.getElementById('ride-request-form').addEventListener('submit', (e) => { e.preventDefault(); handleRequestRide(document.getElementById('origin').value, document.getElementById('destination').value); });
+            
+            supabaseClient.auth.onAuthStateChange(async (event, session) => {
+                if (event === 'PASSWORD_RECOVERY') {
+                    showScreen('update-password-screen');
+                } else if (event === 'SIGNED_IN') {
+                    state.user = session.user;
+                    await loadUserProfile(session.user.id);
+                } else if (event === 'SIGNED_OUT') {
+                    state.user = null;
+                    state.profile = null;
+                    showScreen('login-screen');
+                }
+            });
+            
+            async function checkInitialSession() {
+                try {
+                    const { data: { session } } = await supabaseClient.auth.getSession();
+                    if (session) {
+                        state.user = session.user;
+                        if (!window.location.hash.includes('type=recovery')) {
+                            await loadUserProfile(session.user.id);
+                        }
+                    } else {
+                        showScreen('login-screen');
+                    }
+                } catch (error) {
+                    console.error("Erro crítico na inicialização da sessão:", error);
+                    showScreen('login-screen');
+                }
+            }
+
+            checkInitialSession();
+            initializeAutocomplete();
+        });
+    </script>
+</body>
+</html>
