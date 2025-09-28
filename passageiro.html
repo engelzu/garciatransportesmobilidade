@@ -31,34 +31,32 @@
 
         <div id="loading-screen" class="screen active text-center"><div class="loader mx-auto"></div><p class="mt-4">Carregando...</p></div>
 
-        <div id="login-screen" class="screen space-y-4">
+        <div id="login-screen" class="screen space-y-3">
             
-            <img src="images/logogarcia.png" alt="Logo Garcia Transportes" class="mx-auto h-20 w-auto mb-8">
+            <img src="images/logogarcia.png" alt="Logo Garcia Transportes" class="mx-auto h-16 w-auto mb-6">
             <h2 class="text-3xl font-bold text-center">Login</h2>
             
-            <div class="space-y-3">
+            <div class="space-y-3 pt-2">
                 <button onclick="handleSignInWithGoogle()" class="w-full py-3 font-semibold rounded-lg bg-white text-gray-800 hover:bg-gray-200 flex items-center justify-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.222,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.988,36.635,44,31.023,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
                     Entrar com Google
                 </button>
                 
                 <button onclick="handleSignInWithFacebook()" class="w-full py-3 font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48">
-                        <path fill="#3F51B5" d="M42,37c0,2.762-2.238,5-5,5H11c-2.761,0-5-2.238-5-5V11c0-2.762,2.239-5,5-5h26c2.762,0,5,2.238,5,5V37z"></path><path fill="#FFF" d="M34.368,25H31v13h-5V25h-3v-4h3v-2.41c0-3.408,1.72-5.59,5.592-5.59H35v4h-2.287C31.104,17,31,17.6,31,18.723V21h4L34.368,25z"></path>
-                    </svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#3F51B5" d="M42,37c0,2.762-2.238,5-5,5H11c-2.761,0-5-2.238-5-5V11c0-2.762,2.239-5,5-5h26c2.762,0,5,2.238,5,5V37z"></path><path fill="#FFF" d="M34.368,25H31v13h-5V25h-3v-4h3v-2.41c0-3.408,1.72-5.59,5.592-5.59H35v4h-2.287C31.104,17,31,17.6,31,18.723V21h4L34.368,25z"></path></svg>
                     Entrar com Facebook
                 </button>
             </div>
 
-            <div class="relative flex py-2 items-center"><div class="flex-grow border-t border-gray-600"></div><span class="flex-shrink mx-4 text-gray-400">OU</span><div class="flex-grow border-t border-gray-600"></div></div>
+            <div class="relative flex py-1 items-center"><div class="flex-grow border-t border-gray-600"></div><span class="flex-shrink mx-4 text-gray-400">OU</span><div class="flex-grow border-t border-gray-600"></div></div>
 
-            <form id="login-form" class="space-y-4">
-                <div><label for="login-email" class="block mb-2 text-sm font-medium">E-mail</label><input type="email" id="login-email" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
-                <div><label for="login-password" class="block mb-2 text-sm font-medium">Senha</label><input type="password" id="login-password" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
+            <form id="login-form" class="space-y-3">
+                <div><label for="login-email" class="block mb-1 text-sm font-medium">E-mail</label><input type="email" id="login-email" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
+                <div><label for="login-password" class="block mb-1 text-sm font-medium">Senha</label><input type="password" id="login-password" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
                 <button type="submit" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENTRAR</button>
             </form>
             <div class="text-center"><a href="#" onclick="showScreen('forgot-password-screen')" class="text-sm text-indigo-400">Esqueceu a senha?</a></div>
-            <p class="text-center">Não tem uma conta? <a href="#" onclick="showScreen('signup-screen')" class="font-semibold text-indigo-400">Cadastre-se</a></p>
+            <p class="text-center text-sm">Não tem uma conta? <a href="#" onclick="showScreen('signup-screen')" class="font-semibold text-indigo-400">Cadastre-se</a></p>
         </div>
         
         <div id="forgot-password-screen" class="screen space-y-4">
@@ -91,16 +89,16 @@
             </form>
         </div>
 
-        <div id="signup-screen" class="screen space-y-4">
+        <div id="signup-screen" class="screen space-y-3">
             <h2 class="text-3xl font-bold text-center">Cadastro</h2>
-            <form id="signup-form" class="space-y-4">
-                <div><label for="signup-fullname" class="block mb-2 text-sm font-medium">Nome Completo</label><input type="text" id="signup-fullname" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
-                <div><label for="signup-email" class="block mb-2 text-sm font-medium">E-mail</label><input type="email" id="signup-email" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
-                <div><label for="signup-phone" class="block mb-2 text-sm font-medium">Telefone</label><input type="tel" id="signup-phone" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" placeholder="(XX) XXXXX-XXXX" required></div>
-                <div><label for="signup-password" class="block mb-2 text-sm font-medium">Senha</label><input type="password" id="signup-password" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
+            <form id="signup-form" class="space-y-3">
+                <div><label for="signup-fullname" class="block mb-1 text-sm font-medium">Nome Completo</label><input type="text" id="signup-fullname" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
+                <div><label for="signup-email" class="block mb-1 text-sm font-medium">E-mail</label><input type="email" id="signup-email" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
+                <div><label for="signup-phone" class="block mb-1 text-sm font-medium">Telefone</label><input type="tel" id="signup-phone" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" placeholder="(XX) XXXXX-XXXX" required></div>
+                <div><label for="signup-password" class="block mb-1 text-sm font-medium">Senha</label><input type="password" id="signup-password" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
                 <button type="submit" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">CADASTRAR</button>
             </form>
-            <p class="text-center">Já tem uma conta? <a href="#" onclick="showScreen('login-screen')" class="font-semibold text-indigo-400">Faça o login</a></p>
+            <p class="text-center text-sm">Já tem uma conta? <a href="#" onclick="showScreen('login-screen')" class="font-semibold text-indigo-400">Faça o login</a></p>
         </div>
 
         <div id="user-screen" class="screen space-y-6">
@@ -165,19 +163,11 @@
             } catch (error) { alert('Erro ao tentar login com Google: ' + error.message); }
         }
 
-        // NOVA FUNÇÃO: LOGIN COM FACEBOOK
         async function handleSignInWithFacebook() {
             try {
-                const { data, error } = await supabaseClient.auth.signInWithOAuth({
-                    provider: 'facebook',
-                    options: {
-                        redirectTo: 'https://garciatransportesmobilidade.vercel.app/passageiro.html'
-                    }
-                });
+                const { data, error } = await supabaseClient.auth.signInWithOAuth({ provider: 'facebook', options: { redirectTo: 'https://garciatransportesmobilidade.vercel.app/passageiro.html' } });
                 if (error) throw error;
-            } catch (error) {
-                alert('Erro ao tentar login com Facebook: ' + error.message);
-            }
+            } catch (error) { alert('Erro ao tentar login com Facebook: ' + error.message); }
         }
 
         async function handleSignOut() { await supabaseClient.auth.signOut(); }
