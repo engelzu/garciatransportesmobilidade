@@ -20,17 +20,27 @@
 </head>
 <body class="min-h-screen">
 
-    <div id="login-screen" class="screen active flex items-center justify-center min-h-screen">
-        <div class="w-full max-w-sm space-y-4 p-4">
-            <img src="images/logogarcia.png" alt="Logo Garcia Transportes" class="mx-auto h-20 w-auto mb-8">
-            <h2 class="text-3xl font-bold text-center">Painel de Administração</h2>
-            <form id="login-form" class="space-y-4">
-                <div>
-                    <label for="admin-password" class="block mb-2 text-sm font-medium">Senha de Administrador</label>
-                    <input type="password" id="admin-password" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required>
-                </div>
-                <button type="submit" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENTRAR</button>
-            </form>
+    <div id="loading-screen" class="screen active flex items-center justify-center min-h-screen">
+        <div class="loader"></div>
+    </div>
+
+    <div id="login-screen" class="screen">
+        <div class="flex items-center justify-center min-h-screen">
+            <div class="w-full max-w-sm space-y-4 p-4">
+                <img src="images/logogarcia.png" alt="Logo Garcia Transportes" class="mx-auto h-20 w-auto mb-8">
+                <h2 class="text-3xl font-bold text-center">Painel de Administração</h2>
+                <form id="login-form" class="space-y-4">
+                    <div>
+                        <label for="admin-email" class="block mb-2 text-sm font-medium">E-mail de Administrador</label>
+                        <input type="email" id="admin-email" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required>
+                    </div>
+                    <div>
+                        <label for="admin-password" class="block mb-2 text-sm font-medium">Senha</label>
+                        <input type="password" id="admin-password" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required>
+                    </div>
+                    <button type="submit" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENTRAR</button>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -41,82 +51,49 @@
         </header>
 
         <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
             <div class="lg:col-span-1 space-y-6">
                 <div class="card">
                     <h2 class="text-xl font-semibold mb-4">Aprovações de Motoristas Pendentes</h2>
-                    <div id="pending-drivers-list" class="space-y-4">
-                        </div>
+                    <div id="pending-drivers-list" class="space-y-4"></div>
                 </div>
             </div>
-
             <div class="lg:col-span-2 space-y-6">
                  <div class="card">
                     <h2 class="text-xl font-semibold mb-4">Corridas Solicitadas (Aguardando Atribuição)</h2>
-                    <div id="requested-rides-list" class="space-y-4">
-                        </div>
+                    <div id="requested-rides-list" class="space-y-4"></div>
                 </div>
                 <div class="card">
                     <h2 class="text-xl font-semibold mb-4">Corridas em Andamento</h2>
-                    <div id="ongoing-rides-list" class="space-y-4">
-                        </div>
+                    <div id="ongoing-rides-list" class="space-y-4"></div>
                 </div>
             </div>
-
         </main>
     </div>
 
     <script>
-        // --- 1. CONFIGURAÇÃO E ESTADO ---
         const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
-        // SENHA SIMPLES PARA O PAINEL. MUDE SE QUISER.
-        const ADMIN_PASSWORD = "admin"; 
-
-        const state = {
-            profiles: [],
-            driverDetails: [],
-            rides: [],
-        };
+        const state = { profiles: [], driverDetails: [], rides: [] };
 
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
         }
 
-        // --- 2. LÓGICA DE AUTENTICAÇÃO ---
-        function handleAdminLogin(password) {
-            if (password === ADMIN_PASSWORD) {
-                sessionStorage.setItem('isAdminLoggedIn', 'true'); // Usa sessionStorage para manter o login na aba
-                showScreen('admin-dashboard');
-                loadAdminData();
-            } else {
-                alert('Senha incorreta!');
-            }
+        async function handleAdminLogin(email, password) {
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) alert('E-mail ou senha incorretos!');
         }
 
-        function handleSignOut() {
-            sessionStorage.removeItem('isAdminLoggedIn');
-            showScreen('login-screen');
-        }
+        async function handleSignOut() { await supabaseClient.auth.signOut(); }
 
-        function checkAdminSession() {
-            if (sessionStorage.getItem('isAdminLoggedIn') === 'true') {
-                showScreen('admin-dashboard');
-                loadAdminData();
-            } else {
-                showScreen('login-screen');
-            }
-        }
-
-        // --- 3. CARREGAMENTO E RENDERIZAÇÃO DE DADOS ---
         async function loadAdminData() {
-            // Carrega todos os dados necessários de uma vez
+            showScreen('admin-dashboard');
             const { data: profiles, error: pError } = await supabaseClient.from('profiles').select('*');
             const { data: driverDetails, error: ddError } = await supabaseClient.from('driver_details').select('*');
-            const { data: rides, error: rError } = await supabaseClient.from('rides').select('*, profiles(*)');
+            const { data: rides, error: rError } = await supabaseClient.from('rides').select('*, passenger:profiles!rides_passenger_id_fkey(*)');
 
             if (pError || ddError || rError) {
                 console.error("Erro ao carregar dados:", pError || ddError || rError);
@@ -125,7 +102,6 @@
             state.profiles = profiles;
             state.driverDetails = driverDetails;
             state.rides = rides;
-
             renderAllSections();
         }
 
@@ -138,46 +114,34 @@
         function renderPendingDrivers() {
             const list = document.getElementById('pending-drivers-list');
             const pendingDrivers = state.driverDetails.filter(d => d.approval_status === 'pending');
-            
             if (pendingDrivers.length === 0) {
-                list.innerHTML = `<p class="text-gray-400">Nenhum motorista aguardando aprovação.</p>`;
-                return;
+                list.innerHTML = `<p class="text-gray-400">Nenhum motorista aguardando aprovação.</p>`; return;
             }
-            
             list.innerHTML = pendingDrivers.map(detail => {
                 const profile = state.profiles.find(p => p.id === detail.profile_id);
                 if (!profile) return '';
-                return `
-                    <div class="p-3 rounded-lg bg-gray-700/50 border border-gray-600">
+                return `<div class="p-3 rounded-lg bg-gray-700/50 border border-gray-600">
                         <p class="font-bold">${profile.full_name}</p>
                         <p class="text-sm text-gray-300">${detail.car_model} - ${detail.license_plate}</p>
                         <button onclick="approveDriver('${detail.profile_id}')" class="w-full mt-2 py-1.5 text-sm font-semibold rounded-md bg-green-600 hover:bg-green-700">Aprovar</button>
-                    </div>
-                `;
+                    </div>`;
             }).join('');
         }
 
         function renderRequestedRides() {
             const list = document.getElementById('requested-rides-list');
             const requestedRides = state.rides.filter(r => r.status === 'requested');
-            
             if (requestedRides.length === 0) {
-                list.innerHTML = `<p class="text-gray-400">Nenhuma corrida solicitada no momento.</p>`;
-                return;
+                list.innerHTML = `<p class="text-gray-400">Nenhuma corrida solicitada no momento.</p>`; return;
             }
-
-            // Filtra motoristas que estão aprovados e online
             const availableDrivers = state.driverDetails
                 .filter(d => d.approval_status === 'approved' && d.work_status === 'online')
                 .map(d => state.profiles.find(p => p.id === d.profile_id));
-
             list.innerHTML = requestedRides.map(ride => {
-                const passenger = ride.profiles;
+                const passenger = ride.passenger;
                 const driverOptions = availableDrivers.map(driver => `<option value="${driver.id}">${driver.full_name}</option>`).join('');
-
-                return `
-                    <div class="p-3 rounded-lg bg-gray-700/50 border border-gray-600">
-                        <p><strong>Passageiro:</strong> ${passenger.full_name}</p>
+                return `<div class="p-3 rounded-lg bg-gray-700/50 border border-gray-600">
+                        <p><strong>Passageiro:</strong> ${passenger?.full_name || 'N/A'}</p>
                         <p class="text-sm"><strong>Origem:</strong> ${ride.origin_address}</p>
                         <p class="text-sm"><strong>Destino:</strong> ${Array.isArray(ride.destinations) ? ride.destinations.join(', ') : ride.destinations}</p>
                         <div class="mt-3 flex gap-2 items-center">
@@ -187,8 +151,7 @@
                             </select>
                             <button onclick="assignDriver('${ride.id}')" class="py-2 px-4 font-semibold rounded-md bg-indigo-600 hover:bg-indigo-700 text-sm whitespace-nowrap">Atribuir</button>
                         </div>
-                    </div>
-                `;
+                    </div>`;
             }).join('');
         }
         
@@ -196,86 +159,56 @@
             const list = document.getElementById('ongoing-rides-list');
             const ongoingStatuses = ['assigned', 'accepted', 'arrived_pickup', 'in_progress'];
             const ongoingRides = state.rides.filter(r => ongoingStatuses.includes(r.status));
-            
             if (ongoingRides.length === 0) {
-                list.innerHTML = `<p class="text-gray-400">Nenhuma corrida em andamento.</p>`;
-                return;
+                list.innerHTML = `<p class="text-gray-400">Nenhuma corrida em andamento.</p>`; return;
             }
-            
             list.innerHTML = ongoingRides.map(ride => {
-                const passenger = ride.profiles;
+                const passenger = ride.passenger;
                 const driver = state.profiles.find(p => p.id === ride.driver_id);
-                return `
-                    <div class="p-3 rounded-lg bg-gray-700/50 border border-gray-600 text-sm">
+                return `<div class="p-3 rounded-lg bg-gray-700/50 border border-gray-600 text-sm">
                         <p><strong>Passageiro:</strong> ${passenger?.full_name || 'N/A'}</p>
                         <p><strong>Motorista:</strong> ${driver?.full_name || 'N/A'}</p>
                         <p><strong>Status:</strong> <span class="font-semibold text-yellow-400">${ride.status.toUpperCase()}</span></p>
-                    </div>
-                `;
+                    </div>`;
             }).join('');
         }
 
-        // --- 4. FUNÇÕES DE AÇÃO DO ADMIN ---
         async function approveDriver(profileId) {
-            const { error } = await supabaseClient
-                .from('driver_details')
-                .update({ approval_status: 'approved' })
-                .eq('profile_id', profileId);
-            
-            if (error) {
-                alert('Erro ao aprovar motorista.');
-                console.error(error);
-            } else {
-                alert('Motorista aprovado com sucesso!');
-                // Não precisa recarregar tudo, apenas atualiza o estado local e renderiza de novo
-                const detailIndex = state.driverDetails.findIndex(d => d.profile_id === profileId);
-                if (detailIndex > -1) state.driverDetails[detailIndex].approval_status = 'approved';
-                renderAllSections();
-            }
+            const { error } = await supabaseClient.from('driver_details').update({ approval_status: 'approved' }).eq('profile_id', profileId);
+            if (error) { alert('Erro ao aprovar motorista.'); console.error(error); } 
+            else { alert('Motorista aprovado com sucesso!'); }
         }
         
         async function assignDriver(rideId) {
             const selectElement = document.getElementById(`driver-select-${rideId}`);
             const driverId = selectElement.value;
-
-            if (!driverId) {
-                return alert('Por favor, selecione um motorista.');
-            }
-            
-            const { error } = await supabaseClient
-                .from('rides')
-                .update({ driver_id: driverId, status: 'assigned' })
-                .eq('id', rideId);
-            
-            if (error) {
-                alert('Erro ao atribuir corrida.');
-                console.error(error);
-            } else {
-                alert('Corrida atribuída com sucesso!');
-                // A atualização em tempo real deve cuidar de remover este item da lista
-            }
+            if (!driverId) return alert('Por favor, selecione um motorista.');
+            const { error } = await supabaseClient.from('rides').update({ driver_id: driverId, status: 'assigned' }).eq('id', rideId);
+            if (error) { alert('Erro ao atribuir corrida.'); console.error(error); } 
+            else { alert('Corrida atribuída com sucesso!'); }
         }
         
-        // --- 5. INICIALIZAÇÃO E LISTENERS ---
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('login-form').addEventListener('submit', (e) => {
                 e.preventDefault();
-                handleAdminLogin(document.getElementById('admin-password').value);
+                handleAdminLogin(document.getElementById('admin-email').value, document.getElementById('admin-password').value);
             });
             
-            // Inicia a verificação de sessão
-            checkAdminSession();
-            
-            // Configura os listeners de tempo real
             supabaseClient.channel('public-changes')
                 .on('postgres_changes', { event: '*', schema: 'public' }, payload => {
                     console.log('Mudança detectada:', payload);
-                    // Recarrega todos os dados quando qualquer coisa mudar
                     loadAdminData();
                 })
                 .subscribe();
-        });
 
+            supabaseClient.auth.onAuthStateChange((event, session) => {
+                if (session) {
+                    loadAdminData();
+                } else {
+                    showScreen('login-screen');
+                }
+            });
+        });
     </script>
 </body>
 </html>
