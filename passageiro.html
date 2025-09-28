@@ -132,9 +132,17 @@
         
         async function handleSignInWithGoogle() {
             try {
-                const { data, error } = await supabaseClient.auth.signInWithOAuth({ provider: 'google' });
+                // CORREÇÃO CRÍTICA AQUI
+                const { data, error } = await supabaseClient.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                        redirectTo: 'https://garciatransportesmobilidade.vercel.app/passageiro.html'
+                    }
+                });
                 if (error) throw error;
-            } catch (error) { alert('Erro ao tentar login com Google: ' + error.message); }
+            } catch (error) {
+                alert('Erro ao tentar login com Google: ' + error.message);
+            }
         }
 
         async function handleSignOut() { await supabaseClient.auth.signOut(); }
