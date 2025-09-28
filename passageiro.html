@@ -92,7 +92,14 @@
         </div>
 
         <div id="user-screen" class="screen space-y-6">
-            <div class="flex justify-between items-center"><h2 class="text-2xl font-bold">Solicitar Viagem</h2><button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700">Sair</button></div>
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <img src="image/user.png" alt="Ícone do Usuário" class="w-8 h-8">
+                    <h2 class="text-2xl font-bold">Solicitar Viagem</h2>
+                </div>
+                <button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700">Sair</button>
+            </div>
+
             <p id="welcome-message" class="text-lg"></p>
             
             <form id="ride-request-form" class="space-y-4">
@@ -198,7 +205,6 @@
             new google.maps.places.Autocomplete(destinationInput, options);
         }
 
-        // NOVA FUNÇÃO: PEGA A LOCALIZAÇÃO ATUAL DO USUÁRIO
         async function useCurrentLocation() {
             if (!navigator.geolocation) {
                 alert('Geolocalização não é suportada pelo seu navegador.');
@@ -246,17 +252,15 @@
             }
         }
 
-
         async function handleRequestRide(origin, destination) {
             if (!state.user) { alert("Você precisa estar logado para solicitar uma viagem."); return; }
             try {
-                // Futuramente, aqui iremos converter o endereço para coordenadas antes de salvar
                 const newRide = { 
                     passenger_id: state.user.id, 
                     origin_address: origin, 
                     destinations: [destination], 
                     status: 'requested', 
-                    origin_location: 'POINT(0 0)' // Placeholder
+                    origin_location: 'POINT(0 0)' 
                 };
                 const { data, error } = await supabaseClient.from('rides').insert(newRide).select().single();
                 if (error) throw error;
