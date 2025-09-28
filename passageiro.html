@@ -13,14 +13,12 @@
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDZt7BabbQJ3UaLSQYChtMhieikDlqvpLg&libraries=places"></script>
     
     <style>
-        /* ALTERAÇÃO AQUI: Cor de fundo alterada para 'black' */
         body { font-family: 'Poppins', sans-serif; background-color: black; color: white; }
         .screen { display: none; }
         .screen.active { display: block; }
         .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #6d28d9; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* Estilo para o autocomplete do Google (ajustado para o fundo preto) */
-        .pac-container { background-color: #1f2937; border-radius: 8px; border: 1px solid #4B5563; }
+        .pac-container { background-color: #1F2937; border-radius: 8px; border: 1px solid #4B5563; }
         .pac-item { padding: 10px; font-size: 14px; color: #D1D5DB; cursor: pointer; border-top: 1px solid #374151;}
         .pac-item:first-child { border-top: none; }
         .pac-item:hover { background-color: #374151; }
@@ -38,10 +36,20 @@
             <img src="images/logogarcia.png" alt="Logo Garcia Transportes" class="mx-auto h-20 w-auto mb-8">
             <h2 class="text-3xl font-bold text-center">Login</h2>
             
-            <button onclick="handleSignInWithGoogle()" class="w-full py-3 font-semibold rounded-lg bg-white text-gray-800 hover:bg-gray-200 flex items-center justify-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.222,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.988,36.635,44,31.023,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
-                Entrar com Google
-            </button>
+            <div class="space-y-3">
+                <button onclick="handleSignInWithGoogle()" class="w-full py-3 font-semibold rounded-lg bg-white text-gray-800 hover:bg-gray-200 flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.222,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.988,36.635,44,31.023,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
+                    Entrar com Google
+                </button>
+                
+                <button onclick="handleSignInWithFacebook()" class="w-full py-3 font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48">
+                        <path fill="#3F51B5" d="M42,37c0,2.762-2.238,5-5,5H11c-2.761,0-5-2.238-5-5V11c0-2.762,2.239-5,5-5h26c2.762,0,5,2.238,5,5V37z"></path><path fill="#FFF" d="M34.368,25H31v13h-5V25h-3v-4h3v-2.41c0-3.408,1.72-5.59,5.592-5.59H35v4h-2.287C31.104,17,31,17.6,31,18.723V21h4L34.368,25z"></path>
+                    </svg>
+                    Entrar com Facebook
+                </button>
+            </div>
+
             <div class="relative flex py-2 items-center"><div class="flex-grow border-t border-gray-600"></div><span class="flex-shrink mx-4 text-gray-400">OU</span><div class="flex-grow border-t border-gray-600"></div></div>
 
             <form id="login-form" class="space-y-4">
@@ -155,6 +163,21 @@
                 const { data, error } = await supabaseClient.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: 'https://garciatransportesmobilidade.vercel.app/passageiro.html' } });
                 if (error) throw error;
             } catch (error) { alert('Erro ao tentar login com Google: ' + error.message); }
+        }
+
+        // NOVA FUNÇÃO: LOGIN COM FACEBOOK
+        async function handleSignInWithFacebook() {
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithOAuth({
+                    provider: 'facebook',
+                    options: {
+                        redirectTo: 'https://garciatransportesmobilidade.vercel.app/passageiro.html'
+                    }
+                });
+                if (error) throw error;
+            } catch (error) {
+                alert('Erro ao tentar login com Facebook: ' + error.message);
+            }
         }
 
         async function handleSignOut() { await supabaseClient.auth.signOut(); }
