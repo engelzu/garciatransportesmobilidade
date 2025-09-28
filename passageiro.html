@@ -94,11 +94,20 @@
         <div id="user-screen" class="screen space-y-6">
             <div class="flex justify-between items-center"><h2 class="text-2xl font-bold">Solicitar Viagem</h2><button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700">Sair</button></div>
             <p id="welcome-message" class="text-lg"></p>
+            
             <form id="ride-request-form" class="space-y-4">
-                 <div><label for="origin" class="block mb-2 text-sm font-medium">Origem</label><input type="text" id="origin" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600" placeholder="Digite o endereço de partida" required></div>
-                <div><label for="destination" class="block mb-2 text-sm font-medium">Destino</label><input type="text" id="destination" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600" placeholder="Digite o destino" required></div>
+                 <div>
+                    <label for="origin" class="block mb-2 text-sm font-medium">Origem</label>
+                    <input type="text" id="origin" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600" placeholder="Digite o endereço de partida" required>
+                    <button type="button" onclick="useCurrentLocation()" id="location-button" class="w-full mt-2 py-2 px-4 text-sm font-semibold rounded-lg bg-gray-600 hover:bg-gray-700">Usar Localização Atual</button>
+                </div>
+                <div>
+                    <label for="destination" class="block mb-2 text-sm font-medium">Destino</label>
+                    <input type="text" id="destination" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600" placeholder="Digite o destino" required>
+                </div>
                 <button type="submit" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">SOLICITAR AGORA</button>
             </form>
+
             <div id="ride-status-container" class="hidden"><h3 class="text-xl font-bold">Status da sua Viagem</h3><p id="ride-status-message" class="mt-2 p-4 bg-gray-800 rounded-lg"></p></div>
         </div>
     </div>
@@ -132,17 +141,9 @@
         
         async function handleSignInWithGoogle() {
             try {
-                // CORREÇÃO CRÍTICA AQUI
-                const { data, error } = await supabaseClient.auth.signInWithOAuth({
-                    provider: 'google',
-                    options: {
-                        redirectTo: 'https://garciatransportesmobilidade.vercel.app/passageiro.html'
-                    }
-                });
+                const { data, error } = await supabaseClient.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: 'https://garciatransportesmobilidade.vercel.app/passageiro.html' } });
                 if (error) throw error;
-            } catch (error) {
-                alert('Erro ao tentar login com Google: ' + error.message);
-            }
+            } catch (error) { alert('Erro ao tentar login com Google: ' + error.message); }
         }
 
         async function handleSignOut() { await supabaseClient.auth.signOut(); }
@@ -197,10 +198,66 @@
             new google.maps.places.Autocomplete(destinationInput, options);
         }
 
+        // NOVA FUNÇÃO: PEGA A LOCALIZAÇÃO ATUAL DO USUÁRIO
+        async function useCurrentLocation() {
+            if (!navigator.geolocation) {
+                alert('Geolocalização não é suportada pelo seu navegador.');
+                return;
+            }
+
+            const originInput = document.getElementById('origin');
+            const locationButton = document.getElementById('location-button');
+
+            originInput.value = 'Obtendo localização...';
+            locationButton.disabled = true;
+
+            try {
+                const position = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    });
+                });
+
+                const latLng = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+
+                const geocoder = new google.maps.Geocoder();
+                geocoder.geocode({ location: latLng }, (results, status) => {
+                    if (status === 'OK' && results[0]) {
+                        originInput.value = results[0].formatted_address;
+                    } else {
+                        alert('Não foi possível encontrar o endereço para sua localização.');
+                        originInput.value = '';
+                    }
+                });
+            } catch (error) {
+                let errorMessage = 'Não foi possível obter sua localização.';
+                if (error.code === 1) {
+                    errorMessage = 'Você negou a permissão de localização. Habilite nas configurações do seu navegador.';
+                }
+                alert(errorMessage);
+                originInput.value = '';
+            } finally {
+                locationButton.disabled = false;
+            }
+        }
+
+
         async function handleRequestRide(origin, destination) {
             if (!state.user) { alert("Você precisa estar logado para solicitar uma viagem."); return; }
             try {
-                const newRide = { passenger_id: state.user.id, origin_address: origin, destinations: [destination], status: 'requested', origin_location: 'POINT(0 0)' };
+                // Futuramente, aqui iremos converter o endereço para coordenadas antes de salvar
+                const newRide = { 
+                    passenger_id: state.user.id, 
+                    origin_address: origin, 
+                    destinations: [destination], 
+                    status: 'requested', 
+                    origin_location: 'POINT(0 0)' // Placeholder
+                };
                 const { data, error } = await supabaseClient.from('rides').insert(newRide).select().single();
                 if (error) throw error;
                 alert("Sua viagem foi solicitada!");
