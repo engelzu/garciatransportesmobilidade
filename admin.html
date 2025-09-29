@@ -84,23 +84,20 @@
 
         async function handleAdminLogin(email, password) {
             const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) {
-                alert('E-mail ou senha incorretos!');
-            }
+            if (error) alert('E-mail ou senha incorretos!');
         }
 
-        async function handleSignOut() { 
-            await supabaseClient.auth.signOut();
-        }
+        async function handleSignOut() { await supabaseClient.auth.signOut(); }
 
         async function loadAdminData() {
             const { data: profiles, error: pError } = await supabaseClient.from('profiles').select('*');
             const { data: driverDetails, error: ddError } = await supabaseClient.from('driver_details').select('*');
-            const { data: rides, error: rError } = await supabaseClient.from('rides').select('*, passenger:profiles!rides_passenger_id_fkey(*)');
+            // CORREÇÃO: Usando a forma mais simples e robusta de buscar os dados do passageiro
+            const { data: rides, error: rError } = await supabaseClient.from('rides').select('*, profiles(*)');
 
             if (pError || ddError || rError) {
                 console.error("Erro ao carregar dados:", pError || ddError || rError);
-                alert("Não foi possível carregar os dados do painel. Verifique as permissões (RLS).");
+                alert("Não foi possível carregar os dados do painel. Verifique as permissões (RLS) e o console.");
                 return;
             }
             state.profiles = profiles;
@@ -138,7 +135,8 @@
                 .filter(d => d.approval_status === 'approved' && d.work_status === 'online')
                 .map(d => state.profiles.find(p => p.id === d.profile_id)).filter(Boolean);
             list.innerHTML = requestedRides.map(ride => {
-                const passenger = ride.passenger;
+                // CORREÇÃO: Acessando o perfil do passageiro da forma correta
+                const passenger = ride.profiles;
                 const driverOptions = availableDrivers.map(driver => `<option value="${driver.id}">${driver.full_name}</option>`).join('');
                 return `<div class="p-3 rounded-lg bg-gray-700/50 border border-gray-600">
                         <p><strong>Passageiro:</strong> ${passenger?.full_name || 'N/A'}</p>
@@ -161,7 +159,8 @@
             const ongoingRides = state.rides.filter(r => ongoingStatuses.includes(r.status));
             if (ongoingRides.length === 0) { list.innerHTML = `<p class="text-gray-400">Nenhuma corrida em andamento.</p>`; return; }
             list.innerHTML = ongoingRides.map(ride => {
-                const passenger = ride.passenger;
+                // CORREÇÃO: Acessando o perfil do passageiro da forma correta
+                const passenger = ride.profiles;
                 const driver = state.profiles.find(p => p.id === ride.driver_id);
                 return `<div class="p-3 rounded-lg bg-gray-700/50 border border-gray-600 text-sm">
                         <p><strong>Passageiro:</strong> ${passenger?.full_name || 'N/A'}</p>
@@ -194,7 +193,6 @@
             
             supabaseClient.channel('public-changes')
                 .on('postgres_changes', { event: '*', schema: 'public' }, payload => {
-                    console.log('Mudança detectada:', payload);
                     if (document.getElementById('admin-dashboard').classList.contains('active')) {
                         loadAdminData();
                     }
@@ -202,23 +200,31 @@
                 .subscribe();
 
             async function checkInitialSession() {
-                const { data: { session } } = await supabaseClient.auth.getSession();
-                if (session && session.user) {
-                    const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', session.user.id).single();
-                    if (profile && profile.role === 'admin') {
-                        showScreen('admin-dashboard');
-                        await loadAdminData();
+                try {
+                    const { data: { session } } = await supabaseClient.auth.getSession();
+                    if (session && session.user) {
+                        const { data: profile, error } = await supabaseClient.from('profiles').select('role').eq('id', session.user.id).single();
+
+                        if (error) throw error; // Lança o erro para o catch
+
+                        if (profile && profile.role === 'admin') {
+                            showScreen('admin-dashboard');
+                            await loadAdminData();
+                        } else {
+                            showScreen('login-screen');
+                        }
                     } else {
                         showScreen('login-screen');
                     }
-                } else {
+                } catch (error) {
+                    console.error("Erro na verificação de sessão:", error);
                     showScreen('login-screen');
                 }
             }
 
             supabaseClient.auth.onAuthStateChange(async (event, session) => {
                 if (event === 'SIGNED_IN') {
-                    checkInitialSession(); 
+                    await checkInitialSession();
                 } else if (event === 'SIGNED_OUT') {
                     showScreen('login-screen');
                 }
