@@ -72,7 +72,7 @@
 
     <script>
         const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
         const state = { user: null, profiles: [], driverDetails: [], rides: [] };
@@ -83,11 +83,15 @@
         }
 
         async function handleAdminLogin(email, password) {
-            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) alert('E-mail ou senha incorretos!');
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                alert('E-mail ou senha incorretos!');
+            }
         }
 
-        async function handleSignOut() { await supabaseClient.auth.signOut(); }
+        async function handleSignOut() { 
+            await supabaseClient.auth.signOut();
+        }
 
         async function loadAdminData() {
             const { data: profiles, error: pError } = await supabaseClient.from('profiles').select('*');
@@ -96,7 +100,7 @@
 
             if (pError || ddError || rError) {
                 console.error("Erro ao carregar dados:", pError || ddError || rError);
-                alert("Não foi possível carregar os dados do painel.");
+                alert("Não foi possível carregar os dados do painel. Verifique as permissões (RLS).");
                 return;
             }
             state.profiles = profiles;
@@ -197,45 +201,30 @@
                 })
                 .subscribe();
 
-            // ATUALIZAÇÃO: Lógica de inicialização robusta
-            async function checkAdminSession() {
-                try {
-                    const { data: { session } } = await supabaseClient.auth.getSession();
-                    if (session && session.user) {
-                        const { data: profile, error } = await supabaseClient
-                            .from('profiles')
-                            .select('role')
-                            .eq('id', session.user.id)
-                            .single();
-
-                        if (profile && profile.role === 'admin') {
-                            showScreen('admin-dashboard');
-                            await loadAdminData();
-                        } else {
-                            // Se está logado mas não é admin, desloga
-                            await handleSignOut();
-                            showScreen('login-screen');
-                        }
+            async function checkInitialSession() {
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (session && session.user) {
+                    const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', session.user.id).single();
+                    if (profile && profile.role === 'admin') {
+                        showScreen('admin-dashboard');
+                        await loadAdminData();
                     } else {
                         showScreen('login-screen');
                     }
-                } catch (error) {
-                    console.error("Erro na verificação de sessão:", error);
+                } else {
                     showScreen('login-screen');
                 }
             }
 
-            supabaseClient.auth.onAuthStateChange((event, session) => {
-                // onAuthStateChange vai lidar com os eventos de LOGIN e LOGOUT
-                // A verificação inicial é feita por checkAdminSession
+            supabaseClient.auth.onAuthStateChange(async (event, session) => {
                 if (event === 'SIGNED_IN') {
-                    checkAdminSession(); // Re-verifica a role no login
+                    checkInitialSession(); 
                 } else if (event === 'SIGNED_OUT') {
                     showScreen('login-screen');
                 }
             });
 
-            checkAdminSession(); // Executa a verificação inicial
+            checkInitialSession();
         });
     </script>
 </body>
