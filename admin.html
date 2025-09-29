@@ -51,13 +51,13 @@
         </header>
 
         <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="lg-col-span-1 space-y-6">
+            <div class="lg:col-span-1 space-y-6">
                 <div class="card">
                     <h2 class="text-xl font-semibold mb-4">Aprovações de Motoristas Pendentes</h2>
                     <div id="pending-drivers-list" class="space-y-4"></div>
                 </div>
             </div>
-            <div class="lg-col-span-2 space-y-6">
+            <div class="lg:col-span-2 space-y-6">
                  <div class="card">
                     <h2 class="text-xl font-semibold mb-4">Corridas Solicitadas (Aguardando Atribuição)</h2>
                     <div id="requested-rides-list" class="space-y-4"></div>
@@ -72,7 +72,7 @@
 
     <script>
         const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
         const state = { user: null, profiles: [], driverDetails: [], rides: [] };
@@ -83,12 +83,8 @@
         }
 
         async function handleAdminLogin(email, password) {
-            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) {
-                alert('E-mail ou senha incorretos!');
-                return;
-            }
-            // A lógica de verificação de role vai acontecer no onAuthStateChange
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) alert('E-mail ou senha incorretos!');
         }
 
         async function handleSignOut() { await supabaseClient.auth.signOut(); }
@@ -136,7 +132,7 @@
             if (requestedRides.length === 0) { list.innerHTML = `<p class="text-gray-400">Nenhuma corrida solicitada no momento.</p>`; return; }
             const availableDrivers = state.driverDetails
                 .filter(d => d.approval_status === 'approved' && d.work_status === 'online')
-                .map(d => state.profiles.find(p => p.id === d.profile_id)).filter(Boolean); // filter(Boolean) remove nulos
+                .map(d => state.profiles.find(p => p.id === d.profile_id)).filter(Boolean);
             list.innerHTML = requestedRides.map(ride => {
                 const passenger = ride.passenger;
                 const driverOptions = availableDrivers.map(driver => `<option value="${driver.id}">${driver.full_name}</option>`).join('');
@@ -201,30 +197,45 @@
                 })
                 .subscribe();
 
-            // LÓGICA DE INICIALIZAÇÃO E VERIFICAÇÃO DE ROLE
-            supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                if (session && session.user) {
-                    // Se há uma sessão, verifica se o usuário é admin
-                    const { data: profile, error } = await supabaseClient
-                        .from('profiles')
-                        .select('role')
-                        .eq('id', session.user.id)
-                        .single();
+            // ATUALIZAÇÃO: Lógica de inicialização robusta
+            async function checkAdminSession() {
+                try {
+                    const { data: { session } } = await supabaseClient.auth.getSession();
+                    if (session && session.user) {
+                        const { data: profile, error } = await supabaseClient
+                            .from('profiles')
+                            .select('role')
+                            .eq('id', session.user.id)
+                            .single();
 
-                    if (profile && profile.role === 'admin') {
-                        // Se for admin, carrega os dados e mostra o painel
-                        showScreen('admin-dashboard');
-                        await loadAdminData();
+                        if (profile && profile.role === 'admin') {
+                            showScreen('admin-dashboard');
+                            await loadAdminData();
+                        } else {
+                            // Se está logado mas não é admin, desloga
+                            await handleSignOut();
+                            showScreen('login-screen');
+                        }
                     } else {
-                        // Se não for admin, desloga e mostra alerta
-                        alert('Acesso negado. Apenas administradores podem entrar.');
-                        await handleSignOut();
+                        showScreen('login-screen');
                     }
-                } else {
-                    // Se não há sessão, mostra a tela de login
+                } catch (error) {
+                    console.error("Erro na verificação de sessão:", error);
+                    showScreen('login-screen');
+                }
+            }
+
+            supabaseClient.auth.onAuthStateChange((event, session) => {
+                // onAuthStateChange vai lidar com os eventos de LOGIN e LOGOUT
+                // A verificação inicial é feita por checkAdminSession
+                if (event === 'SIGNED_IN') {
+                    checkAdminSession(); // Re-verifica a role no login
+                } else if (event === 'SIGNED_OUT') {
                     showScreen('login-screen');
                 }
             });
+
+            checkAdminSession(); // Executa a verificação inicial
         });
     </script>
 </body>
