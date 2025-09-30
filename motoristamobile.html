@@ -130,7 +130,9 @@
                 state.rideSubscription = null;
             }
             stopLocationTracking();
-            await supabaseClient.from('driver_details').update({ work_status: 'offline' }).eq('profile_id', state.user.id);
+            if(state.user) {
+                await supabaseClient.from('driver_details').update({ work_status: 'offline' }).eq('profile_id', state.user.id);
+            }
             await supabaseClient.auth.signOut();
         }
 
@@ -178,14 +180,9 @@
             state.rideSubscription = supabaseClient
                 .channel('public:rides')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, payload => {
-                    console.log('Mudança recebida!', payload);
                     loadDriverJobs();
                 })
-                .subscribe(status => {
-                    if (status === 'SUBSCRIBED') {
-                        console.log('Conectado ao canal de corridas!');
-                    }
-                });
+                .subscribe();
         }
         
         async function toggleWorkStatus() {
@@ -230,7 +227,6 @@
             if (state.locationWatcher) {
                 navigator.geolocation.clearWatch(state.locationWatcher);
                 state.locationWatcher = null;
-                console.log('Rastreamento parado.');
             }
         }
         
@@ -248,12 +244,11 @@
         async function loadDriverJobs() {
             if (!state.user) return;
             const list = document.getElementById('driver-jobs-list');
-            list.innerHTML = `<div class="loader mx-auto"></div>`;
-
-            // CORREÇÃO AQUI: A consulta foi tornada mais explícita e robusta
+            
+            // CORREÇÃO AQUI: Consulta alterada para ser explícita
             const { data, error } = await supabaseClient
                 .from('rides')
-                .select('*, passenger:profiles!rides_passenger_id_fkey(full_name, phone_number)')
+                .select('*, passenger:passenger_id(full_name, phone_number)')
                 .eq('driver_id', state.user.id)
                 .in('status', ['assigned', 'accepted', 'arrived_pickup', 'in_progress']);
                 
@@ -339,8 +334,8 @@
         
         const ringtone = document.getElementById('ringtone');
         function playRingSound() { ringtone.play().catch(console.error); }
-        function startRinging() { stopRinging(); playRingSound(); document.getElementById('silence-btn').classList.remove('hidden');}
-        function stopRinging() { ringtone.pause(); ringtone.currentTime = 0; document.getElementById('silence-btn').classList.add('hidden');}
+        function startRinging() { stopRinging(); playRingSound(); ringInterval = setInterval(playRingSound, 6000); document.getElementById('silence-btn').classList.remove('hidden');}
+        function stopRinging() { clearInterval(ringInterval); ringInterval = null; ringtone.pause(); ringtone.currentTime = 0; document.getElementById('silence-btn').classList.add('hidden');}
 
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('login-form').addEventListener('submit', (e) => { e.preventDefault(); handleSignIn(document.getElementById('login-email').value, document.getElementById('login-password').value); });
