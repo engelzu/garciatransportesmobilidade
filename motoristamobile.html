@@ -90,7 +90,7 @@
 
     <script>
         const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWKwJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         const state = { user: null, profile: null, driverDetails: null, rides: [], rideSubscription: null, locationWatcher: null };
@@ -149,7 +149,6 @@
         async function loadDriverData(userId) {
             const { data: profileData, error: profileError } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
             if (profileError || !profileData || profileData.user_type !== 'driver') {
-                console.error('Perfil de motorista não encontrado ou erro:', profileError?.message);
                 return handleSignOut();
             }
             state.profile = profileData;
@@ -333,7 +332,7 @@
             }
 
             if (destLat && destLng) {
-                const url = `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`;
+                const url = `http://googleusercontent.com/maps/google.com/1{destLat},${destLng}`;
                 window.open(url, '_blank');
             }
         }
