@@ -63,7 +63,7 @@
         <div id="pending-approval-screen" class="screen text-center space-y-4">
             <h2 class="text-3xl font-bold">Cadastro em Análise</h2>
             <p class="text-gray-400">Obrigado por se cadastrar! Seus dados foram enviados e estão sendo analisados pela nossa equipe.</p>
-            <p class="text-gray-400">Você será notificado assim que seu cadastro for aprovado.</p>
+            <p class="text-400">Você será notificado assim que seu cadastro for aprovado.</p>
             <button onclick="handleSignOut()" class="w-full py-3 font-semibold rounded-lg bg-red-600 hover:bg-red-700">Sair</button>
         </div>
 
@@ -87,7 +87,7 @@
         </div>
     </div>
     
-    <audio id="ringtone" loop preload="auto" src="https://cdn.pixabay.com/download/audio/2022/06/14/audio_a7a9e3ae89.mp3"></audio>
+    <audio id="ringtone" loop preload="auto" src="https://assets.mixkit.co/sfx/preview/mixkit-bell-notification-933.mp3"></audio>
 
     <script>
         const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
@@ -216,6 +216,7 @@
                 async (position) => {
                     console.log('Localização atualizada:', position.coords);
                     const { latitude, longitude } = position.coords;
+                    // Supabase armazena POINT(longitude latitude)
                     const location = `POINT(${longitude} ${latitude})`;
                     const { error } = await supabaseClient.from('driver_details').update({ current_location: location }).eq('profile_id', state.user.id);
                     if (error) console.error('Erro ao atualizar localização do motorista:', error.message);
@@ -255,8 +256,8 @@
 
             const { data, error } = await supabaseClient
                 .from('rides')
-                .select('*, passenger:profiles(full_name, phone_number)')
-                .or(`driver_id.eq.${state.user.id},and(status.eq.requested,driver_id.is.null)`) // Pega corridas já atribuídas OU corridas novas para motoristas online
+                .select('*, passenger:passenger_id!profiles(full_name, phone_number)') // Correção aqui!
+                .or(`driver_id.eq.${state.user.id},and(status.eq.requested,driver_id.is.null)`) 
                 .in('status', ['requested', 'assigned', 'accepted', 'arrived_pickup', 'in_progress']);
                 
             if (error) {
@@ -272,7 +273,6 @@
                 return;
             }
             
-            // A lógica de 'requested' agora pode ser mais ampla, então filtramos para tocar apenas se for atribuída
             const hasAssignedJob = state.rides.some(r => r.status === 'assigned' && r.driver_id === state.user.id);
             if(hasAssignedJob) startRinging(); else stopRinging();
 
@@ -301,7 +301,11 @@
             if (Array.isArray(destinations)) {
                 return destinations.map(d => d.address || d).join(' -> ');
             }
-            return destinations.address || destinations;
+            // Se for um objeto com propriedade 'address'
+            if (typeof destinations === 'object' && destinations !== null && 'address' in destinations) {
+                return destinations.address;
+            }
+            return destinations;
         }
         
         function renderRideButtons(ride) {
@@ -355,17 +359,27 @@
             if (status === 'accepted' || status === 'assigned' || status === 'arrived_pickup') {
                 // Destino é a origem do passageiro
                 if (!ride.origin_location) return alert('Local de partida não definido.');
-                const [lon, lat] = ride.origin_location.replace('POINT(', '').replace(')', '').split(' ');
+                // O formato POINT(longitude latitude) precisa ser parseado corretamente
+                const pointStr = ride.origin_location.replace('POINT(', '').replace(')', '');
+                const [lon, lat] = pointStr.split(' ').map(Number);
                 destLat = lat; destLng = lon;
             } else if (status === 'in_progress') {
                 // Destino é o destino final da corrida
                 if (!ride.destinations) return alert('Destino da corrida não definido.');
-                // Assumindo que 'destinations' é um array de objetos com lat/lng
-                const finalDestination = Array.isArray(ride.destinations) ? ride.destinations[ride.destinations.length - 1] : ride.destinations;
-                if (finalDestination.lat && finalDestination.lng) {
+                // Assumindo que 'destinations' é um array de objetos com lat/lng ou um objeto com address e talvez lat/lng
+                let finalDestination;
+                if (Array.isArray(ride.destinations)) {
+                    finalDestination = ride.destinations[ride.destinations.length - 1];
+                } else if (typeof ride.destinations === 'object' && ride.destinations !== null) {
+                    finalDestination = ride.destinations;
+                } else {
+                    return alert('Formato de destino inválido.');
+                }
+
+                if (finalDestination && finalDestination.lat && finalDestination.lng) {
                     destLat = finalDestination.lat; destLng = finalDestination.lng;
                 } else {
-                    return alert('Coordenadas do destino não encontradas.');
+                    return alert('Coordenadas do destino final não encontradas.');
                 }
             } else { return; }
 
