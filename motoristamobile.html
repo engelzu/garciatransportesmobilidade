@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -86,16 +87,15 @@
         </div>
     </div>
     
-    <audio id="ringtone" preload="auto" src="SOM/somchamada.mp3"></audio>
+    <audio id="ringtone" loop preload="auto" src="https://cdn.pixabay.com/download/audio/2022/06/14/audio_a7a9e3ae89.mp3"></audio>
 
     <script>
         const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const state = { user: null, profile: null, driverDetails: null, rides: [] };
+        const state = { user: null, profile: null, driverDetails: null, rides: [], rideSubscription: null, locationWatcher: null };
         let ringInterval = null;
-        let locationWatchId = null; // Variável para controlar o rastreador de localização
 
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -103,12 +103,18 @@
         }
 
         async function handleSignUp(formData) {
-            // Lógica de cadastro... (sem alterações)
-            const { data: authData, error: authError } = await supabaseClient.auth.signUp({ email: formData.email, phone: formData.phone, password: formData.password, options: { data: { full_name: formData.fullName, user_type: 'driver' } } });
+            const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+                email: formData.email, phone: formData.phone, password: formData.password,
+                options: { data: { full_name: formData.fullName, user_type: 'driver' } }
+            });
             if (authError) return alert('Erro no cadastro: ' + authError.message);
             if (!authData.user) return alert('Não foi possível criar o usuário. Tente novamente.');
-            const { error: detailsError } = await supabaseClient.from('driver_details').insert({ profile_id: authData.user.id, license_plate: formData.plate, car_model: formData.model, car_color: formData.color, approval_status: 'pending' });
+
+            const { error: detailsError } = await supabaseClient.from('driver_details').insert({
+                profile_id: authData.user.id, license_plate: formData.plate, car_model: formData.model, car_color: formData.color, approval_status: 'pending'
+            });
             if (detailsError) return alert('Erro ao salvar detalhes do veículo: ' + detailsError.message);
+
             alert('Cadastro enviado com sucesso! Sua conta está em análise.');
             await supabaseClient.auth.signOut();
             showScreen('login-screen');
@@ -120,8 +126,11 @@
         }
 
         async function handleSignOut() {
-            await stopLocationTracking(); // Garante que o rastreador para ao deslogar
-            await supabaseClient.from('driver_details').update({ work_status: 'offline' }).eq('profile_id', state.user.id);
+            if (state.rideSubscription) {
+                await supabaseClient.removeSubscription(state.rideSubscription);
+                state.rideSubscription = null;
+            }
+            stopLocationTracking();
             await supabaseClient.auth.signOut();
         }
 
@@ -138,76 +147,93 @@
         }
         
         async function loadDriverData(userId) {
-            // Lógica para carregar dados... (sem alterações)
             const { data: profileData, error: profileError } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
-            if (profileError || !profileData || profileData.user_type !== 'driver') { return handleSignOut(); }
+            if (profileError || !profileData || profileData.user_type !== 'driver') {
+                console.error('Perfil de motorista não encontrado ou erro:', profileError?.message);
+                return handleSignOut();
+            }
             state.profile = profileData;
+
             const { data: driverDetailsData, error: driverDetailsError } = await supabaseClient.from('driver_details').select('*').eq('profile_id', userId).single();
-            if (driverDetailsError || !driverDetailsData) { state.driverDetails = { approval_status: 'pending' }; } else { state.driverDetails = driverDetailsData; }
+            if (driverDetailsError || !driverDetailsData) {
+                state.driverDetails = { approval_status: 'pending' };
+            } else {
+                state.driverDetails = driverDetailsData;
+            }
+
             document.getElementById('driver-welcome-message').textContent = `Olá, ${state.profile.full_name}!`;
+
             if (state.driverDetails.approval_status === 'approved') {
                 showScreen('driver-screen');
                 updateWorkStatusToggle();
                 await loadDriverJobs();
-            } else { showScreen('pending-approval-screen'); }
+                subscribeToRides(); // Inicia a escuta por novas corridas
+            } else {
+                showScreen('pending-approval-screen');
+            }
+        }
+
+        function subscribeToRides() {
+            if (state.rideSubscription) return; // Evita múltiplas assinaturas
+
+            state.rideSubscription = supabaseClient
+                .channel('public:rides')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, payload => {
+                    console.log('Mudança recebida!', payload);
+                    // Recarrega as corridas para refletir qualquer mudança (nova, atualização, etc)
+                    loadDriverJobs();
+                })
+                .subscribe(status => {
+                    if (status === 'SUBSCRIBED') {
+                        console.log('Conectado ao canal de corridas!');
+                    }
+                });
         }
         
-        // --- LÓGICA DE LOCALIZAÇÃO E STATUS DE TRABALHO ---
+        async function toggleWorkStatus() {
+            const isChecked = document.getElementById('work-status-toggle').checked;
+            const newStatus = isChecked ? 'online' : 'offline';
+            
+            const { error } = await supabaseClient.from('driver_details').update({ work_status: newStatus }).eq('profile_id', state.user.id);
+            if (error) {
+                alert('Erro ao atualizar status.'); console.error(error);
+                document.getElementById('work-status-toggle').checked = !isChecked; // Reverte o toggle em caso de erro
+            } else {
+                state.driverDetails.work_status = newStatus;
+                if (newStatus === 'online') {
+                    startLocationTracking();
+                } else {
+                    stopLocationTracking();
+                }
+            }
+        }
 
         function startLocationTracking() {
-            if (locationWatchId) navigator.geolocation.clearWatch(locationWatchId); // Limpa qualquer rastreador antigo
+            if (!navigator.geolocation) return alert('Geolocalização não suportada.');
+            if (state.locationWatcher) return; // Já está rastreando
 
-            locationWatchId = navigator.geolocation.watchPosition(
+            state.locationWatcher = navigator.geolocation.watchPosition(
                 async (position) => {
+                    console.log('Localização atualizada:', position.coords);
                     const { latitude, longitude } = position.coords;
-                    const newLocation = `POINT(${longitude} ${latitude})`;
-                    
-                    const { error } = await supabaseClient
-                        .from('driver_details')
-                        .update({ current_location: newLocation })
-                        .eq('profile_id', state.user.id);
-                    
-                    if (error) console.error("Erro ao atualizar localização:", error.message);
+                    const location = `POINT(${longitude} ${latitude})`;
+                    const { error } = await supabaseClient.from('driver_details').update({ current_location: location }).eq('profile_id', state.user.id);
+                    if (error) console.error('Erro ao atualizar localização do motorista:', error.message);
                 },
                 (error) => {
-                    console.error("Erro de geolocalização:", error.message);
-                    alert("Não foi possível obter sua localização. Verifique as permissões.");
-                    // Desliga o motorista se a localização falhar
-                    document.getElementById('work-status-toggle').checked = false;
-                    toggleWorkStatus();
+                    console.error('Erro no rastreamento de localização:', error.message);
+                    alert('Não foi possível obter sua localização. Verifique as permissões do navegador.');
+                    stopLocationTracking();
                 },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }
 
         function stopLocationTracking() {
-            if (locationWatchId) {
-                navigator.geolocation.clearWatch(locationWatchId);
-                locationWatchId = null;
-            }
-        }
-
-        async function toggleWorkStatus() {
-            const isChecked = document.getElementById('work-status-toggle').checked;
-            const newStatus = isChecked ? 'online' : 'offline';
-
-            if (isChecked) {
-                // Pede permissão e começa a rastrear
-                startLocationTracking();
-            } else {
-                // Para o rastreamento
-                stopLocationTracking();
-            }
-
-            const { error } = await supabaseClient
-                .from('driver_details')
-                .update({ work_status: newStatus })
-                .eq('profile_id', state.user.id);
-
-            if (error) {
-                alert('Erro ao atualizar status.'); console.error(error);
-            } else {
-                state.driverDetails.work_status = newStatus;
+            if (state.locationWatcher) {
+                navigator.geolocation.clearWatch(state.locationWatcher);
+                state.locationWatcher = null;
+                console.log('Rastreamento de localização parado.');
             }
         }
         
@@ -215,7 +241,6 @@
             if (!state.driverDetails) return;
             const toggle = document.getElementById('work-status-toggle');
             toggle.checked = state.driverDetails.work_status === 'online';
-            // Inicia ou para o rastreamento com base no status carregado
             if (toggle.checked) {
                 startLocationTracking();
             } else {
@@ -223,46 +248,97 @@
             }
         }
 
-        // --- LÓGICA DE CORRIDAS ---
         async function loadDriverJobs() {
-            // Lógica para carregar corridas... (sem alterações na consulta)
+            if (!state.user) return;
             const list = document.getElementById('driver-jobs-list');
             list.innerHTML = `<div class="loader mx-auto"></div>`;
-            const { data, error } = await supabaseClient.from('rides').select('*, passenger:profiles(full_name, phone_number)').eq('driver_id', state.user.id).in('status', ['assigned', 'accepted', 'arrived_pickup', 'in_progress']);
-            if (error) { console.error("Erro ao buscar corridas:", error); list.innerHTML = `<p class="text-center text-red-500">Erro ao carregar corridas.</p>`; return; }
+
+            const { data, error } = await supabaseClient
+                .from('rides')
+                .select('*, passenger:profiles(full_name, phone_number)')
+                .or(`driver_id.eq.${state.user.id},and(status.eq.requested,driver_id.is.null)`) // Pega corridas já atribuídas OU corridas novas para motoristas online
+                .in('status', ['requested', 'assigned', 'accepted', 'arrived_pickup', 'in_progress']);
+                
+            if (error) {
+                console.error("Erro ao buscar corridas:", error);
+                list.innerHTML = `<p class="text-center text-red-500">Erro ao carregar corridas.</p>`;
+                return;
+            }
             state.rides = data;
-            if (state.rides.length === 0) { list.innerHTML = `<p class="text-center text-gray-400">Nenhuma corrida para você no momento.</p>`; return; }
-            const hasAssignedJob = state.rides.some(r => r.status === 'assigned');
+
+            if (state.rides.length === 0) {
+                list.innerHTML = `<p class="text-center text-gray-400">Nenhuma corrida para você no momento.</p>`;
+                stopRinging();
+                return;
+            }
+            
+            // A lógica de 'requested' agora pode ser mais ampla, então filtramos para tocar apenas se for atribuída
+            const hasAssignedJob = state.rides.some(r => r.status === 'assigned' && r.driver_id === state.user.id);
             if(hasAssignedJob) startRinging(); else stopRinging();
+
             let ridesHtml = state.rides.map(ride => {
-                const passenger = ride.passenger;
-                return `
-                <div class="p-4 rounded-lg bg-gray-800 border border-gray-600 space-y-2">
-                    <p><strong>Passageiro:</strong> ${passenger?.full_name || 'N/A'}</p>
-                    <p><strong>Telefone:</strong> ${passenger?.phone_number || 'N/A'}</p>
-                    <p><strong>Origem:</strong> ${ride.origin_address}</p>
-                    <p><strong>Destinos:</strong> ${Array.isArray(ride.destinations) ? ride.destinations.join(' -> ') : ride.destinations}</p>
-                    <p><strong>Status:</strong> <span class="font-bold text-yellow-400">${ride.status.toUpperCase()}</span></p>
-                    <div class="pt-2 mt-2 border-t border-gray-700">${renderRideButtons(ride)}</div>
-                </div>
-            `}).join('');
-            list.innerHTML = ridesHtml;
+                // Motorista só vê corridas atribuídas a ele ou as que ele pode aceitar
+                if (ride.status === 'requested' || ride.driver_id === state.user.id) {
+                    const passenger = ride.passenger;
+                    return `
+                    <div class="p-4 rounded-lg bg-gray-800 border border-gray-600 space-y-2">
+                        <p><strong>Passageiro:</strong> ${passenger?.full_name || 'N/A'}</p>
+                        <p><strong>Telefone:</strong> ${passenger?.phone_number || 'N/A'}</p>
+                        <p><strong>Origem:</strong> ${ride.origin_address}</p>
+                        <p><strong>Destinos:</strong> ${getDestinationsText(ride.destinations)}</p>
+                        <p><strong>Status:</strong> <span class="font-bold text-yellow-400">${ride.status.toUpperCase()}</span></p>
+                        <div class="pt-2 mt-2 border-t border-gray-700">
+                            ${renderRideButtons(ride)}
+                        </div>
+                    </div>
+                `}
+            }).join('');
+            list.innerHTML = ridesHtml || `<p class="text-center text-gray-400">Nenhuma corrida para você no momento.</p>`;
+        }
+
+        function getDestinationsText(destinations) {
+            if (!destinations) return 'N/A';
+            if (Array.isArray(destinations)) {
+                return destinations.map(d => d.address || d).join(' -> ');
+            }
+            return destinations.address || destinations;
         }
         
         function renderRideButtons(ride) {
-            // Lógica para renderizar botões... (sem alterações)
             let buttons = '';
-            if (ride.status === 'assigned') { buttons = `<button onclick="acceptRide('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-green-600 hover:bg-green-700">ACEITAR</button>`; } 
-            else if (ride.status === 'accepted') { buttons = `<button onclick="arriveAtPickup('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-blue-600 hover:bg-blue-700">CHEGUEI NO LOCAL</button>`; } 
-            else if (ride.status === 'arrived_pickup') { buttons = `<button onclick="startTrip('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-purple-600 hover:bg-purple-700">INICIAR VIAGEM</button>`; } 
-            else if (ride.status === 'in_progress') { buttons = `<button onclick="completeRide('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-teal-600 hover:bg-teal-700">FINALIZAR CORRIDA</button>`; }
-            const mapButton = `<button onclick="openMap('${ride.status}', '${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-gray-600 hover:bg-gray-700">Ver Rota no Mapa</button>`;
+            // Botão para aceitar corrida 'requested' que ainda não tem motorista
+            if (ride.status === 'requested' && !ride.driver_id) {
+                 buttons = `<button onclick="acceptNewRide('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-green-600 hover:bg-green-700">ACEITAR NOVA CORRIDA</button>`;
+            }
+            // Botões para corridas já atribuídas a este motorista
+            else if (ride.driver_id === state.user.id) {
+                if (ride.status === 'assigned') {
+                    buttons = `<button onclick="acceptRide('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-green-600 hover:bg-green-700">ACEITAR</button>`;
+                } else if (ride.status === 'accepted') {
+                    buttons = `<button onclick="arriveAtPickup('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-blue-600 hover:bg-blue-700">CHEGUEI NO LOCAL</button>`;
+                } else if (ride.status === 'arrived_pickup') {
+                    buttons = `<button onclick="startTrip('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-purple-600 hover:bg-purple-700">INICIAR VIAGEM</button>`;
+                } else if (ride.status === 'in_progress') {
+                    buttons = `<button onclick="completeRide('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-teal-600 hover:bg-teal-700">FINALIZAR CORRIDA</button>`;
+                }
+            }
+            
+            const mapButton = (ride.driver_id === state.user.id) ? `<button onclick="openMap('${ride.status}', '${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-gray-600 hover:bg-gray-700">Ver Rota no Mapa</button>` : '';
             return `<div class="space-y-2">${buttons}${mapButton}</div>`;
+        }
+
+        async function acceptNewRide(rideId) {
+            stopRinging();
+            // Tenta atribuir a corrida ao motorista atual
+            const { error } = await supabaseClient.from('rides').update({ driver_id: state.user.id, status: 'assigned' }).eq('id', rideId).is('driver_id', null);
+            if (error) alert(`Não foi possível aceitar a corrida: ${error.message}`);
+            // A atualização em tempo real irá recarregar a lista
         }
         
         async function updateRideStatus(rideId, status) {
             const { error } = await supabaseClient.from('rides').update({ status: status }).eq('id', rideId);
             if (error) alert(`Erro ao atualizar status: ${error.message}`);
+            // A atualização em tempo real irá recarregar a lista
         }
 
         function acceptRide(rideId) { stopRinging(); updateRideStatus(rideId, 'accepted'); }
@@ -271,43 +347,79 @@
         function completeRide(rideId) { updateRideStatus(rideId, 'completed'); }
         
         async function openMap(status, rideId) {
-            // Lógica do mapa... (sem alterações)
-            const { data: ride, error } = await supabaseClient.from('rides').select('*').eq('id', rideId).single();
-            if (error || !ride) return alert('Corrida não encontrada.');
-            let destinationUrl = '';
-            if (status === 'accepted' || status === 'assigned') {
+            const ride = state.rides.find(r => r.id === rideId);
+            if (!ride) return alert('Corrida não encontrada.');
+
+            let destLat, destLng;
+
+            if (status === 'accepted' || status === 'assigned' || status === 'arrived_pickup') {
+                // Destino é a origem do passageiro
+                if (!ride.origin_location) return alert('Local de partida não definido.');
                 const [lon, lat] = ride.origin_location.replace('POINT(', '').replace(')', '').split(' ');
-                destinationUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
-            } else {
+                destLat = lat; destLng = lon;
+            } else if (status === 'in_progress') {
+                // Destino é o destino final da corrida
+                if (!ride.destinations) return alert('Destino da corrida não definido.');
+                // Assumindo que 'destinations' é um array de objetos com lat/lng
                 const finalDestination = Array.isArray(ride.destinations) ? ride.destinations[ride.destinations.length - 1] : ride.destinations;
-                destinationUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(finalDestination)}`;
-            }
-            window.open(destinationUrl, '_blank');
-        }
-        
-        const ringtone = document.getElementById('ringtone');
-        function playRingSound() { ringtone.currentTime = 0; ringtone.play().catch(console.error); }
-        function startRinging() { stopRinging(); playRingSound(); ringInterval = setInterval(playRingSound, 6000); document.getElementById('silence-btn').classList.remove('hidden');}
-        function stopRinging() { clearInterval(ringInterval); ringInterval = null; ringtone.pause(); document.getElementById('silence-btn').classList.add('hidden');}
-
-        document.addEventListener('DOMContentLoaded', () => {
-            // Listeners de formulário... (sem alterações)
-            document.getElementById('login-form').addEventListener('submit', (e) => { e.preventDefault(); handleSignIn(document.getElementById('login-email').value, document.getElementById('login-password').value); });
-            document.getElementById('signup-form').addEventListener('submit', (e) => { e.preventDefault(); const formData = { fullName: document.getElementById('signup-fullname').value, email: document.getElementById('signup-email').value, phone: document.getElementById('signup-phone').value, password: document.getElementById('signup-password').value, plate: document.getElementById('signup-plate').value, model: document.getElementById('signup-model').value, color: document.getElementById('signup-color').value,}; handleSignUp(formData); });
-
-            supabaseClient.channel('public:rides').on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, payload => {
-                if (state.user && (payload.new.driver_id === state.user.id || (payload.old && payload.old.driver_id === state.user.id))) {
-                    loadDriverJobs();
+                if (finalDestination.lat && finalDestination.lng) {
+                    destLat = finalDestination.lat; destLng = finalDestination.lng;
+                } else {
+                    return alert('Coordenadas do destino não encontradas.');
                 }
-            }).subscribe();
+            } else { return; }
 
-            supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            if (destLat && destLng) {
+                const url = `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`;
+                window.open(url, '_blank');
+            }
+        }
+
+        function startRinging() {
+            const ringtone = document.getElementById('ringtone');
+            const silenceBtn = document.getElementById('silence-btn');
+            ringtone.play().catch(e => console.error("Erro ao tocar áudio:", e));
+            silenceBtn.classList.remove('hidden');
+        }
+
+        function stopRinging() {
+            const ringtone = document.getElementById('ringtone');
+            const silenceBtn = document.getElementById('silence-btn');
+            ringtone.pause();
+            ringtone.currentTime = 0;
+            silenceBtn.classList.add('hidden');
+        }
+
+        // --- Inicialização ---
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('login-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                handleSignIn(e.target.elements['login-email'].value, e.target.elements['login-password'].value);
+            });
+
+            document.getElementById('signup-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const formData = {
+                    fullName: e.target.elements['signup-fullname'].value,
+                    email: e.target.elements['signup-email'].value,
+                    phone: e.target.elements['signup-phone'].value,
+                    password: e.target.elements['signup-password'].value,
+                    plate: e.target.elements['signup-plate'].value,
+                    model: e.target.elements['signup-model'].value,
+                    color: e.target.elements['signup-color'].value,
+                };
+                handleSignUp(formData);
+            });
+
+            supabaseClient.auth.onAuthStateChange((event, session) => {
                 if (event === 'SIGNED_IN') {
                     state.user = session.user;
-                    await loadDriverData(session.user.id);
+                    loadDriverData(session.user.id);
                 } else if (event === 'SIGNED_OUT') {
-                    state.user = null; state.profile = null; state.driverDetails = null;
-                    stopLocationTracking(); // Garante que para o rastreio
+                    state.user = null;
+                    state.profile = null;
+                    state.driverDetails = null;
+                    state.rides = [];
                     showScreen('login-screen');
                 }
             });
@@ -317,3 +429,4 @@
     </script>
 </body>
 </html>
+
