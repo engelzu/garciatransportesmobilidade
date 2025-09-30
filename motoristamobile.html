@@ -183,7 +183,6 @@
             const list = document.getElementById('driver-jobs-list');
             list.innerHTML = `<div class="loader mx-auto"></div>`;
 
-            // CORREÇÃO AQUI: A consulta foi tornada mais explícita e robusta
             const { data, error } = await supabaseClient
                 .from('rides')
                 .select('*, passenger:profiles(full_name, phone_number)')
@@ -206,7 +205,6 @@
             if(hasAssignedJob) startRinging(); else stopRinging();
 
             let ridesHtml = state.rides.map(ride => {
-                // CORREÇÃO AQUI: Acessando os dados do passageiro através de 'ride.passenger'
                 const passenger = ride.passenger;
                 return `
                 <div class="p-4 rounded-lg bg-gray-800 border border-gray-600 space-y-2">
@@ -256,10 +254,10 @@
             let destinationUrl = '';
             if (status === 'accepted' || status === 'assigned') {
                 const [lon, lat] = ride.origin_location.replace('POINT(', '').replace(')', '').split(' ');
-                destinationUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+                destinationUrl = `http://googleusercontent.com/maps/google.com/1{lat},${lon}`;
             } else {
                 const finalDestination = Array.isArray(ride.destinations) ? ride.destinations[ride.destinations.length - 1] : ride.destinations;
-                destinationUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(finalDestination)}`;
+                destinationUrl = `http://googleusercontent.com/maps/google.com/1{encodeURIComponent(finalDestination)}`;
             }
             window.open(destinationUrl, '_blank');
         }
