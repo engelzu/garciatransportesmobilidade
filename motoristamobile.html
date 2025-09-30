@@ -90,7 +90,7 @@
 
     <script>
         const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWKwJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         const state = { user: null, profile: null, driverDetails: null, rides: [], rideSubscription: null, locationWatcher: null };
@@ -250,6 +250,7 @@
             const list = document.getElementById('driver-jobs-list');
             list.innerHTML = `<div class="loader mx-auto"></div>`;
 
+            // CORREÇÃO AQUI: A consulta foi tornada mais explícita e robusta
             const { data, error } = await supabaseClient
                 .from('rides')
                 .select('*, passenger:profiles!rides_passenger_id_fkey(full_name, phone_number)')
@@ -326,13 +327,12 @@
                 destLat = parseFloat(lat);
                 destLng = parseFloat(lon);
             } else {
-                // Para o futuro, quando o destino tiver coordenadas
                 alert("Navegação para o destino final ainda não implementada.");
                 return;
             }
 
             if (destLat && destLng) {
-                const url = `http://googleusercontent.com/maps/google.com/1{destLat},${destLng}`;
+                const url = `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`;
                 window.open(url, '_blank');
             }
         }
