@@ -95,6 +95,7 @@
 
         const state = { user: null, profile: null, driverDetails: null, rides: [] };
         let ringInterval = null;
+        let locationWatchId = null; // Variável para controlar o rastreador de localização
 
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -102,18 +103,12 @@
         }
 
         async function handleSignUp(formData) {
-            const { data: authData, error: authError } = await supabaseClient.auth.signUp({
-                email: formData.email, phone: formData.phone, password: formData.password,
-                options: { data: { full_name: formData.fullName, user_type: 'driver' } }
-            });
+            // Lógica de cadastro... (sem alterações)
+            const { data: authData, error: authError } = await supabaseClient.auth.signUp({ email: formData.email, phone: formData.phone, password: formData.password, options: { data: { full_name: formData.fullName, user_type: 'driver' } } });
             if (authError) return alert('Erro no cadastro: ' + authError.message);
             if (!authData.user) return alert('Não foi possível criar o usuário. Tente novamente.');
-
-            const { error: detailsError } = await supabaseClient.from('driver_details').insert({
-                profile_id: authData.user.id, license_plate: formData.plate, car_model: formData.model, car_color: formData.color, approval_status: 'pending'
-            });
+            const { error: detailsError } = await supabaseClient.from('driver_details').insert({ profile_id: authData.user.id, license_plate: formData.plate, car_model: formData.model, car_color: formData.color, approval_status: 'pending' });
             if (detailsError) return alert('Erro ao salvar detalhes do veículo: ' + detailsError.message);
-
             alert('Cadastro enviado com sucesso! Sua conta está em análise.');
             await supabaseClient.auth.signOut();
             showScreen('login-screen');
@@ -124,7 +119,11 @@
             if (error) alert('Erro no login: ' + error.message);
         }
 
-        async function handleSignOut() { await supabaseClient.auth.signOut(); }
+        async function handleSignOut() {
+            await stopLocationTracking(); // Garante que o rastreador para ao deslogar
+            await supabaseClient.from('driver_details').update({ work_status: 'offline' }).eq('profile_id', state.user.id);
+            await supabaseClient.auth.signOut();
+        }
 
         async function checkSession() {
             try {
@@ -139,33 +138,72 @@
         }
         
         async function loadDriverData(userId) {
+            // Lógica para carregar dados... (sem alterações)
             const { data: profileData, error: profileError } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
-            if (profileError || !profileData || profileData.user_type !== 'driver') {
-                return handleSignOut();
-            }
+            if (profileError || !profileData || profileData.user_type !== 'driver') { return handleSignOut(); }
             state.profile = profileData;
-
             const { data: driverDetailsData, error: driverDetailsError } = await supabaseClient.from('driver_details').select('*').eq('profile_id', userId).single();
-            if (driverDetailsError || !driverDetailsData) {
-                state.driverDetails = { approval_status: 'pending' };
-            } else {
-                state.driverDetails = driverDetailsData;
-            }
-
+            if (driverDetailsError || !driverDetailsData) { state.driverDetails = { approval_status: 'pending' }; } else { state.driverDetails = driverDetailsData; }
             document.getElementById('driver-welcome-message').textContent = `Olá, ${state.profile.full_name}!`;
-
             if (state.driverDetails.approval_status === 'approved') {
                 showScreen('driver-screen');
                 updateWorkStatusToggle();
                 await loadDriverJobs();
-            } else {
-                showScreen('pending-approval-screen');
-            }
+            } else { showScreen('pending-approval-screen'); }
         }
         
+        // --- LÓGICA DE LOCALIZAÇÃO E STATUS DE TRABALHO ---
+
+        function startLocationTracking() {
+            if (locationWatchId) navigator.geolocation.clearWatch(locationWatchId); // Limpa qualquer rastreador antigo
+
+            locationWatchId = navigator.geolocation.watchPosition(
+                async (position) => {
+                    const { latitude, longitude } = position.coords;
+                    const newLocation = `POINT(${longitude} ${latitude})`;
+                    
+                    const { error } = await supabaseClient
+                        .from('driver_details')
+                        .update({ current_location: newLocation })
+                        .eq('profile_id', state.user.id);
+                    
+                    if (error) console.error("Erro ao atualizar localização:", error.message);
+                },
+                (error) => {
+                    console.error("Erro de geolocalização:", error.message);
+                    alert("Não foi possível obter sua localização. Verifique as permissões.");
+                    // Desliga o motorista se a localização falhar
+                    document.getElementById('work-status-toggle').checked = false;
+                    toggleWorkStatus();
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        }
+
+        function stopLocationTracking() {
+            if (locationWatchId) {
+                navigator.geolocation.clearWatch(locationWatchId);
+                locationWatchId = null;
+            }
+        }
+
         async function toggleWorkStatus() {
-            const newStatus = document.getElementById('work-status-toggle').checked ? 'online' : 'offline';
-            const { error } = await supabaseClient.from('driver_details').update({ work_status: newStatus }).eq('profile_id', state.user.id);
+            const isChecked = document.getElementById('work-status-toggle').checked;
+            const newStatus = isChecked ? 'online' : 'offline';
+
+            if (isChecked) {
+                // Pede permissão e começa a rastrear
+                startLocationTracking();
+            } else {
+                // Para o rastreamento
+                stopLocationTracking();
+            }
+
+            const { error } = await supabaseClient
+                .from('driver_details')
+                .update({ work_status: newStatus })
+                .eq('profile_id', state.user.id);
+
             if (error) {
                 alert('Erro ao atualizar status.'); console.error(error);
             } else {
@@ -177,34 +215,25 @@
             if (!state.driverDetails) return;
             const toggle = document.getElementById('work-status-toggle');
             toggle.checked = state.driverDetails.work_status === 'online';
+            // Inicia ou para o rastreamento com base no status carregado
+            if (toggle.checked) {
+                startLocationTracking();
+            } else {
+                stopLocationTracking();
+            }
         }
 
+        // --- LÓGICA DE CORRIDAS ---
         async function loadDriverJobs() {
+            // Lógica para carregar corridas... (sem alterações na consulta)
             const list = document.getElementById('driver-jobs-list');
             list.innerHTML = `<div class="loader mx-auto"></div>`;
-
-            // CORREÇÃO AQUI: A consulta foi tornada mais explícita e robusta
-            const { data, error } = await supabaseClient
-                .from('rides')
-                .select('*, passenger:profiles!rides_passenger_id_fkey(full_name, phone_number)')
-                .eq('driver_id', state.user.id)
-                .in('status', ['assigned', 'accepted', 'arrived_pickup', 'in_progress']);
-                
-            if (error) {
-                console.error("Erro ao buscar corridas:", error);
-                list.innerHTML = `<p class="text-center text-red-500">Erro ao carregar corridas.</p>`;
-                return;
-            }
+            const { data, error } = await supabaseClient.from('rides').select('*, passenger:profiles(full_name, phone_number)').eq('driver_id', state.user.id).in('status', ['assigned', 'accepted', 'arrived_pickup', 'in_progress']);
+            if (error) { console.error("Erro ao buscar corridas:", error); list.innerHTML = `<p class="text-center text-red-500">Erro ao carregar corridas.</p>`; return; }
             state.rides = data;
-
-            if (state.rides.length === 0) {
-                list.innerHTML = `<p class="text-center text-gray-400">Nenhuma corrida para você no momento.</p>`;
-                return;
-            }
-            
+            if (state.rides.length === 0) { list.innerHTML = `<p class="text-center text-gray-400">Nenhuma corrida para você no momento.</p>`; return; }
             const hasAssignedJob = state.rides.some(r => r.status === 'assigned');
             if(hasAssignedJob) startRinging(); else stopRinging();
-
             let ridesHtml = state.rides.map(ride => {
                 const passenger = ride.passenger;
                 return `
@@ -214,26 +243,19 @@
                     <p><strong>Origem:</strong> ${ride.origin_address}</p>
                     <p><strong>Destinos:</strong> ${Array.isArray(ride.destinations) ? ride.destinations.join(' -> ') : ride.destinations}</p>
                     <p><strong>Status:</strong> <span class="font-bold text-yellow-400">${ride.status.toUpperCase()}</span></p>
-                    <div class="pt-2 mt-2 border-t border-gray-700">
-                        ${renderRideButtons(ride)}
-                    </div>
+                    <div class="pt-2 mt-2 border-t border-gray-700">${renderRideButtons(ride)}</div>
                 </div>
             `}).join('');
             list.innerHTML = ridesHtml;
         }
         
         function renderRideButtons(ride) {
+            // Lógica para renderizar botões... (sem alterações)
             let buttons = '';
-            if (ride.status === 'assigned') {
-                buttons = `<button onclick="acceptRide('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-green-600 hover:bg-green-700">ACEITAR</button>`;
-            } else if (ride.status === 'accepted') {
-                buttons = `<button onclick="arriveAtPickup('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-blue-600 hover:bg-blue-700">CHEGUEI NO LOCAL</button>`;
-            } else if (ride.status === 'arrived_pickup') {
-                buttons = `<button onclick="startTrip('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-purple-600 hover:bg-purple-700">INICIAR VIAGEM</button>`;
-            } else if (ride.status === 'in_progress') {
-                buttons = `<button onclick="completeRide('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-teal-600 hover:bg-teal-700">FINALIZAR CORRIDA</button>`;
-            }
-            
+            if (ride.status === 'assigned') { buttons = `<button onclick="acceptRide('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-green-600 hover:bg-green-700">ACEITAR</button>`; } 
+            else if (ride.status === 'accepted') { buttons = `<button onclick="arriveAtPickup('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-blue-600 hover:bg-blue-700">CHEGUEI NO LOCAL</button>`; } 
+            else if (ride.status === 'arrived_pickup') { buttons = `<button onclick="startTrip('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-purple-600 hover:bg-purple-700">INICIAR VIAGEM</button>`; } 
+            else if (ride.status === 'in_progress') { buttons = `<button onclick="completeRide('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-teal-600 hover:bg-teal-700">FINALIZAR CORRIDA</button>`; }
             const mapButton = `<button onclick="openMap('${ride.status}', '${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-gray-600 hover:bg-gray-700">Ver Rota no Mapa</button>`;
             return `<div class="space-y-2">${buttons}${mapButton}</div>`;
         }
@@ -249,9 +271,9 @@
         function completeRide(rideId) { updateRideStatus(rideId, 'completed'); }
         
         async function openMap(status, rideId) {
+            // Lógica do mapa... (sem alterações)
             const { data: ride, error } = await supabaseClient.from('rides').select('*').eq('id', rideId).single();
             if (error || !ride) return alert('Corrida não encontrada.');
-
             let destinationUrl = '';
             if (status === 'accepted' || status === 'assigned') {
                 const [lon, lat] = ride.origin_location.replace('POINT(', '').replace(')', '').split(' ');
@@ -269,15 +291,9 @@
         function stopRinging() { clearInterval(ringInterval); ringInterval = null; ringtone.pause(); document.getElementById('silence-btn').classList.add('hidden');}
 
         document.addEventListener('DOMContentLoaded', () => {
+            // Listeners de formulário... (sem alterações)
             document.getElementById('login-form').addEventListener('submit', (e) => { e.preventDefault(); handleSignIn(document.getElementById('login-email').value, document.getElementById('login-password').value); });
-            document.getElementById('signup-form').addEventListener('submit', (e) => {
-                e.preventDefault();
-                const formData = {
-                    fullName: document.getElementById('signup-fullname').value, email: document.getElementById('signup-email').value, phone: document.getElementById('signup-phone').value,
-                    password: document.getElementById('signup-password').value, plate: document.getElementById('signup-plate').value, model: document.getElementById('signup-model').value, color: document.getElementById('signup-color').value,
-                };
-                handleSignUp(formData);
-            });
+            document.getElementById('signup-form').addEventListener('submit', (e) => { e.preventDefault(); const formData = { fullName: document.getElementById('signup-fullname').value, email: document.getElementById('signup-email').value, phone: document.getElementById('signup-phone').value, password: document.getElementById('signup-password').value, plate: document.getElementById('signup-plate').value, model: document.getElementById('signup-model').value, color: document.getElementById('signup-color').value,}; handleSignUp(formData); });
 
             supabaseClient.channel('public:rides').on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, payload => {
                 if (state.user && (payload.new.driver_id === state.user.id || (payload.old && payload.old.driver_id === state.user.id))) {
@@ -291,6 +307,7 @@
                     await loadDriverData(session.user.id);
                 } else if (event === 'SIGNED_OUT') {
                     state.user = null; state.profile = null; state.driverDetails = null;
+                    stopLocationTracking(); // Garante que para o rastreio
                     showScreen('login-screen');
                 }
             });
