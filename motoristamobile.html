@@ -256,7 +256,7 @@
 
             const { data, error } = await supabaseClient
                 .from('rides')
-                .select('*, passenger:passenger_id!profiles(full_name, phone_number)') // Correção aqui!
+                .select('*, passenger:profiles!rides_passenger_id_fkey(full_name, phone_number)') // Correção aqui!
                 .or(`driver_id.eq.${state.user.id},and(status.eq.requested,driver_id.is.null)`) 
                 .in('status', ['requested', 'assigned', 'accepted', 'arrived_pickup', 'in_progress']);
                 
