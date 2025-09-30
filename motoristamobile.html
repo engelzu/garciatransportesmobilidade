@@ -183,9 +183,10 @@
             const list = document.getElementById('driver-jobs-list');
             list.innerHTML = `<div class="loader mx-auto"></div>`;
 
+            // CORREÇÃO AQUI: A consulta foi tornada mais explícita e robusta
             const { data, error } = await supabaseClient
                 .from('rides')
-                .select('*, passenger:profiles(full_name, phone_number)')
+                .select('*, passenger:profiles!rides_passenger_id_fkey(full_name, phone_number)')
                 .eq('driver_id', state.user.id)
                 .in('status', ['assigned', 'accepted', 'arrived_pickup', 'in_progress']);
                 
@@ -254,10 +255,10 @@
             let destinationUrl = '';
             if (status === 'accepted' || status === 'assigned') {
                 const [lon, lat] = ride.origin_location.replace('POINT(', '').replace(')', '').split(' ');
-                destinationUrl = `http://googleusercontent.com/maps/google.com/1{lat},${lon}`;
+                destinationUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
             } else {
                 const finalDestination = Array.isArray(ride.destinations) ? ride.destinations[ride.destinations.length - 1] : ride.destinations;
-                destinationUrl = `http://googleusercontent.com/maps/google.com/1{encodeURIComponent(finalDestination)}`;
+                destinationUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(finalDestination)}`;
             }
             window.open(destinationUrl, '_blank');
         }
