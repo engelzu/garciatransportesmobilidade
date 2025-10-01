@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GARCIA MOBILIDADE - Passageiro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDZt7BabbQJ3UaLSQYChtMhieikDlqvpLg&libraries=places"></script>
+    
+    <style>
+        body { font-family: 'Poppins', sans-serif; background-color: black; color: white; }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #6d28d9; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Autocomplete Google Maps Styling */
+        .pac-container { background-color: #1F2937; border-radius: 8px; border: 1px solid #4B5563; }
+        .pac-item { padding: 10px; font-size: 14px; color: #D1D5DB; cursor: pointer; border-top: 1px solid #374151;}
+        .pac-item:first-child { border-top: none; }
+        .pac-item:hover { background-color: #374151; }
+        .pac-item-query { font-weight: 600; color: #F3F4F6; }
+
+        /* Status Cards Styling */
+        .status-card {
+            background: linear-gradient(135deg, #1f2937, #374151);
+            border: 1px solid #4b5563;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 8px 0;
+            transition: all 0.3s ease;
+        }
+
+        .status-card.active {
+            border-color: #6d28d9;
+            box-shadow: 0 0 20px rgba(109, 40, 217, 0.3);
+            transform: scale(1.02);
+        }
+
+        /* Status específicos com cores */
+        .status-requested { border-left: 4px solid #fbbf24; background: linear-gradient(135deg, #1f2937, #292524); }
+        .status-assigned { border-left: 4px solid #3b82f6; background: linear-gradient(135deg, #1f2937, #1e3a8a); }
+        .status-accepted { border-left: 4px solid #8b5cf6; background: linear-gradient(135deg, #1f2937, #5b21b6); }
+        .status-arrived_pickup { border-left: 4px solid #6366f1; background: linear-gradient(135deg, #1f2937, #4338ca); }
+        .status-in_progress { border-left: 4px solid #10b981; background: linear-gradient(135deg, #1f2937, #059669); }
+        .status-completed { border-left: 4px solid #22c55e; background: linear-gradient(135deg, #1f2937, #16a34a); }
+        .status-cancelled { border-left: 4px solid #ef4444; background: linear-gradient(135deg, #1f2937, #dc2626); }
+
+        /* Animações de pulsação para status ativos */
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        /* Driver Info Card */
+        .driver-card {
+            background: linear-gradient(135deg, #059669, #10b981);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 16px 0;
+            color: white;
+            box-shadow: 0 8px 32px rgba(16, 185, 129, 0.3);
+        }
+
+        /* Toast Notifications */
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 1000; }
+        .toast { 
+            background: #1f2937; border-left: 4px solid; color: white; padding: 16px; border-radius: 8px; 
+            margin-bottom: 10px; min-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transform: translateX(400px); transition: all 0.3s ease;
+        }
+        .toast.show { transform: translateX(0); }
+        .toast.success { border-left-color: #22c55e; }
+        .toast.error { border-left-color: #ef4444; }
+        .toast.info { border-left-color: #3b82f6; }
+        .toast.warning { border-left-color: #f59e0b; }
+
+        /* Progress Bar */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #374151;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 16px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #6d28d9, #8b5cf6);
+            transition: width 0.5s ease;
+            border-radius: 4px;
+        }
+
+        /* Loading States */
+        .btn-loading { position: relative; color: transparent; }
+        .btn-loading::after {
+            content: ''; position: absolute; top: 50%; left: 50%; width: 20px; height: 20px;
+            margin: -10px 0 0 -10px; border: 2px solid #ffffff; border-top: 2px solid transparent;
+            border-radius: 50%; animation: spin 1s linear infinite;
+        }
+
+        /* Real-time indicator */
+        .realtime-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #22c55e;
+            font-size: 0.875rem;
+            margin-bottom: 16px;
+        }
+
+        .realtime-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #22c55e;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        /* Responsividade */
+        @media (max-width: 480px) {
+            .status-card { padding: 12px; margin: 6px 0; }
+            .driver-card { padding: 16px; margin: 12px 0; }
+            .toast { min-width: 280px; }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <div id="app-container" class="w-full max-w-md mx-auto p-4">
+
+        <div id="loading-screen" class="screen active text-center">
+            <div class="loader mx-auto"></div>
+            <p class="mt-4">Carregando...</p>
+        </div>
+
+        <div id="login-screen" class="screen space-y-3">
+            <img src="images/logogarcia.png" alt="Logo Garcia Transportes" class="mx-auto h-16 w-auto mb-6">
+            <h2 class="text-3xl font-bold text-center">Login</h2>
+            
+            <div class="space-y-3 pt-2">
+                <button onclick="handleSignInWithGoogle()" class="w-full py-3 font-semibold rounded-lg bg-white text-gray-800 hover:bg-gray-200 flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.222,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.988,36.635,44,31.023,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
+                    Entrar com Google
+                </button>
+                
+                <button onclick="handleSignInWithFacebook()" class="w-full py-3 font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#3F51B5" d="M42,37c0,2.762-2.238,5-5,5H11c-2.761,0-5-2.238-5-5V11c0-2.762,2.239-5,5-5h26c2.762,0,5,2.238,5,5V37z"></path><path fill="#FFF" d="M34.368,25H31v13h-5V25h-3v-4h3v-2.41c0-3.408,1.72-5.59,5.592-5.59H35v4h-2.287C31.104,17,31,17.6,31,18.723V21h4L34.368,25z"></path></svg>
+                    Entrar com Facebook
+                </button>
+            </div>
+
+            <div class="relative flex py-1 items-center">
+                <div class="flex-grow border-t border-gray-600"></div>
+                <span class="flex-shrink mx-4 text-gray-400">OU</span>
+                <div class="flex-grow border-t border-gray-600"></div>
+            </div>
+
+            <form id="login-form" class="space-y-3">
+                <div>
+                    <label for="login-email" class="block mb-1 text-sm font-medium">E-mail</label>
+                    <input type="email" id="login-email" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                </div>
+                <div>
+                    <label for="login-password" class="block mb-1 text-sm font-medium">Senha</label>
+                    <input type="password" id="login-password" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                </div>
+                <button type="submit" id="login-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENTRAR</button>
+            </form>
+            
+            <div class="text-center">
+                <a href="#" onclick="showScreen('forgot-password-screen')" class="text-sm text-indigo-400">Esqueceu a senha?</a>
+            </div>
+            <p class="text-center text-sm">Não tem uma conta? <a href="#" onclick="showScreen('signup-screen')" class="font-semibold text-indigo-400">Cadastre-se</a></p>
+        </div>
+        
+        <div id="forgot-password-screen" class="screen space-y-4">
+            <h2 class="text-3xl font-bold text-center">Recuperar Senha</h2>
+            <p class="text-center text-gray-400">Digite seu e-mail e enviaremos um link.</p>
+            <form id="forgot-password-form" class="space-y-4">
+                <div>
+                    <label for="forgot-email" class="block mb-2 text-sm font-medium">E-mail</label>
+                    <input type="email" id="forgot-email" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                </div>
+                <button type="submit" id="forgot-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENVIAR LINK</button>
+            </form>
+            <p class="text-center">
+                <a href="#" onclick="showScreen('login-screen')" class="font-semibold text-indigo-400">Voltar para o Login</a>
+            </p>
+        </div>
+        
+        <div id="update-password-screen" class="screen space-y-4">
+            <h2 class="text-3xl font-bold text-center">Crie uma Nova Senha</h2>
+            <form id="update-password-form" class="space-y-4">
+                <div>
+                    <label for="update-password" class="block mb-2 text-sm font-medium">Nova Senha</label>
+                    <input type="password" id="update-password" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                </div>
+                <button type="submit" id="update-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">SALVAR NOVA SENHA</button>
+            </form>
+        </div>
+        
+        <div id="complete-profile-screen" class="screen space-y-4">
+            <h2 class="text-3xl font-bold text-center">Complete seu Perfil</h2>
+            <p class="text-center text-gray-400">Precisamos de mais uma informação para continuar.</p>
+            <form id="complete-profile-form" class="space-y-4">
+                <div>
+                    <label for="profile-phone" class="block mb-2 text-sm font-medium">Telefone</label>
+                    <input type="tel" id="profile-phone" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="(XX) XXXXX-XXXX" required>
+                </div>
+                <button type="submit" id="profile-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">SALVAR E CONTINUAR</button>
+            </form>
+        </div>
+
+        <div id="signup-screen" class="screen space-y-3">
+            <h2 class="text-3xl font-bold text-center">Cadastro</h2>
+            <form id="signup-form" class="space-y-3">
+                <div>
+                    <label for="signup-fullname" class="block mb-1 text-sm font-medium">Nome Completo</label>
+                    <input type="text" id="signup-fullname" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                </div>
+                <div>
+                    <label for="signup-email" class="block mb-1 text-sm font-medium">E-mail</label>
+                    <input type="email" id="signup-email" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                </div>
+                <div>
+                    <label for="signup-phone" class="block mb-1 text-sm font-medium">Telefone</label>
+                    <input type="tel" id="signup-phone" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="(XX) XXXXX-XXXX" required>
+                </div>
+                <div>
+                    <label for="signup-password" class="block mb-1 text-sm font-medium">Senha</label>
+                    <input type="password" id="signup-password" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                </div>
+                <button type="submit" id="signup-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">CADASTRAR</button>
+            </form>
+            <p class="text-center text-sm">Já tem uma conta? <a href="#" onclick="showScreen('login-screen')" class="font-semibold text-indigo-400">Faça o login</a></p>
+        </div>
+
+        <div id="user-screen" class="screen space-y-6">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <img src="images/user.png" alt="Ícone do Usuário" class="w-8 h-8">
+                    <h2 class="text-2xl font-bold">Solicitar Viagem</h2>
+                </div>
+                <button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700 transition-colors">Sair</button>
+            </div>
+
+            <p id="welcome-message" class="text-lg"></p>
+            
+            <!-- FORMULÁRIO DE SOLICITAÇÃO -->
+            <div id="ride-request-container">
+                <form id="ride-request-form" class="space-y-4">
+                    <div>
+                        <label for="origin" class="block mb-2 text-sm font-medium">Origem</label>
+                        <input type="text" id="origin" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="Digite o endereço de partida" required>
+                        <button type="button" onclick="useCurrentLocation()" id="location-button" class="w-full mt-2 py-2 px-4 text-sm font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 transition-colors">
+                            📍 Usar Localização Atual
+                        </button>
+                    </div>
+                    <div>
+                        <label for="destination" class="block mb-2 text-sm font-medium">Destino</label>
+                        <input type="text" id="destination" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="Digite o destino" required>
+                    </div>
+                    <button type="submit" id="request-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">
+                        🚗 SOLICITAR AGORA
+                    </button>
+                </form>
+            </div>
+
+            <!-- CONTAINER DE STATUS DA CORRIDA -->
+            <div id="ride-status-container" class="hidden">
+                
+                <!-- Indicador de Tempo Real -->
+                <div class="realtime-indicator">
+                    <div class="realtime-dot"></div>
+                    <span>Atualizações em tempo real</span>
+                </div>
+
+                <h3 class="text-xl font-bold mb-4">📱 Status da sua Viagem</h3>
+                
+                <!-- Barra de Progresso -->
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+                </div>
+                
+                <!-- Status Principal -->
+                <div id="main-status-card" class="status-card pulse-animation">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div id="status-icon" class="text-2xl">⏳</div>
+                        <div>
+                            <h4 id="status-title" class="font-bold text-lg">Processando Solicitação</h4>
+                            <p id="status-description" class="text-sm text-gray-300">Aguarde um momento...</p>
+                        </div>
+                    </div>
+                    <p id="status-time" class="text-xs text-gray-400 mt-2">Última atualização: agora</p>
+                </div>
+
+                <!-- Card de Informações do Motorista -->
+                <div id="driver-info-card" class="driver-card hidden">
+                    <h4 class="font-bold text-lg mb-3">🚗 Seu Motorista</h4>
+                    <div class="space-y-2">
+                        <p><strong>👤 Nome:</strong> <span id="driver-name">-</span></p>
+                        <p><strong>🚙 Veículo:</strong> <span id="driver-car">-</span></p>
+                        <p><strong>🔢 Placa:</strong> <span id="driver-plate">-</span></p>
+                        <p><strong>📞 Telefone:</strong> <span id="driver-phone">-</span></p>
+                    </div>
+                    <div class="mt-4 flex gap-2">
+                        <button id="call-driver-btn" onclick="callDriver()" class="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-semibold transition-colors">
+                            📞 Ligar
+                        </button>
+                        <button id="message-driver-btn" onclick="messageDriver()" class="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-semibold transition-colors">
+                            💬 Mensagem
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Histórico de Status -->
+                <div id="status-history" class="mt-6">
+                    <h4 class="font-bold text-lg mb-3">📋 Histórico da Viagem</h4>
+                    <div id="status-timeline" class="space-y-2">
+                        <!-- Status history items will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Informações da Viagem -->
+                <div id="trip-details" class="status-card mt-4">
+                    <h4 class="font-bold text-lg mb-3">📍 Detalhes da Viagem</h4>
+                    <div class="space-y-2 text-sm">
+                        <p><strong>🟢 Origem:</strong> <span id="trip-origin">-</span></p>
+                        <p><strong>🔴 Destino:</strong> <span id="trip-destination">-</span></p>
+                        <p><strong>🕐 Solicitado:</strong> <span id="trip-time">-</span></p>
+                    </div>
+                </div>
+
+                <!-- Botões de Ação -->
+                <div class="flex gap-3 mt-6">
+                    <button id="cancel-ride-btn" onclick="cancelRide()" class="flex-1 py-3 font-semibold rounded-lg bg-red-600 hover:bg-red-700 transition-colors">
+                        ❌ CANCELAR VIAGEM
+                    </button>
+                    <button id="help-btn" onclick="getHelp()" class="py-3 px-6 font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 transition-colors">
+                        🆘 AJUDA
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        const state = { 
+            user: null, 
+            profile: null, 
+            currentRide: null, 
+            rideSubscription: null,
+            statusHistory: []
+        };
+
+        // =============================================================================
+        // TOAST NOTIFICATION SYSTEM
+        // =============================================================================
+        class ToastManager {
+            constructor() {
+                this.container = document.getElementById('toast-container');
+                this.toasts = [];
+            }
+
+            show(message, type = 'info', duration = 4000) {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <p class="font-medium">${this.getTypeIcon(type)} ${this.getTypeTitle(type)}</p>
+                            <p class="text-sm opacity-90 mt-1">${message}</p>
+                        </div>
+                        <button onclick="this.parentElement.parentElement.remove()" class="ml-3 text-white/60 hover:text-white">
+                            ✕
+                        </button>
+                    </div>
+                `;
+
+                this.container.appendChild(toast);
+                
+                setTimeout(() => toast.classList.add('show'), 100);
+
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.classList.remove('show');
+                        setTimeout(() => toast.remove(), 300);
+                    }
+                }, duration);
+
+                return toast;
+            }
+
+            getTypeIcon(type) {
+                const icons = {
+                    success: '✅',
+                    error: '❌',
+                    warning: '⚠️',
+                    info: 'ℹ️'
+                };
+                return icons[type] || icons.info;
+            }
+
+            getTypeTitle(type) {
+                const titles = {
+                    success: 'Sucesso',
+                    error: 'Erro',
+                    warning: 'Atenção',
+                    info: 'Informação'
+                };
+                return titles[type] || titles.info;
+            }
+        }
+
+        const toast = new ToastManager();
+
+        // =============================================================================
+        // UTILITY FUNCTIONS
+        // =============================================================================
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function showLoading(buttonId) {
+            const button = document.getElementById(buttonId);
+            button.classList.add('btn-loading');
+            button.disabled = true;
+        }
+
+        function hideLoading(buttonId) {
+            const button = document.getElementById(buttonId);
+            button.classList.remove('btn-loading');
+            button.disabled = false;
+        }
+
+        function formatTime(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleTimeString('pt-BR', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+        }
+
+        function formatDateTime(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('pt-BR', { 
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+        }
+
+        // =============================================================================
+        // STATUS MANAGEMENT SYSTEM
+        // =============================================================================
+        const statusConfig = {
+            'requested': {
+                icon: '⏳',
+                title: 'Solicitação Enviada',
+                description: 'Procurando motorista disponível...',
+                color: '#fbbf24',
+                progress: 15
+            },
+            'assigned': {
+                icon: '🎯',
+                title: 'Motorista Designado',
+                description: 'Um motorista foi designado para sua corrida e está analisando',
+                color: '#3b82f6',
+                progress: 30
+            },
+            'accepted': {
+                icon: '✅',
+                title: 'Motorista Aceitou',
+                description: 'O motorista aceitou sua corrida e está a caminho',
+                color: '#8b5cf6',
+                progress: 45
+            },
+            'arrived_pickup': {
+                icon: '📍',
+                title: 'Motorista Chegou',
+                description: 'O motorista chegou ao local de partida',
+                color: '#6366f1',
+                progress: 70
+            },
+            'in_progress': {
+                icon: '🚗',
+                title: 'Viagem em Andamento',
+                description: 'Você está a caminho do destino. Boa viagem!',
+                color: '#10b981',
+                progress: 85
+            },
+            'completed': {
+                icon: '🏁',
+                title: 'Viagem Concluída',
+                description: 'Você chegou ao destino. Obrigado por usar nossos serviços!',
+                color: '#22c55e',
+                progress: 100
+            },
+            'cancelled': {
+                icon: '❌',
+                title: 'Viagem Cancelada',
+                description: 'A viagem foi cancelada',
+                color: '#ef4444',
+                progress: 0
+            }
+        };
+
+        function updateStatusDisplay(status) {
+            const config = statusConfig[status] || statusConfig['requested'];
+            
+            // Atualizar card principal
+            const mainCard = document.getElementById('main-status-card');
+            const statusIcon = document.getElementById('status-icon');
+            const statusTitle = document.getElementById('status-title');
+            const statusDescription = document.getElementById('status-description');
+            const statusTime = document.getElementById('status-time');
+            const progressFill = document.getElementById('progress-fill');
+
+            statusIcon.textContent = config.icon;
+            statusTitle.textContent = config.title;
+            statusDescription.textContent = config.description;
+            statusTime.textContent = `Última atualização: ${new Date().toLocaleTimeString('pt-BR')}`;
+            
+            // Atualizar classes CSS
+            mainCard.className = `status-card status-${status} active pulse-animation`;
+            
+            // Atualizar barra de progresso
+            progressFill.style.width = `${config.progress}%`;
+            
+            // Adicionar ao histórico
+            addStatusToHistory(status, config);
+            
+            // Som de notificação para mudanças de status importantes
+            if (['accepted', 'arrived_pickup', 'completed'].includes(status)) {
+                playNotificationSound();
+            }
+        }
+
+        function addStatusToHistory(status, config) {
+            const timeline = document.getElementById('status-timeline');
+            const historyItem = document.createElement('div');
+            historyItem.className = `status-card status-${status}`;
+            historyItem.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <div class="text-lg">${config.icon}</div>
+                    <div class="flex-1">
+                        <p class="font-semibold text-sm">${config.title}</p>
+                        <p class="text-xs text-gray-400">${new Date().toLocaleTimeString('pt-BR')}</p>
+                    </div>
+                </div>
+            `;
+            
+            // Inserir no topo do histórico
+            timeline.insertBefore(historyItem, timeline.firstChild);
+            
+            // Manter apenas os últimos 5 itens
+            while (timeline.children.length > 5) {
+                timeline.removeChild(timeline.lastChild);
+            }
+        }
+
+        function playNotificationSound() {
+            try {
+                // Criar um som simples usando Web Audio API
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = 800;
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.3);
+            } catch (error) {
+                console.log('Não foi possível reproduzir som de notificação');
+            }
+        }
+
+        // =============================================================================
+        // AUTHENTICATION FUNCTIONS
+        // =============================================================================
+        async function handleSignUp(fullName, email, phone, password) {
+            showLoading('signup-btn');
+            try {
+                const { data, error } = await supabaseClient.auth.signUp({ 
+                    email, 
+                    phone, 
+                    password, 
+                    options: { 
+                        data: { 
+                            full_name: fullName, 
+                            user_type: 'passenger' 
+                        } 
+                    } 
+                });
+                
+                if (error) throw error;
+                
+                toast.show('Cadastro realizado! Verifique seu e-mail para ativar sua conta.', 'success');
+                showScreen('login-screen');
+            } catch (error) { 
+                toast.show('Erro no cadastro: ' + error.message, 'error');
+            } finally {
+                hideLoading('signup-btn');
+            }
+        }
+
+        async function handleSignIn(email, password) {
+            showLoading('login-btn');
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+                toast.show('Login realizado com sucesso!', 'success');
+            } catch (error) { 
+                toast.show('Erro no login: ' + error.message, 'error');
+            } finally {
+                hideLoading('login-btn');
+            }
+        }
+        
+        async function handleSignInWithGoogle() {
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithOAuth({ 
+                    provider: 'google', 
+                    options: { 
+                        redirectTo: window.location.origin + '/passageiro.html'
+                    } 
+                });
+                if (error) throw error;
+            } catch (error) { 
+                toast.show('Erro ao tentar login com Google: ' + error.message, 'error');
+            }
+        }
+
+        async function handleSignInWithFacebook() {
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithOAuth({ 
+                    provider: 'facebook', 
+                    options: { 
+                        redirectTo: window.location.origin + '/passageiro.html'
+                    } 
+                });
+                if (error) throw error;
+            } catch (error) { 
+                toast.show('Erro ao tentar login com Facebook: ' + error.message, 'error');
+            }
+        }
+
+        async function handleSignOut() {
+            try {
+                if (state.rideSubscription) {
+                    supabaseClient.removeChannel(state.rideSubscription);
+                    state.rideSubscription = null;
+                }
+                state.currentRide = null;
+                state.statusHistory = [];
+                await supabaseClient.auth.signOut();
+                toast.show('Logout realizado com sucesso', 'success');
+            } catch (error) {
+                toast.show('Erro ao fazer logout: ' + error.message, 'error');
+            }
+        }
+
+        async function handlePasswordReset(email) {
+            showLoading('forgot-btn');
+            try {
+                const { data, error } = await supabaseClient.auth.resetPasswordForEmail(email);
+                if (error) throw error;
+                toast.show('Link de recuperação de senha enviado! Verifique seu e-mail.', 'success');
+                showScreen('login-screen');
+            } catch (error) { 
+                toast.show('Erro ao enviar e-mail de recuperação: ' + error.message, 'error');
+            } finally {
+                hideLoading('forgot-btn');
+            }
+        }
+        
+        async function handleUpdatePassword(newPassword) {
+            showLoading('update-btn');
+            try {
+                const { data, error } = await supabaseClient.auth.updateUser({ password: newPassword });
+                if (error) throw error;
+                toast.show('Senha atualizada com sucesso!', 'success');
+                await handleSignOut();
+            } catch (error) { 
+                toast.show('Erro ao atualizar a senha: ' + error.message, 'error');
+            } finally {
+                hideLoading('update-btn');
+            }
+        }
+        
+        async function handleUpdateProfile(userId, phone) {
+            showLoading('profile-btn');
+            try {
+                const { data, error } = await supabaseClient.from('profiles').update({ phone_number: phone }).eq('id', userId);
+                if (error) throw error;
+                await loadUserProfile(userId);
+                toast.show('Perfil atualizado com sucesso!', 'success');
+            } catch(error) { 
+                toast.show('Erro ao salvar o telefone: ' + error.message, 'error');
+            } finally {
+                hideLoading('profile-btn');
+            }
+        }
+
+        async function loadUserProfile(userId) {
+            if (!userId) {
+                console.error("loadUserProfile: userId é nulo.");
+                handleSignOut();
+                return;
+            }
+            
+            try {
+                const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
+                if (error) {
+                    console.error('Erro ao buscar perfil:', error.message);
+                    handleSignOut();
+                    return;
+                }
+                
+                state.profile = data;
+                
+                if (!state.profile.phone_number) {
+                    showScreen('complete-profile-screen');
+                } else {
+                    document.getElementById('welcome-message').textContent = `Olá, ${state.profile.full_name}!`;
+                    await checkPendingRide();
+                    if (!state.currentRide) {
+                        showRideRequestForm();
+                    }
+                    showScreen('user-screen');
+                }
+            } catch (error) { 
+                console.error('Erro inesperado ao carregar perfil:', error.message); 
+                handleSignOut(); 
+            }
+        }
+
+        // =============================================================================
+        // GOOGLE MAPS INTEGRATION
+        // =============================================================================
+        function initializeAutocomplete() {
+            const originInput = document.getElementById('origin');
+            const destinationInput = document.getElementById('destination');
+            const options = { 
+                types: ['address'], 
+                componentRestrictions: { 'country': 'br' } 
+            };
+            
+            new google.maps.places.Autocomplete(originInput, options);
+            new google.maps.places.Autocomplete(destinationInput, options);
+        }
+
+        async function useCurrentLocation() {
+            if (!navigator.geolocation) {
+                toast.show('Geolocalização não é suportada pelo seu navegador.', 'error');
+                return;
+            }
+
+            const originInput = document.getElementById('origin');
+            const locationButton = document.getElementById('location-button');
+
+            originInput.value = 'Obtendo localização...';
+            locationButton.disabled = true;
+            locationButton.innerHTML = '🔄 Obtendo localização...';
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const geocoder = new google.maps.Geocoder();
+                    
+                    geocoder.geocode({ 'location': { lat, lng } }, (results, status) => {
+                        if (status === 'OK' && results[0]) {
+                            originInput.value = results[0].formatted_address;
+                            toast.show('Localização obtida com sucesso!', 'success');
+                        } else {
+                            originInput.value = `Latitude: ${lat}, Longitude: ${lng}`;
+                            console.error('Geocoder failed due to: ' + status);
+                            toast.show('Não foi possível obter o endereço, mas a localização foi capturada.', 'warning');
+                        }
+                        locationButton.disabled = false;
+                        locationButton.innerHTML = '📍 Usar Localização Atual';
+                    });
+                },
+                (error) => {
+                    console.error('Erro ao obter localização:', error);
+                    toast.show('Não foi possível obter sua localização. Verifique as permissões do navegador.', 'error');
+                    originInput.value = '';
+                    locationButton.disabled = false;
+                    locationButton.innerHTML = '📍 Usar Localização Atual';
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        }
+
+        // =============================================================================
+        // RIDE MANAGEMENT
+        // =============================================================================
+        async function requestRide(originAddress, destinationAddress) {
+            if (!state.user || !state.profile) {
+                toast.show('Você precisa estar logado para solicitar uma corrida.', 'error');
+                return;
+            }
+
+            showLoading('request-btn');
+
+            // Geocodificar origem e destino para obter coordenadas
+            const geocoder = new google.maps.Geocoder();
+            let originLocation, destinationLocation;
+
+            try {
+                // Geocodificar origem
+                const originResult = await new Promise((resolve, reject) => {
+                    geocoder.geocode({ 'address': originAddress }, (results, status) => {
+                        if (status === 'OK' && results.length > 0) {
+                            resolve(results);
+                        } else {
+                            reject(new Error('Origem não encontrada.'));
+                        }
+                    });
+                });
+                
+                const originLat = originResult[0].geometry.location.lat();
+                const originLng = originResult[0].geometry.location.lng();
+                originLocation = `POINT(${originLng} ${originLat})`;
+
+                // Geocodificar destino
+                const destinationResult = await new Promise((resolve, reject) => {
+                    geocoder.geocode({ 'address': destinationAddress }, (results, status) => {
+                        if (status === 'OK' && results.length > 0) {
+                            resolve(results);
+                        } else {
+                            reject(new Error('Destino não encontrado.'));
+                        }
+                    });
+                });
+                
+                const destinationLat = destinationResult[0].geometry.location.lat();
+                const destinationLng = destinationResult[0].geometry.location.lng();
+                destinationLocation = `POINT(${destinationLng} ${destinationLat})`;
+
+            } catch (error) {
+                toast.show('Erro ao processar endereços: ' + error.message, 'error');
+                hideLoading('request-btn');
+                return;
+            }
+
+            try {
+                // Criar corrida no banco de dados
+                const { data, error } = await supabaseClient.from('rides').insert({
+                    passenger_id: state.user.id,
+                    origin_address: originAddress,
+                    origin_location: originLocation,
+                    destinations: [destinationAddress], // Array de strings conforme estrutura do motorista
+                    destination_location: destinationLocation,
+                    status: 'requested',
+                    created_at: new Date().toISOString()
+                }).select().single();
+
+                if (error) {
+                    toast.show('Erro ao solicitar corrida: ' + error.message, 'error');
+                    console.error(error);
+                    return;
+                }
+
+                state.currentRide = data;
+                
+                // Atualizar interface
+                showRideStatus();
+                updateTripDetails(originAddress, destinationAddress, data.created_at);
+                updateStatusDisplay('requested');
+                subscribeToRideUpdates(data.id);
+                
+                toast.show('Corrida solicitada com sucesso! Procurando motorista...', 'success');
+
+            } catch (error) {
+                toast.show('Erro inesperado ao solicitar corrida: ' + error.message, 'error');
+                console.error(error);
+            } finally {
+                hideLoading('request-btn');
+            }
+        }
+
+        async function checkPendingRide() {
+            if (!state.user) return;
+            
+            console.log('🔍 Verificando corridas pendentes para usuário:', state.user.id);
+            
+            try {
+                const { data, error } = await supabaseClient.from('rides')
+                    .select(`
+                        *, 
+                        driver:profiles!rides_driver_id_fkey(full_name, phone_number), 
+                        driver_details(car_model, license_plate, car_color)
+                    `)
+                    .eq('passenger_id', state.user.id)
+                    .in('status', ['requested', 'assigned', 'accepted', 'arrived_pickup', 'in_progress'])
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+                    console.error('❌ Erro ao verificar corrida pendente:', error.message);
+                    return;
+                }
+
+                if (data) {
+                    console.log('🚗 CORRIDA PENDENTE ENCONTRADA:', {
+                        id: data.id,
+                        status: data.status,
+                        driver_id: data.driver_id,
+                        has_driver_data: !!data.driver,
+                        has_driver_details: !!data.driver_details
+                    });
+                    
+                    state.currentRide = data;
+                    showRideStatus();
+                    updateTripDetails(data.origin_address, data.destinations?.[0] || 'Destino não especificado', data.created_at);
+                    updateStatusDisplay(data.status);
+                    
+                    // CRÍTICO: Se tem motorista designado, mostrar informações
+                    if (data.driver_id) {
+                        if (data.driver && data.driver_details) {
+                            console.log('✅ Dados do motorista já carregados via JOIN');
+                            updateDriverInfo(data.driver, data.driver_details);
+                        } else {
+                            console.log('🔄 Carregando dados do motorista separadamente...');
+                            await loadDriverInfo(data.driver_id);
+                        }
+                    } else {
+                        console.log('⏳ Corrida ainda sem motorista designado');
+                    }
+                    
+                    subscribeToRideUpdates(data.id);
+                } else {
+                    console.log('ℹ️ Nenhuma corrida pendente encontrada');
+                    showRideRequestForm();
+                }
+            } catch (error) {
+                console.error('❌ Erro inesperado ao verificar corrida pendente:', error.message);
+                showRideRequestForm();
+            }
+        }
+
+        function subscribeToRideUpdates(rideId) {
+            if (state.rideSubscription) {
+                supabaseClient.removeChannel(state.rideSubscription);
+            }
+
+            console.log('🔔 Iniciando subscription para corrida:', rideId);
+            
+            state.rideSubscription = supabaseClient
+                .channel(`public:rides_${rideId}`)
+                .on('postgres_changes', { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'rides', 
+                    filter: `id=eq.${rideId}` 
+                }, async payload => {
+                    console.log('🔄 ATUALIZAÇÃO RECEBIDA:', payload);
+                    const { eventType, new: updatedRide, old: oldRide } = payload;
+                    
+                    if (eventType === 'UPDATE' && updatedRide) {
+                        console.log('📊 Status anterior:', oldRide?.status, '→ Novo status:', updatedRide.status);
+                        console.log('👤 Driver anterior:', oldRide?.driver_id, '→ Novo driver:', updatedRide.driver_id);
+                        
+                        // Atualizar estado global
+                        const previousDriverId = state.currentRide?.driver_id;
+                        state.currentRide = { ...state.currentRide, ...updatedRide };
+                        
+                        // Atualizar status visual
+                        updateStatusDisplay(updatedRide.status);
+                        
+                        // CRÍTICO: Se motorista foi designado/mudou
+                        if (updatedRide.driver_id && updatedRide.driver_id !== previousDriverId) {
+                            console.log('🚗 NOVO MOTORISTA DESIGNADO:', updatedRide.driver_id);
+                            await loadDriverInfo(updatedRide.driver_id);
+                            
+                            // Notificar que motorista foi designado
+                            toast.show('Motorista designado para sua corrida!', 'success', 5000);
+                        }
+                        
+                        // Notificações para todas as mudanças de status importantes
+                        const importantStatuses = ['assigned', 'accepted', 'arrived_pickup', 'in_progress', 'completed', 'cancelled'];
+                        if (importantStatuses.includes(updatedRide.status)) {
+                            const statusInfo = statusConfig[updatedRide.status];
+                            toast.show(statusInfo.title + ': ' + statusInfo.description, 'info', 6000);
+                        }
+                        
+                        // Limpar subscription se corrida finalizada
+                        if (['completed', 'cancelled'].includes(updatedRide.status)) {
+                            setTimeout(() => {
+                                supabaseClient.removeChannel(state.rideSubscription);
+                                state.rideSubscription = null;
+                                state.currentRide = null;
+                                
+                                if (updatedRide.status === 'completed') {
+                                    setTimeout(() => showRideRequestForm(), 5000);
+                                } else {
+                                    setTimeout(() => showRideRequestForm(), 3000);
+                                }
+                            }, 2000);
+                        }
+                    }
+                })
+                .subscribe(status => {
+                    console.log('📡 Status da subscription:', status);
+                    if (status === 'SUBSCRIBED') {
+                        console.log(`✅ CONECTADO ao canal de atualizações da corrida ${rideId}!`);
+                        toast.show('Conectado às atualizações em tempo real', 'success', 3000);
+                    } else if (status === 'CHANNEL_ERROR') {
+                        console.error('❌ Erro no canal de subscription');
+                        toast.show('Erro na conexão em tempo real. Tentando reconectar...', 'warning');
+                        
+                        // Tentar reconectar após 3 segundos
+                        setTimeout(() => {
+                            subscribeToRideUpdates(rideId);
+                        }, 3000);
+                    }
+                });
+        }
+
+        async function loadDriverInfo(driverId) {
+            console.log('🔍 Carregando informações do motorista:', driverId);
+            
+            try {
+                // Buscar dados do perfil do motorista
+                const { data: driverData, error: driverError } = await supabaseClient
+                    .from('profiles')
+                    .select('full_name, phone_number')
+                    .eq('id', driverId)
+                    .single();
+
+                if (driverError) {
+                    console.error('❌ Erro ao buscar perfil do motorista:', driverError);
+                    throw driverError;
+                }
+
+                // Buscar detalhes do veículo
+                const { data: driverDetailsData, error: detailsError } = await supabaseClient
+                    .from('driver_details')
+                    .select('car_model, license_plate, car_color')
+                    .eq('profile_id', driverId)
+                    .single();
+
+                if (detailsError) {
+                    console.error('❌ Erro ao buscar detalhes do motorista:', detailsError);
+                    throw detailsError;
+                }
+
+                if (driverData && driverDetailsData) {
+                    console.log('✅ Dados do motorista carregados:', {
+                        nome: driverData.full_name,
+                        telefone: driverData.phone_number,
+                        veiculo: driverDetailsData.car_model,
+                        placa: driverDetailsData.license_plate
+                    });
+                    
+                    state.currentRide.driver = driverData;
+                    state.currentRide.driver_details = driverDetailsData;
+                    updateDriverInfo(driverData, driverDetailsData);
+                } else {
+                    console.warn('⚠️ Dados do motorista incompletos');
+                }
+            } catch (error) {
+                console.error('❌ Erro crítico ao carregar informações do motorista:', error);
+                toast.show('Erro ao carregar dados do motorista', 'warning');
+            }
+        }
+
+        function updateDriverInfo(driver, driverDetails) {
+            const driverCard = document.getElementById('driver-info-card');
+            const driverName = document.getElementById('driver-name');
+            const driverCar = document.getElementById('driver-car');
+            const driverPlate = document.getElementById('driver-plate');
+            const driverPhone = document.getElementById('driver-phone');
+
+            driverName.textContent = driver.full_name || 'Não informado';
+            driverCar.textContent = `${driverDetails.car_model} ${driverDetails.car_color}` || 'Não informado';
+            driverPlate.textContent = driverDetails.license_plate || 'Não informado';
+            driverPhone.textContent = driver.phone_number || 'Não informado';
+
+            driverCard.classList.remove('hidden');
+        }
+
+        function updateTripDetails(origin, destination, createdAt) {
+            document.getElementById('trip-origin').textContent = origin;
+            document.getElementById('trip-destination').textContent = destination;
+            document.getElementById('trip-time').textContent = formatDateTime(createdAt);
+        }
+
+        async function cancelRide() {
+            if (!state.currentRide || !confirm('Tem certeza que deseja cancelar esta viagem?')) {
+                return;
+            }
+
+            try {
+                const { error } = await supabaseClient.from('rides')
+                    .update({ status: 'cancelled' })
+                    .eq('id', state.currentRide.id);
+
+                if (error) {
+                    toast.show('Erro ao cancelar a corrida: ' + error.message, 'error');
+                    console.error(error);
+                } else {
+                    toast.show('Viagem cancelada com sucesso.', 'success');
+                }
+            } catch (error) {
+                toast.show('Erro inesperado ao cancelar corrida: ' + error.message, 'error');
+            }
+        }
+
+        // =============================================================================
+        // UI MANAGEMENT
+        // =============================================================================
+        function showRideRequestForm() {
+            document.getElementById('ride-request-container').classList.remove('hidden');
+            document.getElementById('ride-status-container').classList.add('hidden');
+        }
+
+        function showRideStatus() {
+            document.getElementById('ride-request-container').classList.add('hidden');
+            document.getElementById('ride-status-container').classList.remove('hidden');
+        }
+
+        // =============================================================================
+        // DRIVER COMMUNICATION
+        // =============================================================================
+        function callDriver() {
+            if (state.currentRide?.driver?.phone_number) {
+                const phoneNumber = state.currentRide.driver.phone_number.replace(/\D/g, '');
+                window.open(`tel:+55${phoneNumber}`, '_self');
+            } else {
+                toast.show('Número do motorista não disponível', 'warning');
+            }
+        }
+
+        function messageDriver() {
+            if (state.currentRide?.driver?.phone_number) {
+                const phoneNumber = state.currentRide.driver.phone_number.replace(/\D/g, '');
+                const message = encodeURIComponent('Olá! Sou o passageiro da corrida que você está atendendo.');
+                window.open(`https://wa.me/55${phoneNumber}?text=${message}`, '_blank');
+            } else {
+                toast.show('Número do motorista não disponível', 'warning');
+            }
+        }
+
+        function getHelp() {
+            toast.show('Entrando em contato com o suporte...', 'info');
+            // Aqui você pode implementar um sistema de suporte
+            // Por exemplo, abrir um chat, enviar e-mail, etc.
+            window.open('https://wa.me/5511999999999?text=Preciso de ajuda com minha corrida', '_blank');
+        }
+
+        // =============================================================================
+        // DEBUG AND MONITORING FUNCTIONS
+        // =============================================================================
+        function debugCurrentState() {
+            console.log('🔍 ESTADO ATUAL DO APP:', {
+                user: state.user?.id,
+                profile: state.profile?.full_name,
+                currentRide: state.currentRide ? {
+                    id: state.currentRide.id,
+                    status: state.currentRide.status,
+                    driver_id: state.currentRide.driver_id,
+                    has_driver: !!state.currentRide.driver,
+                    has_driver_details: !!state.currentRide.driver_details
+                } : null,
+                subscription: !!state.rideSubscription
+            });
+        }
+
+        // Função para debug - pode ser chamada no console
+        window.debugPassengerApp = debugCurrentState;
+        window.forceRefreshRide = checkPendingRide;
+
+        // Monitor de subscription em intervalos
+        setInterval(() => {
+            if (state.currentRide && !state.rideSubscription) {
+                console.warn('⚠️ Corrida ativa mas subscription perdida! Reconectando...');
+                subscribeToRideUpdates(state.currentRide.id);
+            }
+        }, 30000); // Verifica a cada 30 segundos
+
+        // =============================================================================
+        // INITIALIZATION AND EVENT LISTENERS
+        // =============================================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Event Listeners para formulários
+            document.getElementById('login-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await handleSignIn(
+                    e.target.elements['login-email'].value, 
+                    e.target.elements['login-password'].value
+                );
+            });
+
+            document.getElementById('signup-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await handleSignUp(
+                    e.target.elements['signup-fullname'].value,
+                    e.target.elements['signup-email'].value,
+                    e.target.elements['signup-phone'].value,
+                    e.target.elements['signup-password'].value
+                );
+            });
+
+            document.getElementById('forgot-password-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await handlePasswordReset(e.target.elements['forgot-email'].value);
+            });
+
+            document.getElementById('update-password-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await handleUpdatePassword(e.target.elements['update-password'].value);
+            });
+
+            document.getElementById('complete-profile-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await handleUpdateProfile(state.user.id, e.target.elements['profile-phone'].value);
+            });
+
+            document.getElementById('ride-request-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const origin = e.target.elements['origin'].value;
+                const destination = e.target.elements['destination'].value;
+                await requestRide(origin, destination);
+            });
+
+            // Auth State Change Listener
+            supabaseClient.auth.onAuthStateChange(async (event, session) => {
+                console.log('🔐 Auth state change:', event, session?.user?.id);
+                
+                if (event === 'SIGNED_IN' && session) {
+                    state.user = session.user;
+                    await loadUserProfile(session.user.id);
+                } else if (event === 'SIGNED_OUT') {
+                    state.user = null;
+                    state.profile = null;
+                    state.currentRide = null;
+                    state.statusHistory = [];
+                    if (state.rideSubscription) {
+                        supabaseClient.removeChannel(state.rideSubscription);
+                        state.rideSubscription = null;
+                    }
+                    showScreen('login-screen');
+                } else if (event === 'INITIAL_SESSION' && !session) {
+                    showScreen('login-screen');
+                }
+            });
+
+            // Verificar sessão inicial
+            supabaseClient.auth.getSession().then(async ({ data: { session } }) => {
+                if (session) {
+                    state.user = session.user;
+                    await loadUserProfile(session.user.id);
+                } else {
+                    showScreen('login-screen');
+                }
+            }).catch(error => {
+                console.error("Erro ao verificar sessão inicial:", error);
+                showScreen('login-screen');
+            });
+
+            // Inicializar Google Maps Autocomplete
+            if (typeof google !== 'undefined' && google.maps) {
+                initializeAutocomplete();
+            } else {
+                console.warn('Google Maps não carregado');
+            }
+        });
+    </script>
+</body>
+</html>
