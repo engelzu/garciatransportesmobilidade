@@ -8,7 +8,7 @@ CORREÇÕES BASEADAS NA ESTRUTURA REAL DO SUPABASE:
 
 🔄 RESTAURADO: Todas as funcionalidades que já funcionavam
 🗺️ API KEY: Atualizada para AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g
-🔧 COORDENADAS: Corrigido formato PostGIS para POINT(lng lat)
+🔧 COORDENADAS: Apenas origin_location (destination_location NÃO EXISTE)
 📊 LOGS: Melhorados com base na estrutura real da tabela
 
 ESTRUTURA DA TABELA RIDES (confirmada pelo usuário):
@@ -18,10 +18,13 @@ ESTRUTURA DA TABELA RIDES (confirmada pelo usuário):
 - driver_id (UUID, nullable)
 - status (TEXT)
 - origin_address (TEXT)
-- origin_location (PostGIS POINT)
-- destinations (JSONB array)
+- origin_location (PostGIS POINT) - EXISTE
+- destinations (JSONB array) - para destinos
 - estimated_price, final_price, distance_km (nullable)
 - accepted_at, started_at, completed_at (nullable)
+
+❌ CAMPO QUE NÃO EXISTE: destination_location
+✅ DESTINOS: Armazenados no campo 'destinations' (JSONB array)
 
 Última atualização: 01/10/2025
 =============================================================================
@@ -1136,6 +1139,9 @@ ESTRUTURA DA TABELA RIDES (confirmada pelo usuário):
                         const destinationLat = destinationResult[0].geometry.location.lat();
                         const destinationLng = destinationResult[0].geometry.location.lng();
                         destinationLocation = `POINT(${destinationLng} ${destinationLat})`;
+                        
+                        // NOTA: destino geocodificado mas NÃO salvo no banco (campo não existe)
+                        console.log('ℹ️ Destino geocodificado mas não será salvo (campo não existe no banco)');
 
                     } catch (geocodeError) {
                         console.warn('⚠️ Erro no geocoding:', geocodeError.message);
@@ -1153,7 +1159,7 @@ ESTRUTURA DA TABELA RIDES (confirmada pelo usuário):
                     status: 'requested'
                 };
 
-                // Adicionar coordenadas no formato PostGIS correto
+                // CORREÇÃO: Apenas origin_location existe no banco!
                 if (originLocation) {
                     rideData.origin_location = originLocation;
                 } else {
@@ -1161,12 +1167,8 @@ ESTRUTURA DA TABELA RIDES (confirmada pelo usuário):
                     rideData.origin_location = 'POINT(0 0)';
                 }
                 
-                if (destinationLocation) {
-                    rideData.destination_location = destinationLocation;
-                } else {
-                    // Usar coordenada vazia padrão do PostGIS
-                    rideData.destination_location = 'POINT(0 0)';
-                }
+                // REMOVIDO: destination_location NÃO EXISTE na tabela!
+                // Os destinos ficam apenas no campo 'destinations' (JSONB array)
 
                 console.log('💾 DADOS DA CORRIDA a serem inseridos:');
                 console.log('- passenger_id:', rideData.passenger_id);
@@ -1174,7 +1176,7 @@ ESTRUTURA DA TABELA RIDES (confirmada pelo usuário):
                 console.log('- destinations:', rideData.destinations);
                 console.log('- status:', rideData.status);
                 console.log('- origin_location:', rideData.origin_location || 'N/A');
-                console.log('- destination_location:', rideData.destination_location || 'N/A');
+                // Campo destination_location removido - não existe no banco
 
                 console.log('💾 DADOS PARA INSERT (baseado na estrutura Supabase):');
                 console.log('- passenger_id (UUID):', rideData.passenger_id);
@@ -1182,7 +1184,8 @@ ESTRUTURA DA TABELA RIDES (confirmada pelo usuário):
                 console.log('- destinations (JSONB array):', JSON.stringify(rideData.destinations));
                 console.log('- status (TEXT):', rideData.status);
                 console.log('- origin_location (PostGIS POINT):', rideData.origin_location);
-                console.log('- destination_location (PostGIS POINT):', rideData.destination_location || 'N/A');
+                console.log('- destinations (JSONB array - sem coordenadas):', JSON.stringify(rideData.destinations));
+                console.log('- REMOVIDO: destination_location (campo não existe no banco)');
                 
                 console.log('📊 Executando INSERT na tabela rides...');
                 const { data, error } = await supabaseClient
@@ -1252,7 +1255,7 @@ ESTRUTURA DA TABELA RIDES (confirmada pelo usuário):
                         origin_address,
                         destinations,
                         origin_location,
-                        destination_location,
+                        // destination_location - REMOVIDO (não existe)
                         status,
                         created_at,
                         updated_at
