@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- CORREÇÃO: API KEY FUNCIONANDO -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g&libraries=places"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDZt7BabbQJ3UaLSQYChtMhieikDlqvpLg&libraries=places"></script>
     
     <style>
         body { font-family: 'Poppins', sans-serif; background-color: black; color: white; }
@@ -1118,29 +1118,60 @@
                     console.warn('⚠️ Google Maps não disponível, criando corrida sem geocoding');
                 }
 
-                // Criar corrida no banco de dados
+                // Criar corrida no banco de dados com estrutura corrigida e tratamento de erro robusto
                 const rideData = {
                     passenger_id: state.user.id,
                     origin_address: originAddress,
                     destinations: [destinationAddress], // Array de strings conforme estrutura do motorista
-                    status: 'requested',
-                    created_at: new Date().toISOString()
+                    status: 'requested'
                 };
 
-                // Adicionar coordenadas se disponíveis
-                if (originLocation) rideData.origin_location = originLocation;
-                if (destinationLocation) rideData.destination_location = destinationLocation;
+                // Adicionar coordenadas se disponíveis (campos opcionais)
+                if (originLocation) {
+                    rideData.origin_location = originLocation;
+                }
+                if (destinationLocation) {
+                    rideData.destination_location = destinationLocation;
+                }
 
-                const { data, error } = await supabaseClient.from('rides').insert(rideData).select().single();
+                console.log('💾 DADOS DA CORRIDA a serem inseridos:');
+                console.log('- passenger_id:', rideData.passenger_id);
+                console.log('- origin_address:', rideData.origin_address);
+                console.log('- destinations:', rideData.destinations);
+                console.log('- status:', rideData.status);
+                console.log('- origin_location:', rideData.origin_location || 'N/A');
+                console.log('- destination_location:', rideData.destination_location || 'N/A');
+
+                console.log('📊 Executando INSERT na tabela rides...');
+                const { data, error } = await supabaseClient
+                    .from('rides')
+                    .insert(rideData)
+                    .select('id, passenger_id, driver_id, origin_address, destinations, status, created_at')
+                    .single();
 
                 if (error) {
-                    console.error('❌ Erro ao criar corrida:', error);
+                    console.error('❌ ERRO ao criar corrida no banco:');
+                    console.error('- Código:', error.code);
+                    console.error('- Mensagem:', error.message);
+                    console.error('- Detalhes:', error.details);
+                    console.error('- Hint:', error.hint);
+                    console.error('- Dados enviados:', JSON.stringify(rideData, null, 2));
+                    
                     toast.show('Erro ao solicitar corrida: ' + error.message, 'error');
                     return;
                 }
 
+                if (!data) {
+                    console.error('❌ INSERT retornou sucesso mas sem dados');
+                    toast.show('Erro: Corrida não foi criada corretamente', 'error');
+                    return;
+                }
+
                 state.currentRide = data;
-                console.log('✅ Corrida criada com sucesso:', data.id);
+                console.log('✅ CORRIDA CRIADA COM SUCESSO:');
+                console.log('- ID da corrida:', data.id);
+                console.log('- Status inicial:', data.status);
+                console.log('- Dados completos:', data);
                 
                 // Atualizar interface
                 showRideStatus();
@@ -1159,62 +1190,122 @@
         }
 
         async function checkPendingRide() {
-            if (!state.user) return;
+            if (!state.user) {
+                console.log('⚠️ checkPendingRide: Usuário não está logado');
+                return;
+            }
             
             console.log('🔍 Verificando corridas pendentes para usuário:', state.user.id);
             
             try {
-                const { data, error } = await supabaseClient.from('rides')
+                // QUERY TOTALMENTE SIMPLIFICADA: Apenas tabela rides sem JOINs
+                console.log('📊 Executando query: SELECT * FROM rides WHERE passenger_id =', state.user.id);
+                
+                const { data, error } = await supabaseClient
+                    .from('rides')
                     .select(`
-                        *, 
-                        driver:profiles!rides_driver_id_fkey(full_name, phone_number), 
-                        driver_details(car_model, license_plate, car_color)
+                        id,
+                        passenger_id,
+                        driver_id,
+                        origin_address,
+                        destinations,
+                        origin_location,
+                        destination_location,
+                        status,
+                        created_at,
+                        updated_at
                     `)
                     .eq('passenger_id', state.user.id)
                     .in('status', ['requested', 'assigned', 'accepted', 'arrived_pickup', 'in_progress'])
                     .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
+                    .limit(1);
 
-                if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-                    console.error('❌ Erro ao verificar corrida pendente:', error.message);
-                    return;
+                if (error) {
+                    if (error.code === 'PGRST116') {
+                        console.log('ℹ️ Nenhuma corrida pendente encontrada (PGRST116)');
+                        showRideRequestForm();
+                        return;
+                    }
+                    
+                    console.error('❌ ERRO SQL ao verificar corrida pendente:');
+                    console.error('- Código:', error.code);
+                    console.error('- Mensagem:', error.message);
+                    console.error('- Detalhes:', error.details);
+                    console.error('- Hint:', error.hint);
+                    
+                    // Tentar query ainda mais simples em caso de erro
+                    console.log('🔄 Tentando query simplificada...');
+                    const { data: fallbackData, error: fallbackError } = await supabaseClient
+                        .from('rides')
+                        .select('id, status, driver_id, origin_address, destinations, created_at')
+                        .eq('passenger_id', state.user.id)
+                        .eq('status', 'requested')
+                        .limit(1);
+                    
+                    if (fallbackError) {
+                        console.error('❌ Erro na query fallback também:', fallbackError);
+                        showRideRequestForm();
+                        return;
+                    }
+                    
+                    if (fallbackData && fallbackData.length > 0) {
+                        console.log('✅ Query fallback bem-sucedida');
+                        data = fallbackData;
+                    } else {
+                        console.log('ℹ️ Nenhuma corrida encontrada na query fallback');
+                        showRideRequestForm();
+                        return;
+                    }
                 }
 
-                if (data) {
-                    console.log('🚗 CORRIDA PENDENTE ENCONTRADA:', {
-                        id: data.id,
-                        status: data.status,
-                        driver_id: data.driver_id,
-                        has_driver_data: !!data.driver,
-                        has_driver_details: !!data.driver_details
-                    });
+                // Processar resultado da query principal ou fallback
+                if (data && (Array.isArray(data) ? data.length > 0 : data)) {
+                    const rideData = Array.isArray(data) ? data[0] : data;
                     
-                    state.currentRide = data;
+                    console.log('🚗 CORRIDA PENDENTE ENCONTRADA:');
+                    console.log('- ID:', rideData.id);
+                    console.log('- Status:', rideData.status);
+                    console.log('- Driver ID:', rideData.driver_id || 'Sem motorista');
+                    console.log('- Origem:', rideData.origin_address);
+                    console.log('- Destinos:', rideData.destinations);
+                    
+                    state.currentRide = rideData;
                     showRideStatus();
-                    updateTripDetails(data.origin_address, data.destinations?.[0] || 'Destino não especificado', data.created_at);
-                    updateStatusDisplay(data.status);
                     
-                    // CRÍTICO: Se tem motorista designado, mostrar informações
-                    if (data.driver_id) {
-                        if (data.driver && data.driver_details) {
-                            console.log('✅ Dados do motorista já carregados via JOIN');
-                            updateDriverInfo(data.driver, data.driver_details);
-                        } else {
-                            console.log('🔄 Carregando dados do motorista separadamente...');
-                            await loadDriverInfo(data.driver_id);
+                    // Extrair destino corretamente
+                    let destinationText = 'Destino não especificado';
+                    if (rideData.destinations) {
+                        if (Array.isArray(rideData.destinations) && rideData.destinations.length > 0) {
+                            destinationText = rideData.destinations[0];
+                        } else if (typeof rideData.destinations === 'string') {
+                            destinationText = rideData.destinations;
                         }
+                    }
+                    
+                    updateTripDetails(rideData.origin_address, destinationText, rideData.created_at);
+                    updateStatusDisplay(rideData.status);
+                    
+                    // Se tem motorista designado, carregar informações separadamente
+                    if (rideData.driver_id) {
+                        console.log('🔄 Motorista designado, carregando dados...');
+                        await loadDriverInfo(rideData.driver_id);
                     } else {
                         console.log('⏳ Corrida ainda sem motorista designado');
                     }
                     
-                    subscribeToRideUpdates(data.id);
+                    subscribeToRideUpdates(rideData.id);
                 } else {
                     console.log('ℹ️ Nenhuma corrida pendente encontrada');
                     showRideRequestForm();
                 }
             } catch (error) {
-                console.error('❌ Erro inesperado ao verificar corrida pendente:', error.message);
+                console.error('❌ ERRO CRÍTICO em checkPendingRide:');
+                console.error('- Tipo:', error.constructor.name);
+                console.error('- Mensagem:', error.message);
+                console.error('- Stack:', error.stack);
+                
+                // Em caso de erro total, mostrar formulário
+                console.log('🔄 Recuperando e mostrando formulário de solicitação');
                 showRideRequestForm();
             }
         }
@@ -1305,50 +1396,112 @@
         }
 
         async function loadDriverInfo(driverId) {
+            if (!driverId) {
+                console.warn('⚠️ loadDriverInfo: driverId não fornecido');
+                return;
+            }
+            
             console.log('🔍 Carregando informações do motorista:', driverId);
             
             try {
-                // Buscar dados do perfil do motorista
+                // STEP 1: Buscar dados do perfil do motorista (SEPARADAMENTE)
+                console.log('📊 Buscando perfil do motorista...');
                 const { data: driverData, error: driverError } = await supabaseClient
                     .from('profiles')
-                    .select('full_name, phone_number')
+                    .select('id, full_name, phone_number, email')
                     .eq('id', driverId)
                     .single();
 
                 if (driverError) {
-                    console.error('❌ Erro ao buscar perfil do motorista:', driverError);
-                    throw driverError;
+                    console.error('❌ ERRO ao buscar perfil do motorista:');
+                    console.error('- Código:', driverError.code);
+                    console.error('- Mensagem:', driverError.message);
+                    console.error('- Driver ID buscado:', driverId);
+                    
+                    // Continuar mesmo com erro no perfil
+                    console.log('⚠️ Continuando sem dados do perfil...');
+                } else {
+                    console.log('✅ Perfil do motorista encontrado:', {
+                        id: driverData.id,
+                        nome: driverData.full_name,
+                        telefone: driverData.phone_number
+                    });
                 }
 
-                // Buscar detalhes do veículo
+                // STEP 2: Buscar detalhes do veículo (SEPARADAMENTE)
+                console.log('📊 Buscando detalhes do veículo...');
                 const { data: driverDetailsData, error: detailsError } = await supabaseClient
                     .from('driver_details')
-                    .select('car_model, license_plate, car_color')
-                    .eq('profile_id', driverId)
-                    .single();
+                    .select('profile_id, car_model, license_plate, car_color, car_year')
+                    .eq('profile_id', driverId);
 
                 if (detailsError) {
-                    console.error('❌ Erro ao buscar detalhes do motorista:', detailsError);
-                    throw detailsError;
+                    console.error('❌ ERRO ao buscar detalhes do motorista:');
+                    console.error('- Código:', detailsError.code);
+                    console.error('- Mensagem:', detailsError.message);
+                    console.error('- Profile ID buscado:', driverId);
+                    
+                    // Continuar mesmo com erro nos detalhes
+                    console.log('⚠️ Continuando sem dados do veículo...');
+                } else if (driverDetailsData && driverDetailsData.length > 0) {
+                    console.log('✅ Detalhes do veículo encontrados:', {
+                        profile_id: driverDetailsData[0].profile_id,
+                        modelo: driverDetailsData[0].car_model,
+                        placa: driverDetailsData[0].license_plate,
+                        cor: driverDetailsData[0].car_color
+                    });
+                } else {
+                    console.log('ℹ️ Nenhum detalhe do veículo encontrado para profile_id:', driverId);
                 }
 
-                if (driverData && driverDetailsData) {
-                    console.log('✅ Dados do motorista carregados:', {
-                        nome: driverData.full_name,
-                        telefone: driverData.phone_number,
-                        veiculo: driverDetailsData.car_model,
-                        placa: driverDetailsData.license_plate
-                    });
+                // STEP 3: Processar e exibir os dados disponíveis
+                const hasDriverData = driverData && !driverError;
+                const hasVehicleData = driverDetailsData && driverDetailsData.length > 0 && !detailsError;
+                
+                if (hasDriverData || hasVehicleData) {
+                    console.log('✅ Atualizando interface com dados disponíveis');
                     
-                    state.currentRide.driver = driverData;
-                    state.currentRide.driver_details = driverDetailsData;
-                    updateDriverInfo(driverData, driverDetailsData);
+                    // Armazenar no state
+                    if (hasDriverData) {
+                        state.currentRide.driver = driverData;
+                    }
+                    if (hasVehicleData) {
+                        state.currentRide.driver_details = driverDetailsData[0];
+                    }
+                    
+                    // Atualizar interface
+                    updateDriverInfo(
+                        hasDriverData ? driverData : { full_name: 'Carregando...', phone_number: 'N/A' },
+                        hasVehicleData ? driverDetailsData[0] : { car_model: 'Carregando...', license_plate: 'N/A', car_color: '' }
+                    );
                 } else {
-                    console.warn('⚠️ Dados do motorista incompletos');
+                    console.warn('⚠️ Nenhum dado do motorista pôde ser carregado');
+                    toast.show('Informações do motorista temporariamente indisponíveis', 'warning', 3000);
+                    
+                    // Mostrar pelo menos o card com dados em branco
+                    updateDriverInfo(
+                        { full_name: 'Informação não disponível', phone_number: 'N/A' },
+                        { car_model: 'Informação não disponível', license_plate: 'N/A', car_color: '' }
+                    );
                 }
+                
             } catch (error) {
-                console.error('❌ Erro crítico ao carregar informações do motorista:', error);
-                toast.show('Erro ao carregar dados do motorista', 'warning');
+                console.error('❌ ERRO CRÍTICO em loadDriverInfo:');
+                console.error('- Tipo:', error.constructor.name);
+                console.error('- Mensagem:', error.message);
+                console.error('- Stack:', error.stack);
+                
+                toast.show('Erro ao carregar dados do motorista', 'warning', 3000);
+                
+                // Tentar mostrar card mesmo com erro
+                try {
+                    updateDriverInfo(
+                        { full_name: 'Erro ao carregar', phone_number: 'N/A' },
+                        { car_model: 'Erro ao carregar', license_plate: 'N/A', car_color: '' }
+                    );
+                } catch (uiError) {
+                    console.error('❌ Erro também ao atualizar UI:', uiError);
+                }
             }
         }
 
@@ -1503,31 +1656,120 @@
         // Funções para debug - podem ser chamadas no console
         window.debugPassengerApp = debugCurrentState;
         window.forceRefreshRide = checkPendingRide;
-        window.showAppState = () => console.table(state);
-        window.checkAuth = async () => {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            console.log('VERIFICAÇÃO DE AUTENTICAÇÃO:');
-            console.log('- Sessão Supabase:', session ? 'ATIVA' : 'INATIVA');
-            console.log('- state.user:', state.user ? 'PRESENTE' : 'AUSENTE');
-            console.log('- state.profile:', state.profile ? 'PRESENTE' : 'AUSENTE');
-            return { session, user: state.user, profile: state.profile };
+        window.showAppState = () => {
+            console.log('=== ESTADO COMPLETO DO APP ===');
+            console.table(state);
+            console.log('=== DETALHES ===');
+            console.log('User:', state.user);
+            console.log('Profile:', state.profile);
+            console.log('Current Ride:', state.currentRide);
+            console.log('Subscription:', state.rideSubscription);
         };
-        window.forceLogin = async () => {
-            const { data: { session } } = await supabaseClient.auth.getSession();
+        
+        window.checkAuth = async () => {
+            console.log('=== VERIFICAÇÃO COMPLETA DE AUTENTICAÇÃO ===');
+            
+            const { data: { session }, error } = await supabaseClient.auth.getSession();
+            
+            console.log('1. SESSÃO SUPABASE:');
+            console.log('   - Status:', session ? 'ATIVA' : 'INATIVA');
+            console.log('   - Erro:', error || 'Nenhum');
             if (session) {
+                console.log('   - User ID:', session.user.id);
+                console.log('   - Email:', session.user.email);
+            }
+            
+            console.log('2. ESTADO LOCAL:');
+            console.log('   - state.user:', state.user ? 'PRESENTE' : 'AUSENTE');
+            console.log('   - state.profile:', state.profile ? 'PRESENTE' : 'AUSENTE');
+            console.log('   - state.currentRide:', state.currentRide ? 'PRESENTE' : 'AUSENTE');
+            
+            if (state.user) {
+                console.log('   - User ID local:', state.user.id);
+            }
+            if (state.profile) {
+                console.log('   - Profile Name:', state.profile.full_name);
+                console.log('   - Profile Phone:', state.profile.phone_number);
+            }
+            
+            return { session, user: state.user, profile: state.profile, error };
+        };
+        
+        window.forceLogin = async () => {
+            console.log('=== FORÇANDO LOGIN ===');
+            
+            const { data: { session }, error } = await supabaseClient.auth.getSession();
+            
+            if (error) {
+                console.error('❌ Erro ao obter sessão:', error);
+                return;
+            }
+            
+            if (session) {
+                console.log('✅ Sessão encontrada, definindo state...');
                 state.user = session.user;
-                await loadUserProfile(session.user.id);
-                console.log('✅ Login forçado com sucesso');
+                
+                try {
+                    await loadUserProfile(session.user.id);
+                    console.log('✅ Login forçado com sucesso');
+                } catch (profileError) {
+                    console.error('❌ Erro ao carregar perfil:', profileError);
+                }
             } else {
                 console.log('❌ Nenhuma sessão encontrada');
             }
         };
+        
+        window.testDbConnection = async () => {
+            console.log('=== TESTE DE CONEXÃO COM BANCO ===');
+            
+            try {
+                console.log('1. Testando conexão básica...');
+                const { data, error } = await supabaseClient.from('profiles').select('count').limit(1);
+                console.log('   - Erro:', error || 'Nenhum');
+                console.log('   - Dados:', data);
+                
+                if (state.user) {
+                    console.log('2. Testando busca do perfil atual...');
+                    const { data: profileData, error: profileError } = await supabaseClient
+                        .from('profiles')
+                        .select('*')
+                        .eq('id', state.user.id)
+                        .single();
+                    console.log('   - Erro:', profileError || 'Nenhum');
+                    console.log('   - Dados:', profileData);
+                }
+                
+                console.log('3. Testando tabela rides...');
+                const { data: ridesData, error: ridesError } = await supabaseClient
+                    .from('rides')
+                    .select('count')
+                    .limit(1);
+                console.log('   - Erro:', ridesError || 'Nenhum');
+                console.log('   - Dados:', ridesData);
+                
+            } catch (error) {
+                console.error('❌ Erro no teste:', error);
+            }
+        };
 
-        // Monitor de subscription em intervalos
+        // Monitor de subscription e estado em intervalos
         setInterval(() => {
+            // Verificar subscription perdida
             if (state.currentRide && !state.rideSubscription) {
                 console.warn('⚠️ Corrida ativa mas subscription perdida! Reconectando...');
                 subscribeToRideUpdates(state.currentRide.id);
+            }
+            
+            // Log de status periódico (apenas se em debug)
+            if (window.location.search.includes('debug=true')) {
+                console.log('📊 STATUS PERIÓDICO:', {
+                    timestamp: new Date().toLocaleTimeString(),
+                    user: !!state.user,
+                    profile: !!state.profile,
+                    ride: !!state.currentRide,
+                    subscription: !!state.rideSubscription
+                });
             }
         }, 30000); // Verifica a cada 30 segundos
 
@@ -1574,7 +1816,10 @@
         // INITIALIZATION AND EVENT LISTENERS
         // =============================================================================
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('📄 DOM carregado, configurando event listeners...');
+            console.log('📄 DOM CARREGADO - Configurando aplicação...');
+            console.log('- URL atual:', window.location.href);
+            console.log('- User Agent:', navigator.userAgent);
+            console.log('- Timestamp:', new Date().toISOString());
             
             try {
                 // Event Listeners para formulários
@@ -1636,14 +1881,20 @@
                     });
                 }
 
-                console.log('✅ Event listeners configurados');
+                console.log('✅ EVENT LISTENERS CONFIGURADOS COM SUCESSO');
+                console.log('- Formulários: login, signup, forgot, update, profile, ride');
+                console.log('- Próximo passo: Configurar auth state listener');
             } catch (error) {
                 console.error('❌ Erro ao configurar event listeners:', error);
             }
 
-            // Auth State Change Listener
+            // Auth State Change Listener com debug detalhado
             supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                console.log('🔐 Auth state change:', event, session?.user?.id);
+                console.log('🔐 AUTH STATE CHANGE:');
+                console.log('- Evento:', event);
+                console.log('- Session:', session ? 'PRESENTE' : 'AUSENTE');
+                console.log('- User ID:', session?.user?.id || 'N/A');
+                console.log('- Timestamp:', new Date().toISOString());
                 
                 try {
                     if (event === 'SIGNED_IN' && session) {
