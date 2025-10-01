@@ -1,34 +1,4 @@
 <!DOCTYPE html>
-<!--
-=============================================================================
-GARCIA MOBILIDADE - APP PASSAGEIRO - VERSÃO RESTAURADA E CORRIGIDA
-=============================================================================
-
-CORREÇÕES BASEADAS NA ESTRUTURA REAL DO SUPABASE:
-
-🔄 RESTAURADO: Todas as funcionalidades que já funcionavam
-🗺️ API KEY: Atualizada para AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g
-🔧 COORDENADAS: Apenas origin_location (destination_location NÃO EXISTE)
-📊 LOGS: Melhorados com base na estrutura real da tabela
-
-ESTRUTURA DA TABELA RIDES (confirmada pelo usuário):
-- id (UUID)
-- created_at (timestamp)
-- passenger_id (UUID) 
-- driver_id (UUID, nullable)
-- status (TEXT)
-- origin_address (TEXT)
-- origin_location (PostGIS POINT) - EXISTE
-- destinations (JSONB array) - para destinos
-- estimated_price, final_price, distance_km (nullable)
-- accepted_at, started_at, completed_at (nullable)
-
-❌ CAMPO QUE NÃO EXISTE: destination_location
-✅ DESTINOS: Armazenados no campo 'destinations' (JSONB array)
-
-Última atualização: 01/10/2025
-=============================================================================
--->
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -36,372 +6,70 @@ ESTRUTURA DA TABELA RIDES (confirmada pelo usuário):
     <title>GARCIA MOBILIDADE - Passageiro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- API KEY FORNECIDA PELO USUÁRIO -->
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g&libraries=places"></script>
     
     <style>
-        body { font-family: 'Poppins', sans-serif; background-color: black; color: white; }
+        body { font-family: 'Arial', sans-serif; background-color: black; color: white; }
         .screen { display: none; }
         .screen.active { display: block; }
         .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #6d28d9; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* Autocomplete Google Maps Styling */
-        .pac-container { background-color: #1F2937; border-radius: 8px; border: 1px solid #4B5563; }
-        .pac-item { padding: 10px; font-size: 14px; color: #D1D5DB; cursor: pointer; border-top: 1px solid #374151;}
-        .pac-item:first-child { border-top: none; }
-        .pac-item:hover { background-color: #374151; }
-        .pac-item-query { font-weight: 600; color: #F3F4F6; }
-
-        /* Status Cards Styling */
-        .status-card {
-            background: linear-gradient(135deg, #1f2937, #374151);
-            border: 1px solid #4b5563;
-            border-radius: 12px;
-            padding: 16px;
-            margin: 8px 0;
-            transition: all 0.3s ease;
-        }
-
-        .status-card.active {
-            border-color: #6d28d9;
-            box-shadow: 0 0 20px rgba(109, 40, 217, 0.3);
-            transform: scale(1.02);
-        }
-
-        /* Status específicos com cores */
-        .status-requested { border-left: 4px solid #fbbf24; background: linear-gradient(135deg, #1f2937, #292524); }
-        .status-assigned { border-left: 4px solid #3b82f6; background: linear-gradient(135deg, #1f2937, #1e3a8a); }
-        .status-accepted { border-left: 4px solid #8b5cf6; background: linear-gradient(135deg, #1f2937, #5b21b6); }
-        .status-arrived_pickup { border-left: 4px solid #6366f1; background: linear-gradient(135deg, #1f2937, #4338ca); }
-        .status-in_progress { border-left: 4px solid #10b981; background: linear-gradient(135deg, #1f2937, #059669); }
-        .status-completed { border-left: 4px solid #22c55e; background: linear-gradient(135deg, #1f2937, #16a34a); }
-        .status-cancelled { border-left: 4px solid #ef4444; background: linear-gradient(135deg, #1f2937, #dc2626); }
-
-        /* Animações de pulsação para status ativos */
-        .pulse-animation {
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
-        }
-
-        /* Driver Info Card */
-        .driver-card {
-            background: linear-gradient(135deg, #059669, #10b981);
-            border-radius: 12px;
-            padding: 20px;
-            margin: 16px 0;
-            color: white;
-            box-shadow: 0 8px 32px rgba(16, 185, 129, 0.3);
-        }
-
-        /* Toast Notifications */
-        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 1000; }
-        .toast { 
-            background: #1f2937; border-left: 4px solid; color: white; padding: 16px; border-radius: 8px; 
-            margin-bottom: 10px; min-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-            transform: translateX(400px); transition: all 0.3s ease;
-        }
-        .toast.show { transform: translateX(0); }
-        .toast.success { border-left-color: #22c55e; }
-        .toast.error { border-left-color: #ef4444; }
-        .toast.info { border-left-color: #3b82f6; }
-        .toast.warning { border-left-color: #f59e0b; }
-
-        /* Progress Bar */
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background-color: #374151;
-            border-radius: 4px;
-            overflow: hidden;
-            margin: 16px 0;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #6d28d9, #8b5cf6);
-            transition: width 0.5s ease;
-            border-radius: 4px;
-        }
-
-        /* Loading States */
-        .btn-loading { position: relative; color: transparent; }
-        .btn-loading::after {
-            content: ''; position: absolute; top: 50%; left: 50%; width: 20px; height: 20px;
-            margin: -10px 0 0 -10px; border: 2px solid #ffffff; border-top: 2px solid transparent;
-            border-radius: 50%; animation: spin 1s linear infinite;
-        }
-
-        /* Real-time indicator */
-        .realtime-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            color: #22c55e;
-            font-size: 0.875rem;
-            margin-bottom: 16px;
-        }
-
-        .realtime-dot {
-            width: 8px;
-            height: 8px;
-            background-color: #22c55e;
-            border-radius: 50%;
-            animation: pulse 1.5s infinite;
-        }
-
-        /* Error Recovery */
-        .error-recovery {
-            background: linear-gradient(135deg, #991b1b, #dc2626);
-            border-radius: 12px;
-            padding: 16px;
-            margin: 16px 0;
-            text-align: center;
-        }
-
-        /* Responsividade */
-        @media (max-width: 480px) {
-            .status-card { padding: 12px; margin: 6px 0; }
-            .driver-card { padding: 16px; margin: 12px 0; }
-            .toast { min-width: 280px; }
-        }
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen">
-
-    <!-- Toast Container -->
-    <div id="toast-container" class="toast-container"></div>
 
     <div id="app-container" class="w-full max-w-md mx-auto p-4">
 
         <div id="loading-screen" class="screen active text-center">
             <div class="loader mx-auto"></div>
             <p class="mt-4">Carregando aplicativo...</p>
-            <div id="loading-error" class="error-recovery hidden">
-                <p class="text-white mb-2">⚠️ Problema no carregamento</p>
-                <p class="text-sm text-gray-200 mb-4">Tentando resolver automaticamente...</p>
-                <button onclick="forceReload()" class="py-2 px-4 bg-white text-red-600 rounded-lg font-semibold">
-                    🔄 Recarregar App
-                </button>
-            </div>
+            
+            <!-- Botão de emergência -->
+            <button id="emergency-skip" onclick="forceLogin()" class="hidden mt-4 py-2 px-4 bg-red-600 text-white rounded-lg">
+                🆘 PULAR CARREGAMENTO
+            </button>
         </div>
 
-        <div id="login-screen" class="screen space-y-3">
-            <img src="images/logogarcia.png" alt="Logo Garcia Transportes" class="mx-auto h-16 w-auto mb-6">
+        <div id="login-screen" class="screen space-y-4">
             <h2 class="text-3xl font-bold text-center">Login</h2>
-            
-            <div class="space-y-3 pt-2">
-                <button onclick="handleSignInWithGoogle()" class="w-full py-3 font-semibold rounded-lg bg-white text-gray-800 hover:bg-gray-200 flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.222,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.988,36.635,44,31.023,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
-                    Entrar com Google
-                </button>
-                
-                <button onclick="handleSignInWithFacebook()" class="w-full py-3 font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#3F51B5" d="M42,37c0,2.762-2.238,5-5,5H11c-2.761,0-5-2.238-5-5V11c0-2.762,2.239-5,5-5h26c2.762,0,5,2.238,5,5V37z"></path><path fill="#FFF" d="M34.368,25H31v13h-5V25h-3v-4h3v-2.41c0-3.408,1.72-5.59,5.592-5.59H35v4h-2.287C31.104,17,31,17.6,31,18.723V21h4L34.368,25z"></path></svg>
-                    Entrar com Facebook
-                </button>
-            </div>
-
-            <div class="relative flex py-1 items-center">
-                <div class="flex-grow border-t border-gray-600"></div>
-                <span class="flex-shrink mx-4 text-gray-400">OU</span>
-                <div class="flex-grow border-t border-gray-600"></div>
-            </div>
-
-            <form id="login-form" class="space-y-3">
+            <form id="login-form" class="space-y-4">
                 <div>
-                    <label for="login-email" class="block mb-1 text-sm font-medium">E-mail</label>
-                    <input type="email" id="login-email" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                    <label for="login-email" class="block mb-2 text-sm font-medium">E-mail</label>
+                    <input type="email" id="login-email" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
                 </div>
                 <div>
-                    <label for="login-password" class="block mb-1 text-sm font-medium">Senha</label>
-                    <input type="password" id="login-password" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                    <label for="login-password" class="block mb-2 text-sm font-medium">Senha</label>
+                    <input type="password" id="login-password" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
                 </div>
                 <button type="submit" id="login-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENTRAR</button>
             </form>
-            
-            <div class="text-center">
-                <a href="#" onclick="showScreen('forgot-password-screen')" class="text-sm text-indigo-400">Esqueceu a senha?</a>
-            </div>
-            <p class="text-center text-sm">Não tem uma conta? <a href="#" onclick="showScreen('signup-screen')" class="font-semibold text-indigo-400">Cadastre-se</a></p>
-        </div>
-        
-        <div id="forgot-password-screen" class="screen space-y-4">
-            <h2 class="text-3xl font-bold text-center">Recuperar Senha</h2>
-            <p class="text-center text-gray-400">Digite seu e-mail e enviaremos um link.</p>
-            <form id="forgot-password-form" class="space-y-4">
-                <div>
-                    <label for="forgot-email" class="block mb-2 text-sm font-medium">E-mail</label>
-                    <input type="email" id="forgot-email" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <button type="submit" id="forgot-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENVIAR LINK</button>
-            </form>
-            <p class="text-center">
-                <a href="#" onclick="showScreen('login-screen')" class="font-semibold text-indigo-400">Voltar para o Login</a>
-            </p>
-        </div>
-        
-        <div id="update-password-screen" class="screen space-y-4">
-            <h2 class="text-3xl font-bold text-center">Crie uma Nova Senha</h2>
-            <form id="update-password-form" class="space-y-4">
-                <div>
-                    <label for="update-password" class="block mb-2 text-sm font-medium">Nova Senha</label>
-                    <input type="password" id="update-password" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <button type="submit" id="update-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">SALVAR NOVA SENHA</button>
-            </form>
-        </div>
-        
-        <div id="complete-profile-screen" class="screen space-y-4">
-            <h2 class="text-3xl font-bold text-center">Complete seu Perfil</h2>
-            <p class="text-center text-gray-400">Precisamos de mais uma informação para continuar.</p>
-            <form id="complete-profile-form" class="space-y-4">
-                <div>
-                    <label for="profile-phone" class="block mb-2 text-sm font-medium">Telefone</label>
-                    <input type="tel" id="profile-phone" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="(XX) XXXXX-XXXX" required>
-                </div>
-                <button type="submit" id="profile-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">SALVAR E CONTINUAR</button>
-            </form>
-        </div>
-
-        <div id="signup-screen" class="screen space-y-3">
-            <h2 class="text-3xl font-bold text-center">Cadastro</h2>
-            <form id="signup-form" class="space-y-3">
-                <div>
-                    <label for="signup-fullname" class="block mb-1 text-sm font-medium">Nome Completo</label>
-                    <input type="text" id="signup-fullname" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <div>
-                    <label for="signup-email" class="block mb-1 text-sm font-medium">E-mail</label>
-                    <input type="email" id="signup-email" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <div>
-                    <label for="signup-phone" class="block mb-1 text-sm font-medium">Telefone</label>
-                    <input type="tel" id="signup-phone" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="(XX) XXXXX-XXXX" required>
-                </div>
-                <div>
-                    <label for="signup-password" class="block mb-1 text-sm font-medium">Senha</label>
-                    <input type="password" id="signup-password" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <button type="submit" id="signup-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">CADASTRAR</button>
-            </form>
-            <p class="text-center text-sm">Já tem uma conta? <a href="#" onclick="showScreen('login-screen')" class="font-semibold text-indigo-400">Faça o login</a></p>
         </div>
 
         <div id="user-screen" class="screen space-y-6">
             <div class="flex justify-between items-center">
-                <div class="flex items-center gap-3">
-                    <img src="images/user.png" alt="Ícone do Usuário" class="w-8 h-8">
-                    <h2 class="text-2xl font-bold">Solicitar Viagem</h2>
-                </div>
-                <button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700 transition-colors">Sair</button>
+                <h2 class="text-2xl font-bold">Solicitar Viagem</h2>
+                <button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700">Sair</button>
             </div>
 
             <p id="welcome-message" class="text-lg"></p>
             
-            <!-- FORMULÁRIO DE SOLICITAÇÃO -->
-            <div id="ride-request-container">
-                <form id="ride-request-form" class="space-y-4">
-                    <div>
-                        <label for="origin" class="block mb-2 text-sm font-medium">Origem</label>
-                        <input type="text" id="origin" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="Digite o endereço de partida" required>
-                        <button type="button" onclick="useCurrentLocation()" id="location-button" class="w-full mt-2 py-2 px-4 text-sm font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 transition-colors">
-                            📍 Usar Localização Atual
-                        </button>
-                    </div>
-                    <div>
-                        <label for="destination" class="block mb-2 text-sm font-medium">Destino</label>
-                        <input type="text" id="destination" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="Digite o destino" required>
-                    </div>
-                    <button type="submit" id="request-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">
-                        🚗 SOLICITAR AGORA
-                    </button>
-                </form>
-            </div>
+            <form id="ride-request-form" class="space-y-4">
+                <div>
+                    <label for="origin" class="block mb-2 text-sm font-medium">Origem</label>
+                    <input type="text" id="origin" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="Digite o endereço de partida" required>
+                </div>
+                <div>
+                    <label for="destination" class="block mb-2 text-sm font-medium">Destino</label>
+                    <input type="text" id="destination" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="Digite o destino" required>
+                </div>
+                <button type="submit" id="request-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">
+                    🚗 SOLICITAR AGORA
+                </button>
+            </form>
 
-            <!-- CONTAINER DE STATUS DA CORRIDA -->
-            <div id="ride-status-container" class="hidden">
-                
-                <!-- Indicador de Tempo Real -->
-                <div class="realtime-indicator">
-                    <div class="realtime-dot"></div>
-                    <span>Atualizações em tempo real</span>
-                </div>
-
-                <h3 class="text-xl font-bold mb-4">📱 Status da sua Viagem</h3>
-                
-                <!-- Barra de Progresso -->
-                <div class="progress-bar">
-                    <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
-                </div>
-                
-                <!-- Status Principal -->
-                <div id="main-status-card" class="status-card pulse-animation">
-                    <div class="flex items-center gap-3 mb-2">
-                        <div id="status-icon" class="text-2xl">⏳</div>
-                        <div>
-                            <h4 id="status-title" class="font-bold text-lg">Processando Solicitação</h4>
-                            <p id="status-description" class="text-sm text-gray-300">Aguarde um momento...</p>
-                        </div>
-                    </div>
-                    <p id="status-time" class="text-xs text-gray-400 mt-2">Última atualização: agora</p>
-                </div>
-
-                <!-- Card de Informações do Motorista -->
-                <div id="driver-info-card" class="driver-card hidden">
-                    <h4 class="font-bold text-lg mb-3">🚗 Seu Motorista</h4>
-                    <div class="space-y-2">
-                        <p><strong>👤 Nome:</strong> <span id="driver-name">-</span></p>
-                        <p><strong>🚙 Veículo:</strong> <span id="driver-car">-</span></p>
-                        <p><strong>🔢 Placa:</strong> <span id="driver-plate">-</span></p>
-                        <p><strong>📞 Telefone:</strong> <span id="driver-phone">-</span></p>
-                    </div>
-                    <div class="mt-4 flex gap-2">
-                        <button id="call-driver-btn" onclick="callDriver()" class="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-semibold transition-colors">
-                            📞 Ligar
-                        </button>
-                        <button id="message-driver-btn" onclick="messageDriver()" class="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-semibold transition-colors">
-                            💬 Mensagem
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Histórico de Status -->
-                <div id="status-history" class="mt-6">
-                    <h4 class="font-bold text-lg mb-3">📋 Histórico da Viagem</h4>
-                    <div id="status-timeline" class="space-y-2">
-                        <!-- Status history items will be populated here -->
-                    </div>
-                </div>
-
-                <!-- Informações da Viagem -->
-                <div id="trip-details" class="status-card mt-4">
-                    <h4 class="font-bold text-lg mb-3">📍 Detalhes da Viagem</h4>
-                    <div class="space-y-2 text-sm">
-                        <p><strong>🟢 Origem:</strong> <span id="trip-origin">-</span></p>
-                        <p><strong>🔴 Destino:</strong> <span id="trip-destination">-</span></p>
-                        <p><strong>🕐 Solicitado:</strong> <span id="trip-time">-</span></p>
-                    </div>
-                </div>
-
-                <!-- Botões de Ação -->
-                <div class="flex gap-3 mt-6">
-                    <button id="cancel-ride-btn" onclick="cancelRide()" class="flex-1 py-3 font-semibold rounded-lg bg-red-600 hover:bg-red-700 transition-colors">
-                        ❌ CANCELAR VIAGEM
-                    </button>
-                    <button id="help-btn" onclick="getHelp()" class="py-3 px-6 font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 transition-colors">
-                        🆘 AJUDA
-                    </button>
-                </div>
+            <div id="ride-status" class="hidden mt-6 p-4 bg-gray-800 rounded-lg">
+                <h3 class="text-xl font-bold mb-2">Status da Viagem</h3>
+                <p id="status-text">Processando...</p>
             </div>
         </div>
     </div>
@@ -411,1566 +79,170 @@ ESTRUTURA DA TABELA RIDES (confirmada pelo usuário):
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
-        const state = { 
-            user: null, 
-            profile: null, 
-            currentRide: null, 
-            rideSubscription: null,
-            statusHistory: [],
-            isInitializing: false
-        };
+        const state = { user: null, profile: null };
 
-        let loadingTimeout = null;
+        // SISTEMA DE EMERGÊNCIA - mostra botão após 5 segundos
+        setTimeout(() => {
+            if (document.getElementById('loading-screen').classList.contains('active')) {
+                document.getElementById('emergency-skip').classList.remove('hidden');
+            }
+        }, 5000);
 
-        // =============================================================================
-        // SISTEMA DE RECUPERAÇÃO DE ERROS
-        // =============================================================================
-        function setupLoadingTimeout() {
-            loadingTimeout = setTimeout(() => {
-                console.warn('⏰ Timeout de carregamento - mostrando opção de recovery');
-                const loadingError = document.getElementById('loading-error');
-                if (loadingError) {
-                    loadingError.classList.remove('hidden');
-                }
-            }, 15000); // 15 segundos
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
         }
 
-        function clearLoadingTimeout() {
-            if (loadingTimeout) {
-                clearTimeout(loadingTimeout);
-                loadingTimeout = null;
-            }
-        }
-
-        function forceReload() {
-            console.log('🔄 Forçando reload da aplicação');
-            window.location.reload();
-        }
-
-        // =============================================================================
-        // TRATAMENTO DE ERROS GLOBAL
-        // =============================================================================
-        window.addEventListener('error', function(event) {
-            console.error('🚨 Erro global capturado:', event.error);
-            
-            // Se for erro de DOM, tentar recuperar
-            if (event.error && event.error.message && event.error.message.includes('classList')) {
-                console.warn('⚠️ Erro de DOM detectado, tentando recuperação...');
-                setTimeout(() => {
-                    initializeApp();
-                }, 1000);
-            }
-        });
-
-        window.addEventListener('unhandledrejection', function(event) {
-            console.error('🚨 Promise rejection não tratada:', event.reason);
-            
-            // Tratar erro de autenticação
-            if (event.reason && event.reason.message && event.reason.message.includes('Auth')) {
-                console.warn('⚠️ Erro de autenticação detectado');
-                handleAuthError();
-            }
-        });
-
-        function handleAuthError() {
-            console.log('🔧 Recuperando de erro de autenticação...');
-            state.user = null;
-            state.profile = null;
-            state.currentRide = null;
-            
-            if (state.rideSubscription) {
-                try {
-                    supabaseClient.removeChannel(state.rideSubscription);
-                } catch (e) {
-                    console.warn('Erro ao remover subscription:', e);
-                }
-                state.rideSubscription = null;
-            }
-            
+        function forceLogin() {
+            console.log('🆘 FORÇANDO LOGIN');
             showScreen('login-screen');
         }
 
-        // =============================================================================
-        // VERIFICAÇÃO SEGURA DE ELEMENTOS DOM
-        // =============================================================================
-        function safeGetElement(id, retryCount = 0) {
-            const element = document.getElementById(id);
-            if (!element && retryCount < 3) {
-                console.warn(`⚠️ Elemento ${id} não encontrado, tentativa ${retryCount + 1}`);
-                return new Promise(resolve => {
-                    setTimeout(() => {
-                        resolve(safeGetElement(id, retryCount + 1));
-                    }, 500);
-                });
-            }
-            return element;
-        }
-
-        function safeAddClass(elementId, className) {
-            const element = document.getElementById(elementId);
-            if (element && element.classList) {
-                element.classList.add(className);
-                return true;
-            } else {
-                console.warn(`⚠️ Não foi possível adicionar classe ${className} ao elemento ${elementId}`);
-                return false;
-            }
-        }
-
-        function safeRemoveClass(elementId, className) {
-            const element = document.getElementById(elementId);
-            if (element && element.classList) {
-                element.classList.remove(className);
-                return true;
-            } else {
-                console.warn(`⚠️ Não foi possível remover classe ${className} do elemento ${elementId}`);
-                return false;
-            }
-        }
-
-        // =============================================================================
-        // TOAST NOTIFICATION SYSTEM
-        // =============================================================================
-        class ToastManager {
-            constructor() {
-                this.container = document.getElementById('toast-container');
-                this.toasts = [];
-            }
-
-            show(message, type = 'info', duration = 4000) {
-                if (!this.container) {
-                    console.warn('⚠️ Toast container não encontrado');
-                    return;
-                }
-
-                const toast = document.createElement('div');
-                toast.className = `toast ${type}`;
-                toast.innerHTML = `
-                    <div class="flex justify-between items-start">
-                        <div class="flex-1">
-                            <p class="font-medium">${this.getTypeIcon(type)} ${this.getTypeTitle(type)}</p>
-                            <p class="text-sm opacity-90 mt-1">${message}</p>
-                        </div>
-                        <button onclick="this.parentElement.parentElement.remove()" class="ml-3 text-white/60 hover:text-white">
-                            ✕
-                        </button>
-                    </div>
-                `;
-
-                this.container.appendChild(toast);
-                
-                setTimeout(() => toast.classList.add('show'), 100);
-
-                setTimeout(() => {
-                    if (toast.parentElement) {
-                        toast.classList.remove('show');
-                        setTimeout(() => toast.remove(), 300);
-                    }
-                }, duration);
-
-                return toast;
-            }
-
-            getTypeIcon(type) {
-                const icons = {
-                    success: '✅',
-                    error: '❌',
-                    warning: '⚠️',
-                    info: 'ℹ️'
-                };
-                return icons[type] || icons.info;
-            }
-
-            getTypeTitle(type) {
-                const titles = {
-                    success: 'Sucesso',
-                    error: 'Erro',
-                    warning: 'Atenção',
-                    info: 'Informação'
-                };
-                return titles[type] || titles.info;
-            }
-        }
-
-        const toast = new ToastManager();
-
-        // =============================================================================
-        // UTILITY FUNCTIONS
-        // =============================================================================
-        function showScreen(screenId) {
-            try {
-                document.querySelectorAll('.screen').forEach(screen => {
-                    if (screen && screen.classList) {
-                        screen.classList.remove('active');
-                    }
-                });
-                
-                const targetScreen = document.getElementById(screenId);
-                if (targetScreen && targetScreen.classList) {
-                    targetScreen.classList.add('active');
-                    clearLoadingTimeout();
-                } else {
-                    console.error(`❌ Tela ${screenId} não encontrada`);
-                }
-            } catch (error) {
-                console.error('❌ Erro ao mostrar tela:', error);
-            }
-        }
-
-        function showLoading(buttonId) {
-            safeAddClass(buttonId, 'btn-loading');
-            const button = document.getElementById(buttonId);
-            if (button) button.disabled = true;
-        }
-
-        function hideLoading(buttonId) {
-            safeRemoveClass(buttonId, 'btn-loading');
-            const button = document.getElementById(buttonId);
-            if (button) button.disabled = false;
-        }
-
-        function formatTime(dateString) {
-            try {
-                const date = new Date(dateString);
-                return date.toLocaleTimeString('pt-BR', { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                });
-            } catch (error) {
-                console.warn('⚠️ Erro ao formatar hora:', error);
-                return 'N/A';
-            }
-        }
-
-        function formatDateTime(dateString) {
-            try {
-                const date = new Date(dateString);
-                return date.toLocaleString('pt-BR', { 
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                });
-            } catch (error) {
-                console.warn('⚠️ Erro ao formatar data/hora:', error);
-                return 'N/A';
-            }
-        }
-
-        // =============================================================================
-        // STATUS MANAGEMENT SYSTEM
-        // =============================================================================
-        const statusConfig = {
-            'requested': {
-                icon: '⏳',
-                title: 'Solicitação Enviada',
-                description: 'Procurando motorista disponível...',
-                color: '#fbbf24',
-                progress: 15
-            },
-            'assigned': {
-                icon: '🎯',
-                title: 'Motorista Designado',
-                description: 'Um motorista foi designado para sua corrida e está analisando',
-                color: '#3b82f6',
-                progress: 30
-            },
-            'accepted': {
-                icon: '✅',
-                title: 'Motorista Aceitou',
-                description: 'O motorista aceitou sua corrida e está a caminho',
-                color: '#8b5cf6',
-                progress: 45
-            },
-            'arrived_pickup': {
-                icon: '📍',
-                title: 'Motorista Chegou',
-                description: 'O motorista chegou ao local de partida',
-                color: '#6366f1',
-                progress: 70
-            },
-            'in_progress': {
-                icon: '🚗',
-                title: 'Viagem em Andamento',
-                description: 'Você está a caminho do destino. Boa viagem!',
-                color: '#10b981',
-                progress: 85
-            },
-            'completed': {
-                icon: '🏁',
-                title: 'Viagem Concluída',
-                description: 'Você chegou ao destino. Obrigado por usar nossos serviços!',
-                color: '#22c55e',
-                progress: 100
-            },
-            'cancelled': {
-                icon: '❌',
-                title: 'Viagem Cancelada',
-                description: 'A viagem foi cancelada',
-                color: '#ef4444',
-                progress: 0
-            }
-        };
-
-        function updateStatusDisplay(status) {
-            try {
-                const config = statusConfig[status] || statusConfig['requested'];
-                
-                // Atualizar card principal com verificação de segurança
-                const statusIcon = document.getElementById('status-icon');
-                const statusTitle = document.getElementById('status-title');
-                const statusDescription = document.getElementById('status-description');
-                const statusTime = document.getElementById('status-time');
-                const progressFill = document.getElementById('progress-fill');
-
-                if (statusIcon) statusIcon.textContent = config.icon;
-                if (statusTitle) statusTitle.textContent = config.title;
-                if (statusDescription) statusDescription.textContent = config.description;
-                if (statusTime) statusTime.textContent = `Última atualização: ${new Date().toLocaleTimeString('pt-BR')}`;
-                
-                // Atualizar classes CSS
-                const mainCard = document.getElementById('main-status-card');
-                if (mainCard) {
-                    mainCard.className = `status-card status-${status} active pulse-animation`;
-                }
-                
-                // Atualizar barra de progresso
-                if (progressFill) {
-                    progressFill.style.width = `${config.progress}%`;
-                }
-                
-                // Adicionar ao histórico
-                addStatusToHistory(status, config);
-                
-                // Som de notificação para mudanças de status importantes
-                if (['assigned', 'accepted', 'arrived_pickup', 'completed'].includes(status)) {
-                    playNotificationSound();
-                }
-
-                console.log(`✅ Status atualizado para: ${status} - ${config.title}`);
-            } catch (error) {
-                console.error('❌ Erro ao atualizar status display:', error);
-            }
-        }
-
-        function addStatusToHistory(status, config) {
-            try {
-                const timeline = document.getElementById('status-timeline');
-                if (!timeline) return;
-
-                const historyItem = document.createElement('div');
-                historyItem.className = `status-card status-${status}`;
-                historyItem.innerHTML = `
-                    <div class="flex items-center gap-3">
-                        <div class="text-lg">${config.icon}</div>
-                        <div class="flex-1">
-                            <p class="font-semibold text-sm">${config.title}</p>
-                            <p class="text-xs text-gray-400">${new Date().toLocaleTimeString('pt-BR')}</p>
-                        </div>
-                    </div>
-                `;
-                
-                // Inserir no topo do histórico
-                timeline.insertBefore(historyItem, timeline.firstChild);
-                
-                // Manter apenas os últimos 5 itens
-                while (timeline.children.length > 5) {
-                    timeline.removeChild(timeline.lastChild);
-                }
-            } catch (error) {
-                console.warn('⚠️ Erro ao adicionar ao histórico:', error);
-            }
-        }
-
-        function playNotificationSound() {
-            try {
-                // Criar um som simples usando Web Audio API
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                oscillator.frequency.value = 800;
-                oscillator.type = 'sine';
-                
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-                
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.3);
-            } catch (error) {
-                console.log('ℹ️ Som de notificação não disponível');
-            }
-        }
-
-        // =============================================================================
-        // AUTHENTICATION FUNCTIONS (COM TRATAMENTO DE ERRO)
-        // =============================================================================
-        async function handleSignUp(fullName, email, phone, password) {
-            showLoading('signup-btn');
-            try {
-                const { data, error } = await supabaseClient.auth.signUp({ 
-                    email, 
-                    phone, 
-                    password, 
-                    options: { 
-                        data: { 
-                            full_name: fullName, 
-                            user_type: 'passenger' 
-                        } 
-                    } 
-                });
-                
-                if (error) throw error;
-                
-                toast.show('Cadastro realizado! Verifique seu e-mail para ativar sua conta.', 'success');
-                showScreen('login-screen');
-            } catch (error) { 
-                console.error('❌ Erro no cadastro:', error);
-                toast.show('Erro no cadastro: ' + error.message, 'error');
-            } finally {
-                hideLoading('signup-btn');
-            }
-        }
-
         async function handleSignIn(email, password) {
-            showLoading('login-btn');
+            const button = document.getElementById('login-btn');
+            button.disabled = true;
+            button.textContent = 'Entrando...';
+            
             try {
+                console.log('🔐 Fazendo login...');
                 const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
                 if (error) throw error;
-                console.log('✅ Login realizado com sucesso');
-                toast.show('Login realizado com sucesso!', 'success');
+                
+                console.log('✅ Login OK:', data.user.id);
+                state.user = data.user;
+                await loadUserProfile(data.user.id);
+                
             } catch (error) { 
-                console.error('❌ Erro no login:', error);
-                toast.show('Erro no login: ' + error.message, 'error');
+                console.error('❌ Erro login:', error.message);
+                alert('Erro no login: ' + error.message);
             } finally {
-                hideLoading('login-btn');
-            }
-        }
-        
-        async function handleSignInWithGoogle() {
-            try {
-                const { data, error } = await supabaseClient.auth.signInWithOAuth({ 
-                    provider: 'google', 
-                    options: { 
-                        redirectTo: window.location.origin + '/passageiro.html'
-                    } 
-                });
-                if (error) throw error;
-            } catch (error) { 
-                console.error('❌ Erro login Google:', error);
-                toast.show('Erro ao tentar login com Google: ' + error.message, 'error');
+                button.disabled = false;
+                button.textContent = 'ENTRAR';
             }
         }
 
-        async function handleSignInWithFacebook() {
+        async function loadUserProfile(userId) {
             try {
-                const { data, error } = await supabaseClient.auth.signInWithOAuth({ 
-                    provider: 'facebook', 
-                    options: { 
-                        redirectTo: window.location.origin + '/passageiro.html'
-                    } 
-                });
+                console.log('📂 Carregando perfil:', userId);
+                const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
                 if (error) throw error;
+                
+                state.profile = data;
+                console.log('✅ Perfil OK:', data.full_name);
+                
+                document.getElementById('welcome-message').textContent = `Olá, ${data.full_name}!`;
+                showScreen('user-screen');
+                
             } catch (error) { 
-                console.error('❌ Erro login Facebook:', error);
-                toast.show('Erro ao tentar login com Facebook: ' + error.message, 'error');
+                console.error('❌ Erro perfil:', error.message);
+                alert('Erro ao carregar perfil: ' + error.message);
+            }
+        }
+
+        async function requestRide(originAddress, destinationAddress) {
+            if (!state.user) {
+                alert('Você precisa estar logado');
+                return;
+            }
+
+            const button = document.getElementById('request-btn');
+            button.disabled = true;
+            button.textContent = 'Criando...';
+            
+            try {
+                console.log('🚗 Criando corrida...');
+                
+                const rideData = {
+                    passenger_id: state.user.id,
+                    origin_address: originAddress,
+                    origin_location: 'POINT(0 0)',
+                    destinations: [destinationAddress],
+                    status: 'requested'
+                };
+
+                console.log('📊 Dados:', rideData);
+
+                const { data, error } = await supabaseClient
+                    .from('rides')
+                    .insert(rideData)
+                    .select('id, status')
+                    .single();
+
+                if (error) {
+                    console.error('❌ INSERT ERROR:', error);
+                    throw error;
+                }
+
+                console.log('✅ Corrida criada:', data.id);
+                
+                document.getElementById('ride-status').classList.remove('hidden');
+                document.getElementById('status-text').textContent = 'Corrida solicitada! ID: ' + data.id;
+                
+            } catch (error) {
+                console.error('❌ Erro corrida:', error);
+                alert('Erro ao solicitar corrida: ' + error.message);
+            } finally {
+                button.disabled = false;
+                button.textContent = '🚗 SOLICITAR AGORA';
             }
         }
 
         async function handleSignOut() {
             try {
-                if (state.rideSubscription) {
-                    supabaseClient.removeChannel(state.rideSubscription);
-                    state.rideSubscription = null;
-                }
-                state.currentRide = null;
-                state.statusHistory = [];
                 await supabaseClient.auth.signOut();
-                console.log('✅ Logout realizado');
-                toast.show('Logout realizado com sucesso', 'success');
-            } catch (error) {
-                console.error('❌ Erro no logout:', error);
-                toast.show('Erro ao fazer logout: ' + error.message, 'error');
-                // Force recovery se logout falhar
-                handleAuthError();
-            }
-        }
-
-        async function handlePasswordReset(email) {
-            showLoading('forgot-btn');
-            try {
-                const { data, error } = await supabaseClient.auth.resetPasswordForEmail(email);
-                if (error) throw error;
-                toast.show('Link de recuperação de senha enviado! Verifique seu e-mail.', 'success');
+                state.user = null;
+                state.profile = null;
                 showScreen('login-screen');
-            } catch (error) { 
-                console.error('❌ Erro reset senha:', error);
-                toast.show('Erro ao enviar e-mail de recuperação: ' + error.message, 'error');
-            } finally {
-                hideLoading('forgot-btn');
-            }
-        }
-        
-        async function handleUpdatePassword(newPassword) {
-            showLoading('update-btn');
-            try {
-                const { data, error } = await supabaseClient.auth.updateUser({ password: newPassword });
-                if (error) throw error;
-                toast.show('Senha atualizada com sucesso!', 'success');
-                await handleSignOut();
-            } catch (error) { 
-                console.error('❌ Erro update senha:', error);
-                toast.show('Erro ao atualizar a senha: ' + error.message, 'error');
-            } finally {
-                hideLoading('update-btn');
-            }
-        }
-        
-        async function handleUpdateProfile(userId, phone) {
-            showLoading('profile-btn');
-            try {
-                const { data, error } = await supabaseClient.from('profiles').update({ phone_number: phone }).eq('id', userId);
-                if (error) throw error;
-                await loadUserProfile(userId);
-                toast.show('Perfil atualizado com sucesso!', 'success');
-            } catch(error) { 
-                console.error('❌ Erro update perfil:', error);
-                toast.show('Erro ao salvar o telefone: ' + error.message, 'error');
-            } finally {
-                hideLoading('profile-btn');
+            } catch (error) {
+                console.error('❌ Erro logout:', error);
+                alert('Erro ao fazer logout');
             }
         }
 
-        async function loadUserProfile(userId) {
-            if (!userId) {
-                console.error("❌ loadUserProfile: userId é nulo.");
-                handleAuthError();
-                return;
-            }
+        // INICIALIZAÇÃO SIMPLES
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 App iniciando...');
             
-            try {
-                console.log('🔍 Carregando perfil do usuário:', userId);
-                const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
-                if (error) {
-                    console.error('❌ Erro ao buscar perfil:', error.message);
-                    handleAuthError();
-                    return;
-                }
-                
-                state.profile = data;
-                console.log('✅ Perfil carregado:', data.full_name);
-                
-                // GARANTIR que o user também está definido
-                if (!state.user) {
-                    const { data: { session } } = await supabaseClient.auth.getSession();
-                    if (session?.user) {
-                        state.user = session.user;
-                        console.log('✅ User definido via sessão:', session.user.id);
-                    }
-                }
-                
-                if (!state.profile.phone_number) {
-                    showScreen('complete-profile-screen');
-                } else {
-                    const welcomeMsg = document.getElementById('welcome-message');
-                    if (welcomeMsg) {
-                        welcomeMsg.textContent = `Olá, ${state.profile.full_name}!`;
-                    }
-                    
-                    console.log('✅ PERFIL CARREGADO E ESTADO DEFINIDO:');
-                    console.log('- User ID:', state.user?.id);
-                    console.log('- Profile Name:', state.profile?.full_name);
-                    console.log('- Profile Phone:', state.profile?.phone_number);
-                    
-                    await checkPendingRide();
-                    if (!state.currentRide) {
-                        showRideRequestForm();
-                    }
-                    showScreen('user-screen');
-                }
-            } catch (error) { 
-                console.error('❌ Erro inesperado ao carregar perfil:', error.message); 
-                handleAuthError();
-            }
-        }
-
-        // =============================================================================
-        // GOOGLE MAPS INTEGRATION (COM FALLBACK)
-        // =============================================================================
-        function initializeAutocomplete() {
-            try {
-                if (typeof google !== 'undefined' && google.maps && google.maps.places) {
-                    const originInput = document.getElementById('origin');
-                    const destinationInput = document.getElementById('destination');
-                    const options = { 
-                        types: ['address'], 
-                        componentRestrictions: { 'country': 'br' } 
-                    };
-                    
-                    if (originInput && destinationInput) {
-                        new google.maps.places.Autocomplete(originInput, options);
-                        new google.maps.places.Autocomplete(destinationInput, options);
-                        console.log('✅ Google Maps Autocomplete inicializado');
-                    }
-                } else {
-                    console.warn('⚠️ Google Maps não carregado completamente');
-                    // Retry after 2 seconds
-                    setTimeout(initializeAutocomplete, 2000);
-                }
-            } catch (error) {
-                console.error('❌ Erro ao inicializar autocomplete:', error);
-                toast.show('Autocomplete de endereços não disponível', 'warning');
-            }
-        }
-
-        async function useCurrentLocation() {
-            if (!navigator.geolocation) {
-                toast.show('Geolocalização não é suportada pelo seu navegador.', 'error');
-                return;
-            }
-
-            const originInput = document.getElementById('origin');
-            const locationButton = document.getElementById('location-button');
-
-            if (!originInput || !locationButton) {
-                console.error('❌ Elementos de localização não encontrados');
-                return;
-            }
-
-            originInput.value = 'Obtendo localização...';
-            locationButton.disabled = true;
-            locationButton.innerHTML = '🔄 Obtendo localização...';
-
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    
-                    if (typeof google !== 'undefined' && google.maps && google.maps.Geocoder) {
-                        const geocoder = new google.maps.Geocoder();
-                        
-                        geocoder.geocode({ 'location': { lat, lng } }, (results, status) => {
-                            if (status === 'OK' && results[0]) {
-                                originInput.value = results[0].formatted_address;
-                                toast.show('Localização obtida com sucesso!', 'success');
-                            } else {
-                                originInput.value = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
-                                console.warn('⚠️ Geocoder failed:', status);
-                                toast.show('Coordenadas obtidas, mas não foi possível obter o endereço.', 'warning');
-                            }
-                            locationButton.disabled = false;
-                            locationButton.innerHTML = '📍 Usar Localização Atual';
-                        });
-                    } else {
-                        // Fallback sem geocoding
-                        originInput.value = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
-                        toast.show('Coordenadas obtidas com sucesso!', 'success');
-                        locationButton.disabled = false;
-                        locationButton.innerHTML = '📍 Usar Localização Atual';
-                    }
-                },
-                (error) => {
-                    console.error('❌ Erro ao obter localização:', error);
-                    toast.show('Não foi possível obter sua localização. Verifique as permissões do navegador.', 'error');
-                    originInput.value = '';
-                    locationButton.disabled = false;
-                    locationButton.innerHTML = '📍 Usar Localização Atual';
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-        }
-
-        // =============================================================================
-        // RIDE MANAGEMENT (COM TRATAMENTO DE ERRO ROBUSTO)
-        // =============================================================================
-        async function requestRide(originAddress, destinationAddress) {
-            if (!state.user || !state.profile) {
-                toast.show('Você precisa estar logado para solicitar uma corrida.', 'error');
-                return;
-            }
-
-            if (!originAddress.trim() || !destinationAddress.trim()) {
-                toast.show('Por favor, preencha origem e destino.', 'warning');
-                return;
-            }
-
-            showLoading('request-btn');
-            console.log('🚗 Solicitando corrida:', { origem: originAddress, destino: destinationAddress });
-
-            try {
-                // Geocodificar apenas se Google Maps estiver disponível
-                let originLocation = null;
-                let destinationLocation = null;
-
-                if (typeof google !== 'undefined' && google.maps && google.maps.Geocoder) {
-                    const geocoder = new google.maps.Geocoder();
-
-                    try {
-                        // Geocodificar origem
-                        const originResult = await new Promise((resolve, reject) => {
-                            geocoder.geocode({ 'address': originAddress }, (results, status) => {
-                                if (status === 'OK' && results.length > 0) {
-                                    resolve(results);
-                                } else {
-                                    reject(new Error('Origem não encontrada.'));
-                                }
-                            });
-                        });
-                        
-                        const originLat = originResult[0].geometry.location.lat();
-                        const originLng = originResult[0].geometry.location.lng();
-                        originLocation = `POINT(${originLng} ${originLat})`;
-
-                        // Geocodificar destino
-                        const destinationResult = await new Promise((resolve, reject) => {
-                            geocoder.geocode({ 'address': destinationAddress }, (results, status) => {
-                                if (status === 'OK' && results.length > 0) {
-                                    resolve(results);
-                                } else {
-                                    reject(new Error('Destino não encontrado.'));
-                                }
-                            });
-                        });
-                        
-                        const destinationLat = destinationResult[0].geometry.location.lat();
-                        const destinationLng = destinationResult[0].geometry.location.lng();
-                        destinationLocation = `POINT(${destinationLng} ${destinationLat})`;
-                        
-                        // NOTA: destino geocodificado mas NÃO salvo no banco (campo não existe)
-                        console.log('ℹ️ Destino geocodificado mas não será salvo (campo não existe no banco)');
-
-                    } catch (geocodeError) {
-                        console.warn('⚠️ Erro no geocoding:', geocodeError.message);
-                        toast.show('Aviso: Não foi possível validar endereços, mas a corrida será criada.', 'warning');
-                    }
-                } else {
-                    console.warn('⚠️ Google Maps não disponível, criando corrida sem geocoding');
-                }
-
-                // Criar corrida no banco de dados com estrutura corrigida e tratamento de erro robusto
-                const rideData = {
-                    passenger_id: state.user.id,
-                    origin_address: originAddress,
-                    destinations: [destinationAddress], // Array de strings conforme estrutura do motorista
-                    status: 'requested'
-                };
-
-                // CORREÇÃO: Apenas origin_location existe no banco!
-                if (originLocation) {
-                    rideData.origin_location = originLocation;
-                } else {
-                    // Usar coordenada vazia padrão do PostGIS (como nos dados do Supabase)
-                    rideData.origin_location = 'POINT(0 0)';
-                }
-                
-                // REMOVIDO: destination_location NÃO EXISTE na tabela!
-                // Os destinos ficam apenas no campo 'destinations' (JSONB array)
-
-                console.log('💾 DADOS DA CORRIDA a serem inseridos:');
-                console.log('- passenger_id:', rideData.passenger_id);
-                console.log('- origin_address:', rideData.origin_address);
-                console.log('- destinations:', rideData.destinations);
-                console.log('- status:', rideData.status);
-                console.log('- origin_location:', rideData.origin_location || 'N/A');
-                // Campo destination_location removido - não existe no banco
-
-                console.log('💾 DADOS PARA INSERT (baseado na estrutura Supabase):');
-                console.log('- passenger_id (UUID):', rideData.passenger_id);
-                console.log('- origin_address (TEXT):', rideData.origin_address);
-                console.log('- destinations (JSONB array):', JSON.stringify(rideData.destinations));
-                console.log('- status (TEXT):', rideData.status);
-                console.log('- origin_location (PostGIS POINT):', rideData.origin_location);
-                console.log('- destinations (JSONB array - sem coordenadas):', JSON.stringify(rideData.destinations));
-                console.log('- REMOVIDO: destination_location (campo não existe no banco)');
-                
-                console.log('📊 Executando INSERT na tabela rides...');
-                const { data, error } = await supabaseClient
-                    .from('rides')
-                    .insert(rideData)
-                    .select('id, passenger_id, driver_id, status, origin_address, destinations, created_at')
-                    .single();
-
-                if (error) {
-                    console.error('❌ ERRO ao criar corrida no banco:');
-                    console.error('- Código:', error.code);
-                    console.error('- Mensagem:', error.message);
-                    console.error('- Detalhes:', error.details);
-                    console.error('- Hint:', error.hint);
-                    console.error('- Dados enviados:', JSON.stringify(rideData, null, 2));
-                    
-                    toast.show('Erro ao solicitar corrida: ' + error.message, 'error');
-                    return;
-                }
-
-                if (!data) {
-                    console.error('❌ INSERT retornou sucesso mas sem dados');
-                    toast.show('Erro: Corrida não foi criada corretamente', 'error');
-                    return;
-                }
-
-                state.currentRide = data;
-                console.log('✅ CORRIDA CRIADA COM SUCESSO:');
-                console.log('- ID da corrida:', data.id);
-                console.log('- Status inicial:', data.status);
-                console.log('- Dados completos:', data);
-                
-                // Atualizar interface
-                showRideStatus();
-                updateTripDetails(originAddress, destinationAddress, data.created_at);
-                updateStatusDisplay('requested');
-                subscribeToRideUpdates(data.id);
-                
-                toast.show('Corrida solicitada com sucesso! Procurando motorista...', 'success');
-
-            } catch (error) {
-                console.error('❌ Erro inesperado ao solicitar corrida:', error);
-                toast.show('Erro inesperado ao solicitar corrida: ' + error.message, 'error');
-            } finally {
-                hideLoading('request-btn');
-            }
-        }
-
-        async function checkPendingRide() {
-            if (!state.user) {
-                console.log('⚠️ checkPendingRide: Usuário não está logado');
-                return;
-            }
-            
-            console.log('🔍 Verificando corridas pendentes para usuário:', state.user.id);
-            
-            try {
-                // QUERY TOTALMENTE SIMPLIFICADA: Apenas tabela rides sem JOINs
-                console.log('📊 Executando query: SELECT * FROM rides WHERE passenger_id =', state.user.id);
-                
-                const { data, error } = await supabaseClient
-                    .from('rides')
-                    .select(`
-                        id,
-                        passenger_id,
-                        driver_id,
-                        origin_address,
-                        destinations,
-                        origin_location,
-                        // destination_location - REMOVIDO (não existe)
-                        status,
-                        created_at,
-                        updated_at
-                    `)
-                    .eq('passenger_id', state.user.id)
-                    .in('status', ['requested', 'assigned', 'accepted', 'arrived_pickup', 'in_progress'])
-                    .order('created_at', { ascending: false })
-                    .limit(1);
-
-                if (error) {
-                    if (error.code === 'PGRST116') {
-                        console.log('ℹ️ Nenhuma corrida pendente encontrada (PGRST116)');
-                        showRideRequestForm();
-                        return;
-                    }
-                    
-                    console.error('❌ ERRO SQL ao verificar corrida pendente:');
-                    console.error('- Código:', error.code);
-                    console.error('- Mensagem:', error.message);
-                    console.error('- Detalhes:', error.details);
-                    console.error('- Hint:', error.hint);
-                    
-                    // Tentar query ainda mais simples em caso de erro
-                    console.log('🔄 Tentando query simplificada...');
-                    const { data: fallbackData, error: fallbackError } = await supabaseClient
-                        .from('rides')
-                        .select('id, status, driver_id, origin_address, destinations, created_at')
-                        .eq('passenger_id', state.user.id)
-                        .eq('status', 'requested')
-                        .limit(1);
-                    
-                    if (fallbackError) {
-                        console.error('❌ Erro na query fallback também:', fallbackError);
-                        showRideRequestForm();
-                        return;
-                    }
-                    
-                    if (fallbackData && fallbackData.length > 0) {
-                        console.log('✅ Query fallback bem-sucedida');
-                        data = fallbackData;
-                    } else {
-                        console.log('ℹ️ Nenhuma corrida encontrada na query fallback');
-                        showRideRequestForm();
-                        return;
-                    }
-                }
-
-                // Processar resultado da query principal ou fallback
-                if (data && (Array.isArray(data) ? data.length > 0 : data)) {
-                    const rideData = Array.isArray(data) ? data[0] : data;
-                    
-                    console.log('🚗 CORRIDA PENDENTE ENCONTRADA:');
-                    console.log('- ID:', rideData.id);
-                    console.log('- Status:', rideData.status);
-                    console.log('- Driver ID:', rideData.driver_id || 'Sem motorista');
-                    console.log('- Origem:', rideData.origin_address);
-                    console.log('- Destinos:', rideData.destinations);
-                    
-                    state.currentRide = rideData;
-                    showRideStatus();
-                    
-                    // Extrair destino corretamente
-                    let destinationText = 'Destino não especificado';
-                    if (rideData.destinations) {
-                        if (Array.isArray(rideData.destinations) && rideData.destinations.length > 0) {
-                            destinationText = rideData.destinations[0];
-                        } else if (typeof rideData.destinations === 'string') {
-                            destinationText = rideData.destinations;
-                        }
-                    }
-                    
-                    updateTripDetails(rideData.origin_address, destinationText, rideData.created_at);
-                    updateStatusDisplay(rideData.status);
-                    
-                    // Se tem motorista designado, carregar informações separadamente
-                    if (rideData.driver_id) {
-                        console.log('🔄 Motorista designado, carregando dados...');
-                        await loadDriverInfo(rideData.driver_id);
-                    } else {
-                        console.log('⏳ Corrida ainda sem motorista designado');
-                    }
-                    
-                    subscribeToRideUpdates(rideData.id);
-                } else {
-                    console.log('ℹ️ Nenhuma corrida pendente encontrada');
-                    showRideRequestForm();
-                }
-            } catch (error) {
-                console.error('❌ ERRO CRÍTICO em checkPendingRide:');
-                console.error('- Tipo:', error.constructor.name);
-                console.error('- Mensagem:', error.message);
-                console.error('- Stack:', error.stack);
-                
-                // Em caso de erro total, mostrar formulário
-                console.log('🔄 Recuperando e mostrando formulário de solicitação');
-                showRideRequestForm();
-            }
-        }
-
-        function subscribeToRideUpdates(rideId) {
-            if (state.rideSubscription) {
-                supabaseClient.removeChannel(state.rideSubscription);
-            }
-
-            console.log('🔔 Iniciando subscription para corrida:', rideId);
-            
-            try {
-                state.rideSubscription = supabaseClient
-                    .channel(`public:rides_${rideId}`)
-                    .on('postgres_changes', { 
-                        event: '*', 
-                        schema: 'public', 
-                        table: 'rides', 
-                        filter: `id=eq.${rideId}` 
-                    }, async payload => {
-                        console.log('🔄 ATUALIZAÇÃO RECEBIDA:', payload);
-                        const { eventType, new: updatedRide, old: oldRide } = payload;
-                        
-                        if (eventType === 'UPDATE' && updatedRide) {
-                            console.log('📊 Status anterior:', oldRide?.status, '→ Novo status:', updatedRide.status);
-                            console.log('👤 Driver anterior:', oldRide?.driver_id, '→ Novo driver:', updatedRide.driver_id);
-                            
-                            // Atualizar estado global
-                            const previousDriverId = state.currentRide?.driver_id;
-                            state.currentRide = { ...state.currentRide, ...updatedRide };
-                            
-                            // Atualizar status visual
-                            updateStatusDisplay(updatedRide.status);
-                            
-                            // CRÍTICO: Se motorista foi designado/mudou
-                            if (updatedRide.driver_id && updatedRide.driver_id !== previousDriverId) {
-                                console.log('🚗 NOVO MOTORISTA DESIGNADO:', updatedRide.driver_id);
-                                await loadDriverInfo(updatedRide.driver_id);
-                                
-                                // Notificar que motorista foi designado
-                                toast.show('Motorista designado para sua corrida!', 'success', 5000);
-                            }
-                            
-                            // Notificações para todas as mudanças de status importantes
-                            const importantStatuses = ['assigned', 'accepted', 'arrived_pickup', 'in_progress', 'completed', 'cancelled'];
-                            if (importantStatuses.includes(updatedRide.status)) {
-                                const statusInfo = statusConfig[updatedRide.status] || statusConfig['requested'];
-                                toast.show(statusInfo.title + ': ' + statusInfo.description, 'info', 6000);
-                            }
-                            
-                            // Limpar subscription se corrida finalizada
-                            if (['completed', 'cancelled'].includes(updatedRide.status)) {
-                                setTimeout(() => {
-                                    if (state.rideSubscription) {
-                                        supabaseClient.removeChannel(state.rideSubscription);
-                                        state.rideSubscription = null;
-                                    }
-                                    state.currentRide = null;
-                                    
-                                    if (updatedRide.status === 'completed') {
-                                        setTimeout(() => showRideRequestForm(), 5000);
-                                    } else {
-                                        setTimeout(() => showRideRequestForm(), 3000);
-                                    }
-                                }, 2000);
-                            }
-                        }
-                    })
-                    .subscribe(status => {
-                        console.log('📡 Status da subscription:', status);
-                        if (status === 'SUBSCRIBED') {
-                            console.log(`✅ CONECTADO ao canal de atualizações da corrida ${rideId}!`);
-                            toast.show('Conectado às atualizações em tempo real', 'success', 3000);
-                        } else if (status === 'CHANNEL_ERROR') {
-                            console.error('❌ Erro no canal de subscription');
-                            toast.show('Erro na conexão em tempo real. Tentando reconectar...', 'warning');
-                            
-                            // Tentar reconectar após 3 segundos
-                            setTimeout(() => {
-                                subscribeToRideUpdates(rideId);
-                            }, 3000);
-                        }
-                    });
-            } catch (error) {
-                console.error('❌ Erro ao criar subscription:', error);
-                toast.show('Erro ao conectar atualizações em tempo real', 'warning');
-            }
-        }
-
-        async function loadDriverInfo(driverId) {
-            if (!driverId) {
-                console.warn('⚠️ loadDriverInfo: driverId não fornecido');
-                return;
-            }
-            
-            console.log('🔍 Carregando informações do motorista:', driverId);
-            
-            try {
-                // STEP 1: Buscar dados do perfil do motorista (SEPARADAMENTE)
-                console.log('📊 Buscando perfil do motorista...');
-                const { data: driverData, error: driverError } = await supabaseClient
-                    .from('profiles')
-                    .select('id, full_name, phone_number, email')
-                    .eq('id', driverId)
-                    .single();
-
-                if (driverError) {
-                    console.error('❌ ERRO ao buscar perfil do motorista:');
-                    console.error('- Código:', driverError.code);
-                    console.error('- Mensagem:', driverError.message);
-                    console.error('- Driver ID buscado:', driverId);
-                    
-                    // Continuar mesmo com erro no perfil
-                    console.log('⚠️ Continuando sem dados do perfil...');
-                } else {
-                    console.log('✅ Perfil do motorista encontrado:', {
-                        id: driverData.id,
-                        nome: driverData.full_name,
-                        telefone: driverData.phone_number
-                    });
-                }
-
-                // STEP 2: Buscar detalhes do veículo (SEPARADAMENTE)
-                console.log('📊 Buscando detalhes do veículo...');
-                const { data: driverDetailsData, error: detailsError } = await supabaseClient
-                    .from('driver_details')
-                    .select('profile_id, car_model, license_plate, car_color, car_year')
-                    .eq('profile_id', driverId);
-
-                if (detailsError) {
-                    console.error('❌ ERRO ao buscar detalhes do motorista:');
-                    console.error('- Código:', detailsError.code);
-                    console.error('- Mensagem:', detailsError.message);
-                    console.error('- Profile ID buscado:', driverId);
-                    
-                    // Continuar mesmo com erro nos detalhes
-                    console.log('⚠️ Continuando sem dados do veículo...');
-                } else if (driverDetailsData && driverDetailsData.length > 0) {
-                    console.log('✅ Detalhes do veículo encontrados:', {
-                        profile_id: driverDetailsData[0].profile_id,
-                        modelo: driverDetailsData[0].car_model,
-                        placa: driverDetailsData[0].license_plate,
-                        cor: driverDetailsData[0].car_color
-                    });
-                } else {
-                    console.log('ℹ️ Nenhum detalhe do veículo encontrado para profile_id:', driverId);
-                }
-
-                // STEP 3: Processar e exibir os dados disponíveis
-                const hasDriverData = driverData && !driverError;
-                const hasVehicleData = driverDetailsData && driverDetailsData.length > 0 && !detailsError;
-                
-                if (hasDriverData || hasVehicleData) {
-                    console.log('✅ Atualizando interface com dados disponíveis');
-                    
-                    // Armazenar no state
-                    if (hasDriverData) {
-                        state.currentRide.driver = driverData;
-                    }
-                    if (hasVehicleData) {
-                        state.currentRide.driver_details = driverDetailsData[0];
-                    }
-                    
-                    // Atualizar interface
-                    updateDriverInfo(
-                        hasDriverData ? driverData : { full_name: 'Carregando...', phone_number: 'N/A' },
-                        hasVehicleData ? driverDetailsData[0] : { car_model: 'Carregando...', license_plate: 'N/A', car_color: '' }
-                    );
-                } else {
-                    console.warn('⚠️ Nenhum dado do motorista pôde ser carregado');
-                    toast.show('Informações do motorista temporariamente indisponíveis', 'warning', 3000);
-                    
-                    // Mostrar pelo menos o card com dados em branco
-                    updateDriverInfo(
-                        { full_name: 'Informação não disponível', phone_number: 'N/A' },
-                        { car_model: 'Informação não disponível', license_plate: 'N/A', car_color: '' }
-                    );
-                }
-                
-            } catch (error) {
-                console.error('❌ ERRO CRÍTICO em loadDriverInfo:');
-                console.error('- Tipo:', error.constructor.name);
-                console.error('- Mensagem:', error.message);
-                console.error('- Stack:', error.stack);
-                
-                toast.show('Erro ao carregar dados do motorista', 'warning', 3000);
-                
-                // Tentar mostrar card mesmo com erro
-                try {
-                    updateDriverInfo(
-                        { full_name: 'Erro ao carregar', phone_number: 'N/A' },
-                        { car_model: 'Erro ao carregar', license_plate: 'N/A', car_color: '' }
-                    );
-                } catch (uiError) {
-                    console.error('❌ Erro também ao atualizar UI:', uiError);
-                }
-            }
-        }
-
-        function updateDriverInfo(driver, driverDetails) {
-            try {
-                const driverCard = document.getElementById('driver-info-card');
-                const driverName = document.getElementById('driver-name');
-                const driverCar = document.getElementById('driver-car');
-                const driverPlate = document.getElementById('driver-plate');
-                const driverPhone = document.getElementById('driver-phone');
-
-                if (driverName) driverName.textContent = driver.full_name || 'Não informado';
-                if (driverCar) driverCar.textContent = `${driverDetails.car_model || ''} ${driverDetails.car_color || ''}`.trim() || 'Não informado';
-                if (driverPlate) driverPlate.textContent = driverDetails.license_plate || 'Não informado';
-                if (driverPhone) driverPhone.textContent = driver.phone_number || 'Não informado';
-
-                if (driverCard) {
-                    driverCard.classList.remove('hidden');
-                    console.log('✅ Informações do motorista exibidas');
-                }
-            } catch (error) {
-                console.error('❌ Erro ao atualizar informações do motorista:', error);
-            }
-        }
-
-        function updateTripDetails(origin, destination, createdAt) {
-            try {
-                const tripOrigin = document.getElementById('trip-origin');
-                const tripDestination = document.getElementById('trip-destination');
-                const tripTime = document.getElementById('trip-time');
-
-                if (tripOrigin) tripOrigin.textContent = origin;
-                if (tripDestination) tripDestination.textContent = destination;
-                if (tripTime) tripTime.textContent = formatDateTime(createdAt);
-            } catch (error) {
-                console.warn('⚠️ Erro ao atualizar detalhes da viagem:', error);
-            }
-        }
-
-        async function cancelRide() {
-            if (!state.currentRide || !confirm('Tem certeza que deseja cancelar esta viagem?')) {
-                return;
-            }
-
-            try {
-                const { error } = await supabaseClient.from('rides')
-                    .update({ status: 'cancelled' })
-                    .eq('id', state.currentRide.id);
-
-                if (error) {
-                    console.error('❌ Erro ao cancelar corrida:', error);
-                    toast.show('Erro ao cancelar a corrida: ' + error.message, 'error');
-                } else {
-                    console.log('✅ Corrida cancelada com sucesso');
-                    toast.show('Viagem cancelada com sucesso.', 'success');
-                }
-            } catch (error) {
-                console.error('❌ Erro inesperado ao cancelar corrida:', error);
-                toast.show('Erro inesperado ao cancelar corrida: ' + error.message, 'error');
-            }
-        }
-
-        // =============================================================================
-        // UI MANAGEMENT
-        // =============================================================================
-        function showRideRequestForm() {
-            try {
-                const requestContainer = document.getElementById('ride-request-container');
-                const statusContainer = document.getElementById('ride-status-container');
-                
-                if (requestContainer) requestContainer.classList.remove('hidden');
-                if (statusContainer) statusContainer.classList.add('hidden');
-            } catch (error) {
-                console.warn('⚠️ Erro ao mostrar formulário de solicitação:', error);
-            }
-        }
-
-        function showRideStatus() {
-            try {
-                const requestContainer = document.getElementById('ride-request-container');
-                const statusContainer = document.getElementById('ride-status-container');
-                
-                if (requestContainer) requestContainer.classList.add('hidden');
-                if (statusContainer) statusContainer.classList.remove('hidden');
-            } catch (error) {
-                console.warn('⚠️ Erro ao mostrar status da corrida:', error);
-            }
-        }
-
-        // =============================================================================
-        // DRIVER COMMUNICATION
-        // =============================================================================
-        function callDriver() {
-            try {
-                if (state.currentRide?.driver?.phone_number) {
-                    const phoneNumber = state.currentRide.driver.phone_number.replace(/\D/g, '');
-                    window.open(`tel:+55${phoneNumber}`, '_self');
-                } else {
-                    toast.show('Número do motorista não disponível', 'warning');
-                }
-            } catch (error) {
-                console.error('❌ Erro ao tentar ligar:', error);
-                toast.show('Erro ao tentar ligar para o motorista', 'error');
-            }
-        }
-
-        function messageDriver() {
-            try {
-                if (state.currentRide?.driver?.phone_number) {
-                    const phoneNumber = state.currentRide.driver.phone_number.replace(/\D/g, '');
-                    const message = encodeURIComponent('Olá! Sou o passageiro da corrida que você está atendendo.');
-                    window.open(`https://wa.me/55${phoneNumber}?text=${message}`, '_blank');
-                } else {
-                    toast.show('Número do motorista não disponível', 'warning');
-                }
-            } catch (error) {
-                console.error('❌ Erro ao abrir WhatsApp:', error);
-                toast.show('Erro ao abrir WhatsApp', 'error');
-            }
-        }
-
-        function getHelp() {
-            try {
-                toast.show('Entrando em contato com o suporte...', 'info');
-                // Aqui você pode implementar um sistema de suporte
-                // Por exemplo, abrir um chat, enviar e-mail, etc.
-                window.open('https://wa.me/5511999999999?text=Preciso de ajuda com minha corrida', '_blank');
-            } catch (error) {
-                console.error('❌ Erro ao abrir suporte:', error);
-                toast.show('Erro ao tentar contatar suporte', 'error');
-            }
-        }
-
-        // =============================================================================
-        // DEBUG AND MONITORING FUNCTIONS
-        // =============================================================================
-        function debugCurrentState() {
-            console.log('🔍 ESTADO ATUAL DO APP:', {
-                user: state.user?.id,
-                profile: state.profile?.full_name,
-                currentRide: state.currentRide ? {
-                    id: state.currentRide.id,
-                    status: state.currentRide.status,
-                    driver_id: state.currentRide.driver_id,
-                    has_driver: !!state.currentRide.driver,
-                    has_driver_details: !!state.currentRide.driver_details
-                } : null,
-                subscription: !!state.rideSubscription
+            // Event listeners
+            document.getElementById('login-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await handleSignIn(
+                    e.target.elements['login-email'].value, 
+                    e.target.elements['login-password'].value
+                );
             });
-        }
 
-        // Funções para debug - podem ser chamadas no console
-        window.debugPassengerApp = debugCurrentState;
-        window.forceRefreshRide = checkPendingRide;
-        window.showAppState = () => {
-            console.log('=== ESTADO COMPLETO DO APP ===');
-            console.table(state);
-            console.log('=== DETALHES ===');
-            console.log('User:', state.user);
-            console.log('Profile:', state.profile);
-            console.log('Current Ride:', state.currentRide);
-            console.log('Subscription:', state.rideSubscription);
-        };
-        
-        window.checkAuth = async () => {
-            console.log('=== VERIFICAÇÃO COMPLETA DE AUTENTICAÇÃO ===');
-            
-            const { data: { session }, error } = await supabaseClient.auth.getSession();
-            
-            console.log('1. SESSÃO SUPABASE:');
-            console.log('   - Status:', session ? 'ATIVA' : 'INATIVA');
-            console.log('   - Erro:', error || 'Nenhum');
-            if (session) {
-                console.log('   - User ID:', session.user.id);
-                console.log('   - Email:', session.user.email);
-            }
-            
-            console.log('2. ESTADO LOCAL:');
-            console.log('   - state.user:', state.user ? 'PRESENTE' : 'AUSENTE');
-            console.log('   - state.profile:', state.profile ? 'PRESENTE' : 'AUSENTE');
-            console.log('   - state.currentRide:', state.currentRide ? 'PRESENTE' : 'AUSENTE');
-            
-            if (state.user) {
-                console.log('   - User ID local:', state.user.id);
-            }
-            if (state.profile) {
-                console.log('   - Profile Name:', state.profile.full_name);
-                console.log('   - Profile Phone:', state.profile.phone_number);
-            }
-            
-            return { session, user: state.user, profile: state.profile, error };
-        };
-        
-        window.forceLogin = async () => {
-            console.log('=== FORÇANDO LOGIN ===');
-            
-            const { data: { session }, error } = await supabaseClient.auth.getSession();
-            
-            if (error) {
-                console.error('❌ Erro ao obter sessão:', error);
-                return;
-            }
-            
-            if (session) {
-                console.log('✅ Sessão encontrada, definindo state...');
-                state.user = session.user;
-                
+            document.getElementById('ride-request-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const origin = e.target.elements['origin'].value;
+                const destination = e.target.elements['destination'].value;
+                await requestRide(origin, destination);
+            });
+
+            // Verificar sessão
+            setTimeout(async () => {
                 try {
-                    await loadUserProfile(session.user.id);
-                    console.log('✅ Login forçado com sucesso');
-                } catch (profileError) {
-                    console.error('❌ Erro ao carregar perfil:', profileError);
-                }
-            } else {
-                console.log('❌ Nenhuma sessão encontrada');
-            }
-        };
-        
-        window.testDbConnection = async () => {
-            console.log('=== TESTE DE CONEXÃO COM BANCO ===');
-            
-            try {
-                console.log('1. Testando conexão básica...');
-                const { data, error } = await supabaseClient.from('profiles').select('count').limit(1);
-                console.log('   - Erro:', error || 'Nenhum');
-                console.log('   - Dados:', data);
-                
-                if (state.user) {
-                    console.log('2. Testando busca do perfil atual...');
-                    const { data: profileData, error: profileError } = await supabaseClient
-                        .from('profiles')
-                        .select('*')
-                        .eq('id', state.user.id)
-                        .single();
-                    console.log('   - Erro:', profileError || 'Nenhum');
-                    console.log('   - Dados:', profileData);
-                }
-                
-                console.log('3. Testando tabela rides...');
-                const { data: ridesData, error: ridesError } = await supabaseClient
-                    .from('rides')
-                    .select('count')
-                    .limit(1);
-                console.log('   - Erro:', ridesError || 'Nenhum');
-                console.log('   - Dados:', ridesData);
-                
-            } catch (error) {
-                console.error('❌ Erro no teste:', error);
-            }
-        };
-
-        // Monitor de subscription e estado em intervalos
-        setInterval(() => {
-            // Verificar subscription perdida
-            if (state.currentRide && !state.rideSubscription) {
-                console.warn('⚠️ Corrida ativa mas subscription perdida! Reconectando...');
-                subscribeToRideUpdates(state.currentRide.id);
-            }
-            
-            // Log de status periódico (apenas se em debug)
-            if (window.location.search.includes('debug=true')) {
-                console.log('📊 STATUS PERIÓDICO:', {
-                    timestamp: new Date().toLocaleTimeString(),
-                    user: !!state.user,
-                    profile: !!state.profile,
-                    ride: !!state.currentRide,
-                    subscription: !!state.rideSubscription
-                });
-            }
-        }, 30000); // Verifica a cada 30 segundos
-
-        // =============================================================================
-        // INITIALIZATION
-        // =============================================================================
-        function initializeApp() {
-            if (state.isInitializing) {
-                console.log('⏳ App já está inicializando...');
-                return;
-            }
-            
-            state.isInitializing = true;
-            setupLoadingTimeout();
-            
-            console.log('🚀 Inicializando aplicação...');
-            
-            // Verificar sessão inicial
-            supabaseClient.auth.getSession().then(async ({ data: { session } }) => {
-                try {
-                    if (session) {
+                    console.log('🔍 Verificando sessão...');
+                    const { data: { session } } = await supabaseClient.auth.getSession();
+                    
+                    if (session?.user) {
                         console.log('✅ Sessão encontrada:', session.user.id);
                         state.user = session.user;
                         await loadUserProfile(session.user.id);
                     } else {
-                        console.log('ℹ️ Nenhuma sessão ativa');
-                        clearLoadingTimeout();
+                        console.log('ℹ️ Sem sessão, indo para login');
                         showScreen('login-screen');
                     }
                 } catch (error) {
-                    console.error('❌ Erro ao processar sessão inicial:', error);
-                    handleAuthError();
-                } finally {
-                    state.isInitializing = false;
+                    console.error('❌ Erro na verificação:', error);
+                    showScreen('login-screen');
                 }
-            }).catch(error => {
-                console.error("❌ Erro ao verificar sessão inicial:", error);
-                handleAuthError();
-                state.isInitializing = false;
-            });
-        }
+            }, 1000);
+        });
 
-        // =============================================================================
-        // INITIALIZATION AND EVENT LISTENERS
-        // =============================================================================
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('📄 DOM CARREGADO - Configurando aplicação...');
-            console.log('- URL atual:', window.location.href);
-            console.log('- User Agent:', navigator.userAgent);
-            console.log('- Timestamp:', new Date().toISOString());
-            
-            try {
-                // Event Listeners para formulários
-                const loginForm = document.getElementById('login-form');
-                if (loginForm) {
-                    loginForm.addEventListener('submit', async (e) => {
-                        e.preventDefault();
-                        await handleSignIn(
-                            e.target.elements['login-email'].value, 
-                            e.target.elements['login-password'].value
-                        );
-                    });
-                }
-
-                const signupForm = document.getElementById('signup-form');
-                if (signupForm) {
-                    signupForm.addEventListener('submit', async (e) => {
-                        e.preventDefault();
-                        await handleSignUp(
-                            e.target.elements['signup-fullname'].value,
-                            e.target.elements['signup-email'].value,
-                            e.target.elements['signup-phone'].value,
-                            e.target.elements['signup-password'].value
-                        );
-                    });
-                }
-
-                const forgotForm = document.getElementById('forgot-password-form');
-                if (forgotForm) {
-                    forgotForm.addEventListener('submit', async (e) => {
-                        e.preventDefault();
-                        await handlePasswordReset(e.target.elements['forgot-email'].value);
-                    });
-                }
-
-                const updateForm = document.getElementById('update-password-form');
-                if (updateForm) {
-                    updateForm.addEventListener('submit', async (e) => {
-                        e.preventDefault();
-                        await handleUpdatePassword(e.target.elements['update-password'].value);
-                    });
-                }
-
-                const profileForm = document.getElementById('complete-profile-form');
-                if (profileForm) {
-                    profileForm.addEventListener('submit', async (e) => {
-                        e.preventDefault();
-                        await handleUpdateProfile(state.user.id, e.target.elements['profile-phone'].value);
-                    });
-                }
-
-                const rideForm = document.getElementById('ride-request-form');
-                if (rideForm) {
-                    rideForm.addEventListener('submit', async (e) => {
-                        e.preventDefault();
-                        const origin = e.target.elements['origin'].value;
-                        const destination = e.target.elements['destination'].value;
-                        await requestRide(origin, destination);
-                    });
-                }
-
-                console.log('✅ EVENT LISTENERS CONFIGURADOS COM SUCESSO');
-                console.log('- Formulários: login, signup, forgot, update, profile, ride');
-                console.log('- Próximo passo: Configurar auth state listener');
-            } catch (error) {
-                console.error('❌ Erro ao configurar event listeners:', error);
-            }
-
-            // Auth State Change Listener com debug detalhado
-            supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                console.log('🔐 AUTH STATE CHANGE:');
-                console.log('- Evento:', event);
-                console.log('- Session:', session ? 'PRESENTE' : 'AUSENTE');
-                console.log('- User ID:', session?.user?.id || 'N/A');
-                console.log('- Timestamp:', new Date().toISOString());
-                
-                try {
-                    if (event === 'SIGNED_IN' && session) {
-                        state.user = session.user;
-                        await loadUserProfile(session.user.id);
-                    } else if (event === 'SIGNED_OUT') {
-                        state.user = null;
-                        state.profile = null;
-                        state.currentRide = null;
-                        state.statusHistory = [];
-                        if (state.rideSubscription) {
-                            supabaseClient.removeChannel(state.rideSubscription);
-                            state.rideSubscription = null;
-                        }
-                        showScreen('login-screen');
-                    } else if (event === 'INITIAL_SESSION' && !session) {
-                        showScreen('login-screen');
-                    }
-                } catch (error) {
-                    console.error('❌ Erro no auth state change:', error);
-                    handleAuthError();
-                }
-            });
-
-            // Inicializar aplicação
-            initializeApp();
-
-            // Inicializar Google Maps Autocomplete após um delay
-            setTimeout(() => {
-                initializeAutocomplete();
-            }, 2000);
+        // Capturar erros
+        window.addEventListener('error', (e) => {
+            console.error('🚨 Erro JS:', e.error);
         });
     </script>
 </body>
