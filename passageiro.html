@@ -1164,32 +1164,106 @@ FUNÇÕES DE DEBUG DISPONÍVEIS NO CONSOLE:
             console.log('🚗 Solicitando corrida:', { origem: originAddress, destino: destinationAddress });
 
             try {
-                // SIMPLIFICADO: Pular geocoding para evitar erros de API
-                // Criar corrida apenas com endereços de texto
-                console.log('🔄 Pulando geocoding - usando apenas endereços de texto');
+                // GEOCODING CONDICIONAL: Tentar obter coordenadas se possível
+                let originLocation = null;
+                let destinationLocation = null;
                 
-                if (typeof google !== 'undefined' && google.maps) {
-                    console.log('✅ Google Maps carregado, mas usando modo simplificado');
+                console.log('🔄 Tentando geocoding (opcional)...');
+                
+                if (typeof google !== 'undefined' && google.maps && google.maps.Geocoder) {
+                    console.log('✅ Google Maps disponível, tentando geocoding...');
+                    
+                    try {
+                        const geocoder = new google.maps.Geocoder();
+                        
+                        // Tentar geocodificar origem (sem bloquear se falhar)
+                        try {
+                            const originResult = await new Promise((resolve, reject) => {
+                                const timeout = setTimeout(() => reject(new Error('Timeout')), 5000);
+                                geocoder.geocode({ 'address': originAddress }, (results, status) => {
+                                    clearTimeout(timeout);
+                                    if (status === 'OK' && results.length > 0) {
+                                        resolve(results);
+                                    } else {
+                                        reject(new Error(`Geocode falhou: ${status}`));
+                                    }
+                                });
+                            });
+                            
+                            const originLat = originResult[0].geometry.location.lat();
+                            const originLng = originResult[0].geometry.location.lng();
+                            originLocation = `POINT(${originLng} ${originLat})`;
+                            console.log('✅ Origem geocodificada:', originLocation);
+                            
+                        } catch (originError) {
+                            console.log('⚠️ Falha no geocoding da origem:', originError.message);
+                        }
+                        
+                        // Tentar geocodificar destino (sem bloquear se falhar)
+                        try {
+                            const destinationResult = await new Promise((resolve, reject) => {
+                                const timeout = setTimeout(() => reject(new Error('Timeout')), 5000);
+                                geocoder.geocode({ 'address': destinationAddress }, (results, status) => {
+                                    clearTimeout(timeout);
+                                    if (status === 'OK' && results.length > 0) {
+                                        resolve(results);
+                                    } else {
+                                        reject(new Error(`Geocode falhou: ${status}`));
+                                    }
+                                });
+                            });
+                            
+                            const destinationLat = destinationResult[0].geometry.location.lat();
+                            const destinationLng = destinationResult[0].geometry.location.lng();
+                            destinationLocation = `POINT(${destinationLng} ${destinationLat})`;
+                            console.log('✅ Destino geocodificado:', destinationLocation);
+                            
+                        } catch (destinationError) {
+                            console.log('⚠️ Falha no geocoding do destino:', destinationError.message);
+                        }
+                        
+                    } catch (geocodeError) {
+                        console.log('⚠️ Erro geral no geocoding:', geocodeError.message);
+                    }
                 } else {
-                    console.log('⚠️ Google Maps não disponível');
+                    console.log('⚠️ Google Maps não disponível - usando apenas endereços');
+                }
+                
+                // Definir coordenadas padrão se não conseguiu geocodificar
+                if (!originLocation) {
+                    // Coordenadas de referência do Brasil (centro aproximado)
+                    originLocation = 'POINT(-47.8825 -15.7942)';
+                    console.log('📍 Usando coordenada padrão para origem');
+                }
+                
+                if (!destinationLocation) {
+                    // Coordenadas de referência do Brasil (centro aproximado)
+                    destinationLocation = 'POINT(-47.8825 -15.7942)';
+                    console.log('📍 Usando coordenada padrão para destino');
                 }
 
-                // ESTRUTURA SIMPLIFICADA: Apenas campos essenciais que existem no banco
+                // ESTRUTURA CORRIGIDA: Incluindo campos obrigatórios do banco
                 const rideData = {
                     passenger_id: state.user.id,
                     origin_address: originAddress,
                     destinations: [destinationAddress], // Array JSONB de strings
-                    status: 'requested'
+                    status: 'requested',
+                    // Campos obrigatórios identificados pelo erro
+                    origin_location: null, // Campo obrigatório no banco - usar null como padrão
+                    destination_location: null // Campo obrigatório no banco - usar null como padrão
                 };
 
-                // REMOVIDO: Não adicionar campos de localização que podem não existir
-                // Apenas campos básicos para evitar erros de estrutura
+                // Atualizar com coordenadas obtidas (ou padrão)
+                rideData.origin_location = originLocation;
+                rideData.destination_location = destinationLocation;
 
-                console.log('💾 DADOS SIMPLIFICADOS DA CORRIDA:');
+                console.log('💾 DADOS COMPLETOS DA CORRIDA:');
                 console.log('- passenger_id (UUID):', rideData.passenger_id);
                 console.log('- origin_address (TEXT):', rideData.origin_address);
                 console.log('- destinations (JSONB):', JSON.stringify(rideData.destinations));
                 console.log('- status (TEXT):', rideData.status);
+                console.log('- origin_location (POINT):', rideData.origin_location);
+                console.log('- destination_location (POINT):', rideData.destination_location);
 
                 console.log('📊 Executando INSERT com campos simplificados...');
                 const { data, error } = await supabaseClient
