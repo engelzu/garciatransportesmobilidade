@@ -486,7 +486,7 @@
             'assigned': {
                 icon: '🎯',
                 title: 'Motorista Designado',
-                description: 'Um motorista foi designado para sua corrida e está analisando',
+                description: 'Um motorista foi designado para sua corrida',
                 color: '#3b82f6',
                 progress: 30
             },
@@ -913,8 +913,6 @@
         async function checkPendingRide() {
             if (!state.user) return;
             
-            console.log('🔍 Verificando corridas pendentes para usuário:', state.user.id);
-            
             try {
                 const { data, error } = await supabaseClient.from('rides')
                     .select(`
@@ -929,44 +927,26 @@
                     .single();
 
                 if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-                    console.error('❌ Erro ao verificar corrida pendente:', error.message);
+                    console.error('Erro ao verificar corrida pendente:', error.message);
                     return;
                 }
 
                 if (data) {
-                    console.log('🚗 CORRIDA PENDENTE ENCONTRADA:', {
-                        id: data.id,
-                        status: data.status,
-                        driver_id: data.driver_id,
-                        has_driver_data: !!data.driver,
-                        has_driver_details: !!data.driver_details
-                    });
-                    
                     state.currentRide = data;
                     showRideStatus();
                     updateTripDetails(data.origin_address, data.destinations?.[0] || 'Destino não especificado', data.created_at);
                     updateStatusDisplay(data.status);
                     
-                    // CRÍTICO: Se tem motorista designado, mostrar informações
-                    if (data.driver_id) {
-                        if (data.driver && data.driver_details) {
-                            console.log('✅ Dados do motorista já carregados via JOIN');
-                            updateDriverInfo(data.driver, data.driver_details);
-                        } else {
-                            console.log('🔄 Carregando dados do motorista separadamente...');
-                            await loadDriverInfo(data.driver_id);
-                        }
-                    } else {
-                        console.log('⏳ Corrida ainda sem motorista designado');
+                    if (data.driver && data.driver_details) {
+                        updateDriverInfo(data.driver, data.driver_details);
                     }
                     
                     subscribeToRideUpdates(data.id);
                 } else {
-                    console.log('ℹ️ Nenhuma corrida pendente encontrada');
                     showRideRequestForm();
                 }
             } catch (error) {
-                console.error('❌ Erro inesperado ao verificar corrida pendente:', error.message);
+                console.error('Erro inesperado ao verificar corrida pendente:', error.message);
                 showRideRequestForm();
             }
         }
@@ -976,124 +956,77 @@
                 supabaseClient.removeChannel(state.rideSubscription);
             }
 
-            console.log('🔔 Iniciando subscription para corrida:', rideId);
-            
             state.rideSubscription = supabaseClient
-                .channel(`public:rides_${rideId}`)
+                .channel(`ride:${rideId}`)
                 .on('postgres_changes', { 
-                    event: '*', 
+                    event: 'UPDATE', 
                     schema: 'public', 
                     table: 'rides', 
                     filter: `id=eq.${rideId}` 
                 }, async payload => {
-                    console.log('🔄 ATUALIZAÇÃO RECEBIDA:', payload);
-                    const { eventType, new: updatedRide, old: oldRide } = payload;
+                    console.log('🔄 Atualização de corrida recebida:', payload);
+                    const updatedRide = payload.new;
+                    state.currentRide = updatedRide;
                     
-                    if (eventType === 'UPDATE' && updatedRide) {
-                        console.log('📊 Status anterior:', oldRide?.status, '→ Novo status:', updatedRide.status);
-                        console.log('👤 Driver anterior:', oldRide?.driver_id, '→ Novo driver:', updatedRide.driver_id);
-                        
-                        // Atualizar estado global
-                        const previousDriverId = state.currentRide?.driver_id;
-                        state.currentRide = { ...state.currentRide, ...updatedRide };
-                        
-                        // Atualizar status visual
-                        updateStatusDisplay(updatedRide.status);
-                        
-                        // CRÍTICO: Se motorista foi designado/mudou
-                        if (updatedRide.driver_id && updatedRide.driver_id !== previousDriverId) {
-                            console.log('🚗 NOVO MOTORISTA DESIGNADO:', updatedRide.driver_id);
-                            await loadDriverInfo(updatedRide.driver_id);
+                    // Atualizar status
+                    updateStatusDisplay(updatedRide.status);
+                    
+                    // Se motorista foi designado, buscar informações do motorista
+                    if (updatedRide.driver_id && !state.currentRide.driver) {
+                        await loadDriverInfo(updatedRide.driver_id);
+                    }
+                    
+                    // Notificação toast para mudanças importantes
+                    const importantStatuses = ['accepted', 'arrived_pickup', 'in_progress', 'completed', 'cancelled'];
+                    if (importantStatuses.includes(updatedRide.status)) {
+                        const statusInfo = statusConfig[updatedRide.status];
+                        toast.show(statusInfo.title, 'info', 6000);
+                    }
+                    
+                    // Limpar subscription se corrida finalizada
+                    if (['completed', 'cancelled'].includes(updatedRide.status)) {
+                        setTimeout(() => {
+                            supabaseClient.removeChannel(state.rideSubscription);
+                            state.rideSubscription = null;
+                            state.currentRide = null;
                             
-                            // Notificar que motorista foi designado
-                            toast.show('Motorista designado para sua corrida!', 'success', 5000);
-                        }
-                        
-                        // Notificações para todas as mudanças de status importantes
-                        const importantStatuses = ['assigned', 'accepted', 'arrived_pickup', 'in_progress', 'completed', 'cancelled'];
-                        if (importantStatuses.includes(updatedRide.status)) {
-                            const statusInfo = statusConfig[updatedRide.status];
-                            toast.show(statusInfo.title + ': ' + statusInfo.description, 'info', 6000);
-                        }
-                        
-                        // Limpar subscription se corrida finalizada
-                        if (['completed', 'cancelled'].includes(updatedRide.status)) {
-                            setTimeout(() => {
-                                supabaseClient.removeChannel(state.rideSubscription);
-                                state.rideSubscription = null;
-                                state.currentRide = null;
-                                
-                                if (updatedRide.status === 'completed') {
-                                    setTimeout(() => showRideRequestForm(), 5000);
-                                } else {
-                                    setTimeout(() => showRideRequestForm(), 3000);
-                                }
-                            }, 2000);
-                        }
+                            if (updatedRide.status === 'completed') {
+                                setTimeout(() => showRideRequestForm(), 5000);
+                            } else {
+                                setTimeout(() => showRideRequestForm(), 3000);
+                            }
+                        }, 2000);
                     }
                 })
                 .subscribe(status => {
-                    console.log('📡 Status da subscription:', status);
                     if (status === 'SUBSCRIBED') {
-                        console.log(`✅ CONECTADO ao canal de atualizações da corrida ${rideId}!`);
-                        toast.show('Conectado às atualizações em tempo real', 'success', 3000);
-                    } else if (status === 'CHANNEL_ERROR') {
-                        console.error('❌ Erro no canal de subscription');
-                        toast.show('Erro na conexão em tempo real. Tentando reconectar...', 'warning');
-                        
-                        // Tentar reconectar após 3 segundos
-                        setTimeout(() => {
-                            subscribeToRideUpdates(rideId);
-                        }, 3000);
+                        console.log(`✅ Conectado ao canal de atualizações da corrida ${rideId}!`);
+                        toast.show('Conectado às atualizações em tempo real', 'success', 2000);
                     }
                 });
         }
 
         async function loadDriverInfo(driverId) {
-            console.log('🔍 Carregando informações do motorista:', driverId);
-            
             try {
-                // Buscar dados do perfil do motorista
                 const { data: driverData, error: driverError } = await supabaseClient
                     .from('profiles')
                     .select('full_name, phone_number')
                     .eq('id', driverId)
                     .single();
 
-                if (driverError) {
-                    console.error('❌ Erro ao buscar perfil do motorista:', driverError);
-                    throw driverError;
-                }
-
-                // Buscar detalhes do veículo
                 const { data: driverDetailsData, error: detailsError } = await supabaseClient
                     .from('driver_details')
                     .select('car_model, license_plate, car_color')
                     .eq('profile_id', driverId)
                     .single();
 
-                if (detailsError) {
-                    console.error('❌ Erro ao buscar detalhes do motorista:', detailsError);
-                    throw detailsError;
-                }
-
-                if (driverData && driverDetailsData) {
-                    console.log('✅ Dados do motorista carregados:', {
-                        nome: driverData.full_name,
-                        telefone: driverData.phone_number,
-                        veiculo: driverDetailsData.car_model,
-                        placa: driverDetailsData.license_plate
-                    });
-                    
+                if (!driverError && !detailsError && driverData && driverDetailsData) {
                     state.currentRide.driver = driverData;
                     state.currentRide.driver_details = driverDetailsData;
                     updateDriverInfo(driverData, driverDetailsData);
-                } else {
-                    console.warn('⚠️ Dados do motorista incompletos');
                 }
             } catch (error) {
-                console.error('❌ Erro crítico ao carregar informações do motorista:', error);
-                toast.show('Erro ao carregar dados do motorista', 'warning');
+                console.error('Erro ao carregar informações do motorista:', error);
             }
         }
 
@@ -1180,36 +1113,6 @@
             // Por exemplo, abrir um chat, enviar e-mail, etc.
             window.open('https://wa.me/5511999999999?text=Preciso de ajuda com minha corrida', '_blank');
         }
-
-        // =============================================================================
-        // DEBUG AND MONITORING FUNCTIONS
-        // =============================================================================
-        function debugCurrentState() {
-            console.log('🔍 ESTADO ATUAL DO APP:', {
-                user: state.user?.id,
-                profile: state.profile?.full_name,
-                currentRide: state.currentRide ? {
-                    id: state.currentRide.id,
-                    status: state.currentRide.status,
-                    driver_id: state.currentRide.driver_id,
-                    has_driver: !!state.currentRide.driver,
-                    has_driver_details: !!state.currentRide.driver_details
-                } : null,
-                subscription: !!state.rideSubscription
-            });
-        }
-
-        // Função para debug - pode ser chamada no console
-        window.debugPassengerApp = debugCurrentState;
-        window.forceRefreshRide = checkPendingRide;
-
-        // Monitor de subscription em intervalos
-        setInterval(() => {
-            if (state.currentRide && !state.rideSubscription) {
-                console.warn('⚠️ Corrida ativa mas subscription perdida! Reconectando...');
-                subscribeToRideUpdates(state.currentRide.id);
-            }
-        }, 30000); // Verifica a cada 30 segundos
 
         // =============================================================================
         // INITIALIZATION AND EVENT LISTENERS
