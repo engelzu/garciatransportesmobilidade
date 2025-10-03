@@ -21,205 +21,1184 @@
         .toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .toggle-slider { background-color: #22c55e; }
         input:checked + .toggle-slider:before { transform: translateX(26px); }
+
+        /* Toast Notifications Styles */
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 1000; }
+        .toast { 
+            background: #1f2937; border-left: 4px solid; color: white; padding: 16px; border-radius: 8px; 
+            margin-bottom: 10px; min-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transform: translateX(400px); transition: all 0.3s ease;
+        }
+        .toast.show { transform: translateX(0); }
+        .toast.success { border-left-color: #22c55e; }
+        .toast.error { border-left-color: #ef4444; }
+        .toast.info { border-left-color: #3b82f6; }
+        .toast.warning { border-left-color: #f59e0b; }
+
+        /* Form Validation Styles */
+        .field-error { border-color: #ef4444 !important; }
+        .field-valid { border-color: #22c55e !important; }
+        .error-message { color: #ef4444; font-size: 0.875rem; margin-top: 4px; }
+        .success-message { color: #22c55e; font-size: 0.875rem; margin-top: 4px; }
+
+        /* Loading Button States */
+        .btn-loading { position: relative; color: transparent; }
+        .btn-loading::after {
+            content: ''; position: absolute; top: 50%; left: 50%; width: 20px; height: 20px;
+            margin: -10px 0 0 -10px; border: 2px solid #ffffff; border-top: 2px solid transparent;
+            border-radius: 50%; animation: spin 1s linear infinite;
+        }
+
+        /* Improved Form Field Styles */
+        .form-field { position: relative; }
+        .form-field input:focus + label { color: #6d28d9; }
+        .form-field.has-value label { color: #6d28d9; font-size: 0.875rem; }
+        
+        /* New Ride Alert Animation */
+        @keyframes newRideAlert { 0%, 100% { background-color: #059669; } 50% { background-color: #10b981; } }
+        .new-ride-alert { animation: newRideAlert 1s ease-in-out infinite; }
+
+        /* Ride Status Colors */
+        .status-requested { color: #fbbf24; }
+        .status-assigned { color: #3b82f6; }
+        .status-accepted { color: #8b5cf6; }
+        .status-arrived_pickup { color: #6366f1; }
+        .status-in_progress { color: #10b981; }
+        .status-completed { color: #22c55e; }
+        .status-cancelled { color: #ef4444; }
+
+        /* DESTINO SUPER HIGHLIGHT - IMPOSSÍVEL DE ESCONDER */
+        .destino-super-highlight { 
+            color: #00ff00 !important; 
+            font-weight: 900 !important; 
+            font-size: 1.1em !important;
+            background: linear-gradient(45deg, #22c55e, #10b981) !important;
+            -webkit-background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+            background-clip: text !important;
+            text-shadow: 0 0 10px #22c55e !important;
+            border: 2px solid #22c55e !important;
+            padding: 4px 8px !important;
+            border-radius: 6px !important;
+            display: inline-block !important;
+            animation: glow 2s infinite alternate !important;
+        }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 5px #22c55e, 0 0 10px #22c55e; }
+            to { box-shadow: 0 0 10px #22c55e, 0 0 20px #22c55e, 0 0 30px #22c55e; }
+        }
+
+        /* Loading Error Styles */
+        .loading-error {
+            background: #1f2937;
+            border: 1px solid #ef4444;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+        }
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen">
 
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
     <div id="app-container" class="w-full max-w-md mx-auto p-4">
 
-        <div id="loading-screen" class="screen active text-center"><div class="loader mx-auto"></div><p class="mt-4">Carregando...</p></div>
+        <div id="loading-screen" class="screen active text-center">
+            <div class="loader mx-auto"></div>
+            <p class="mt-4">Carregando...</p>
+            <div id="loading-error" class="loading-error hidden">
+                <p class="text-red-400 mb-2">⚠️ Problema no carregamento</p>
+                <p class="text-sm text-gray-400 mb-4">Tentando resolver automaticamente...</p>
+                <button onclick="forceReset()" class="w-full py-2 px-4 bg-red-600 hover:bg-red-700 rounded-lg text-white">
+                    🔄 Forçar Reset
+                </button>
+            </div>
+        </div>
 
         <div id="login-screen" class="screen space-y-4">
             <img src="images/logogarcia.png" alt="Logo Garcia Transportes" class="mx-auto h-20 w-auto mb-8">
             <h2 class="text-3xl font-bold text-center">Área do Motorista</h2>
             <form id="login-form" class="space-y-3">
-                <div><label for="login-email" class="block mb-1 text-sm font-medium">E-mail</label><input type="email" id="login-email" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
-                <div><label for="login-password" class="block mb-1 text-sm font-medium">Senha</label><input type="password" id="login-password" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required></div>
-                <button type="submit" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENTRAR</button>
+                <div class="form-field">
+                    <label for="login-email" class="block mb-1 text-sm font-medium">E-mail *</label>
+                    <input type="email" id="login-email" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                    <div id="login-email-error" class="error-message hidden"></div>
+                </div>
+                <div class="form-field">
+                    <label for="login-password" class="block mb-1 text-sm font-medium">Senha *</label>
+                    <div class="relative">
+                        <input type="password" id="login-password" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                        <button type="button" id="toggle-login-password" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white">
+                            👁️
+                        </button>
+                    </div>
+                    <div id="login-password-error" class="error-message hidden"></div>
+                </div>
+                <button type="submit" id="login-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">
+                    ENTRAR
+                </button>
             </form>
-            <p class="text-center text-sm">Ainda não é um motorista parceiro? <a href="#" onclick="showScreen('signup-screen')" class="font-semibold text-indigo-400">Cadastre-se</a></p>
+            <p class="text-center text-sm">Ainda não é um motorista parceiro? <a href="#" onclick="showScreen('signup-screen')" class="font-semibold text-indigo-400 hover:text-indigo-300">Cadastre-se</a></p>
         </div>
 
         <div id="signup-screen" class="screen space-y-3">
             <h2 class="text-3xl font-bold text-center">Cadastro de Motorista</h2>
             <form id="signup-form" class="space-y-3">
                 <h3 class="text-lg font-semibold border-b border-gray-600 pb-2">Dados Pessoais</h3>
-                <div><label for="signup-fullname" class="block mb-1 text-sm font-medium">Nome Completo</label><input type="text" id="signup-fullname" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600" required></div>
-                <div><label for="signup-email" class="block mb-1 text-sm font-medium">E-mail</label><input type="email" id="signup-email" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600" required></div>
-                <div><label for="signup-phone" class="block mb-1 text-sm font-medium">Telefone</label><input type="tel" id="signup-phone" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600" required></div>
-                <div><label for="signup-password" class="block mb-1 text-sm font-medium">Senha</label><input type="password" id="signup-password" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600" required></div>
+                
+                <div class="form-field">
+                    <label for="signup-fullname" class="block mb-1 text-sm font-medium">Nome Completo *</label>
+                    <input type="text" id="signup-fullname" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                    <div id="signup-fullname-error" class="error-message hidden"></div>
+                </div>
+
+                <div class="form-field">
+                    <label for="signup-email" class="block mb-1 text-sm font-medium">E-mail *</label>
+                    <input type="email" id="signup-email" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                    <div id="signup-email-error" class="error-message hidden"></div>
+                </div>
+
+                <div class="form-field">
+                    <label for="signup-phone" class="block mb-1 text-sm font-medium">Telefone * <span class="text-xs text-gray-400">(11) 99999-9999</span></label>
+                    <input type="tel" id="signup-phone" placeholder="(11) 99999-9999" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                    <div id="signup-phone-error" class="error-message hidden"></div>
+                </div>
+
+                <div class="form-field">
+                    <label for="signup-password" class="block mb-1 text-sm font-medium">Senha * <span class="text-xs text-gray-400">Mín. 6 caracteres</span></label>
+                    <div class="relative">
+                        <input type="password" id="signup-password" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                        <button type="button" id="toggle-signup-password" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white">
+                            👁️
+                        </button>
+                    </div>
+                    <div id="signup-password-error" class="error-message hidden"></div>
+                </div>
                 
                 <h3 class="text-lg font-semibold border-b border-gray-600 pt-4 pb-2">Dados do Veículo</h3>
-                <div><label for="signup-plate" class="block mb-1 text-sm font-medium">Placa</label><input type="text" id="signup-plate" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600" required></div>
-                <div><label for="signup-model" class="block mb-1 text-sm font-medium">Modelo</label><input type="text" id="signup-model" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600" required></div>
-                <div><label for="signup-color" class="block mb-1 text-sm font-medium">Cor</label><input type="text" id="signup-color" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600" required></div>
+                
+                <div class="form-field">
+                    <label for="signup-plate" class="block mb-1 text-sm font-medium">Placa * <span class="text-xs text-gray-400">ABC-1234</span></label>
+                    <input type="text" id="signup-plate" placeholder="ABC-1234" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                    <div id="signup-plate-error" class="error-message hidden"></div>
+                </div>
 
-                <button type="submit" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 !mt-6">ENVIAR CADASTRO</button>
+                <div class="form-field">
+                    <label for="signup-model" class="block mb-1 text-sm font-medium">Modelo *</label>
+                    <input type="text" id="signup-model" placeholder="Ex: Honda Civic" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                    <div id="signup-model-error" class="error-message hidden"></div>
+                </div>
+
+                <div class="form-field">
+                    <label for="signup-color" class="block mb-1 text-sm font-medium">Cor *</label>
+                    <input type="text" id="signup-color" placeholder="Ex: Branco" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                    <div id="signup-color-error" class="error-message hidden"></div>
+                </div>
+
+                <button type="submit" id="signup-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors !mt-6">
+                    ENVIAR CADASTRO
+                </button>
             </form>
-            <p class="text-center text-sm">Já tem uma conta? <a href="#" onclick="showScreen('login-screen')" class="font-semibold text-indigo-400">Faça o login</a></p>
+            <p class="text-center text-sm">Já tem uma conta? <a href="#" onclick="showScreen('login-screen')" class="font-semibold text-indigo-400 hover:text-indigo-300">Faça o login</a></p>
         </div>
         
         <div id="pending-approval-screen" class="screen text-center space-y-4">
+            <div class="animate-pulse">
+                <div class="w-16 h-16 bg-yellow-500 rounded-full mx-auto mb-4 flex items-center justify-center">
+                    ⏳
+                </div>
+            </div>
             <h2 class="text-3xl font-bold">Cadastro em Análise</h2>
             <p class="text-gray-400">Obrigado por se cadastrar! Seus dados foram enviados e estão sendo analisados pela nossa equipe.</p>
             <p class="text-gray-400">Você será notificado assim que seu cadastro for aprovado.</p>
-            <button onclick="handleSignOut()" class="w-full py-3 font-semibold rounded-lg bg-red-600 hover:bg-red-700">Sair</button>
+            <button onclick="handleSignOut()" class="w-full py-3 font-semibold rounded-lg bg-red-600 hover:bg-red-700 transition-colors">
+                Sair
+            </button>
         </div>
 
         <div id="driver-screen" class="screen space-y-4">
             <div class="flex justify-between items-center">
                 <h2 class="text-2xl font-bold">Minhas Corridas</h2>
-                <button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700">Sair</button>
+                <button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700 transition-colors">
+                    Sair
+                </button>
             </div>
             <p id="driver-welcome-message" class="text-lg text-center"></p>
 
             <div class="flex items-center justify-between p-3 rounded-lg bg-gray-800">
-                <span class="font-semibold text-lg">Ficar Online</span>
+                <div>
+                    <span class="font-semibold text-lg">Ficar Online</span>
+                    <p class="text-xs text-gray-400">Receba novas corridas</p>
+                </div>
                 <label class="toggle-switch">
                     <input type="checkbox" id="work-status-toggle" onchange="toggleWorkStatus()">
                     <span class="toggle-slider"></span>
                 </label>
             </div>
-             <button id="silence-btn" onclick="stopRinging()" class="hidden w-full mb-4 py-2 px-4 font-semibold rounded-lg bg-yellow-500 text-gray-900">Silenciar Alerta</button>
+
+            <button id="silence-btn" onclick="stopRinging()" class="hidden w-full mb-4 py-2 px-4 font-semibold rounded-lg bg-yellow-500 text-gray-900 hover:bg-yellow-600 transition-colors">
+                🔇 Silenciar Alerta
+            </button>
             
-            <div id="driver-jobs-list" class="space-y-4"></div>
+            <div id="driver-jobs-list" class="space-y-4">
+                <div class="text-center py-8">
+                    <div class="loader mx-auto mb-4"></div>
+                    <p class="text-gray-400">Carregando corridas...</p>
+                </div>
+            </div>
         </div>
     </div>
     
-    <audio id="ringtone" loop preload="auto" src="SOM/somchamada.mp3"></audio>
+    <audio id="ringtone" loop preload="auto" src="https://assets.mixkit.co/sfx/preview/mixkit-bell-notification-933.mp3"></audio>
 
     <script>
         const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const state = { user: null, profile: null, driverDetails: null, rides: [], rideSubscription: null, locationWatcher: null };
+        const state = { 
+            user: null, 
+            profile: null, 
+            driverDetails: null, 
+            rides: [], 
+            rideSubscription: null, 
+            locationWatcher: null,
+            ridesCache: new Map(),
+            isInitializing: false
+        };
         let ringInterval = null;
+        let locationUpdateTimeout = null;
+        let loadingTimeout = null;
 
+        // =============================================================================
+        // SISTEMA DE RECUPERAÇÃO DE CARREGAMENTO
+        // =============================================================================
+        function clearCorruptedData() {
+            console.log('🧹 Limpando dados corrompidos...');
+            try {
+                // Limpar localStorage relacionado ao Supabase
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && (key.includes('supabase') || key.includes('sb-') || key.includes('auth'))) {
+                        keysToRemove.push(key);
+                    }
+                }
+                keysToRemove.forEach(key => {
+                    console.log('🗑️ Removendo:', key);
+                    localStorage.removeItem(key);
+                });
+
+                // Limpar sessionStorage
+                sessionStorage.clear();
+                
+                console.log('✅ Dados corrompidos limpos');
+                return true;
+            } catch (error) {
+                console.error('❌ Erro ao limpar dados:', error);
+                return false;
+            }
+        }
+
+        function setupLoadingTimeout() {
+            // Timeout de 10 segundos para carregamento
+            loadingTimeout = setTimeout(() => {
+                console.log('⏰ Timeout de carregamento atingido');
+                const loadingError = document.getElementById('loading-error');
+                loadingError.classList.remove('hidden');
+                
+                // Tentar limpar dados automaticamente após 3 segundos
+                setTimeout(() => {
+                    console.log('🔄 Tentando recuperação automática...');
+                    forceReset();
+                }, 3000);
+            }, 10000);
+        }
+
+        function clearLoadingTimeout() {
+            if (loadingTimeout) {
+                clearTimeout(loadingTimeout);
+                loadingTimeout = null;
+            }
+        }
+
+        function forceReset() {
+            console.log('🚨 Executando reset forçado...');
+            clearLoadingTimeout();
+            
+            // Limpar dados corrompidos
+            clearCorruptedData();
+            
+            // Reset do state
+            state.user = null;
+            state.profile = null;
+            state.driverDetails = null;
+            state.rides = [];
+            state.isInitializing = false;
+            
+            // Parar subscriptions
+            if (state.rideSubscription) {
+                supabaseClient.removeChannel(state.rideSubscription);
+                state.rideSubscription = null;
+            }
+            
+            stopLocationTracking();
+            
+            // Mostrar tela de login
+            showScreen('login-screen');
+            
+            toast.show('Reset executado com sucesso! Faça login novamente.', 'success');
+        }
+
+        // =============================================================================
+        // TOAST NOTIFICATION SYSTEM
+        // =============================================================================
+        class ToastManager {
+            constructor() {
+                this.container = document.getElementById('toast-container');
+                this.toasts = [];
+            }
+
+            show(message, type = 'info', duration = 4000) {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <p class="font-medium">${this.getTypeIcon(type)} ${this.getTypeTitle(type)}</p>
+                            <p class="text-sm opacity-90 mt-1">${message}</p>
+                        </div>
+                        <button onclick="this.parentElement.parentElement.remove()" class="ml-3 text-white/60 hover:text-white">
+                            ✕
+                        </button>
+                    </div>
+                `;
+
+                this.container.appendChild(toast);
+                
+                setTimeout(() => toast.classList.add('show'), 100);
+
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.classList.remove('show');
+                        setTimeout(() => toast.remove(), 300);
+                    }
+                }, duration);
+
+                return toast;
+            }
+
+            getTypeIcon(type) {
+                const icons = {
+                    success: '✅',
+                    error: '❌',
+                    warning: '⚠️',
+                    info: 'ℹ️'
+                };
+                return icons[type] || icons.info;
+            }
+
+            getTypeTitle(type) {
+                const titles = {
+                    success: 'Sucesso',
+                    error: 'Erro',
+                    warning: 'Atenção',
+                    info: 'Informação'
+                };
+                return titles[type] || titles.info;
+            }
+        }
+
+        const toast = new ToastManager();
+
+        // =============================================================================
+        // FORM VALIDATION SYSTEM
+        // =============================================================================
+        class FormValidator {
+            constructor() {
+                this.rules = {
+                    email: {
+                        pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                        message: 'Digite um e-mail válido'
+                    },
+                    phone: {
+                        pattern: /^\(\d{2}\)\s\d{4,5}-\d{4}$/,
+                        message: 'Digite um telefone válido (11) 99999-9999'
+                    },
+                    plate: {
+                        pattern: /^[A-Z]{3}-\d{4}$/,
+                        message: 'Digite uma placa válida ABC-1234'
+                    },
+                    password: {
+                        minLength: 6,
+                        message: 'A senha deve ter pelo menos 6 caracteres'
+                    },
+                    required: {
+                        message: 'Este campo é obrigatório'
+                    }
+                };
+            }
+
+            validateField(field, value) {
+                const errors = [];
+                
+                if (field.hasAttribute('required') && !value.trim()) {
+                    errors.push(this.rules.required.message);
+                    return errors;
+                }
+
+                if (!value.trim()) return errors;
+
+                const fieldType = field.type;
+                const fieldId = field.id;
+
+                if (fieldType === 'email' && !this.rules.email.pattern.test(value)) {
+                    errors.push(this.rules.email.message);
+                }
+
+                if (fieldId.includes('phone') && !this.rules.phone.pattern.test(value)) {
+                    errors.push(this.rules.phone.message);
+                }
+
+                if (fieldId.includes('plate') && !this.rules.plate.pattern.test(value.toUpperCase())) {
+                    errors.push(this.rules.plate.message);
+                }
+
+                if (fieldType === 'password' && value.length < this.rules.password.minLength) {
+                    errors.push(this.rules.password.message);
+                }
+
+                if (fieldId.includes('fullname') && value.trim().split(' ').length < 2) {
+                    errors.push('Digite o nome completo');
+                }
+
+                return errors;
+            }
+
+            showFieldError(fieldId, errors) {
+                const field = document.getElementById(fieldId);
+                const errorDiv = document.getElementById(fieldId + '-error');
+                
+                if (errors.length > 0) {
+                    field.classList.add('field-error');
+                    field.classList.remove('field-valid');
+                    errorDiv.textContent = errors[0];
+                    errorDiv.classList.remove('hidden');
+                } else {
+                    field.classList.remove('field-error');
+                    field.classList.add('field-valid');
+                    errorDiv.classList.add('hidden');
+                }
+            }
+
+            validateForm(formId) {
+                const form = document.getElementById(formId);
+                const fields = form.querySelectorAll('input[required], input[type="email"], input[type="password"]');
+                let isValid = true;
+
+                fields.forEach(field => {
+                    const errors = this.validateField(field, field.value);
+                    this.showFieldError(field.id, errors);
+                    if (errors.length > 0) isValid = false;
+                });
+
+                return isValid;
+            }
+        }
+
+        const validator = new FormValidator();
+
+        // =============================================================================
+        // UTILITY FUNCTIONS
+        // =============================================================================
+        function validateEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+
+        function getAuthErrorMessage(error) {
+            const errorMessages = {
+                'Invalid login credentials': 'E-mail ou senha incorretos',
+                'Email not confirmed': 'Confirme seu e-mail antes de fazer login',
+                'Too many requests': 'Muitas tentativas de login. Tente novamente em alguns minutos',
+                'User not found': 'Usuário não encontrado',
+                'Invalid email': 'E-mail inválido',
+                'Weak password': 'Senha muito fraca',
+                'signup_disabled': 'Cadastros desabilitados temporariamente'
+            };
+            
+            for (const [key, message] of Object.entries(errorMessages)) {
+                if (error.message.includes(key)) {
+                    return message;
+                }
+            }
+            
+            return 'Erro: ' + error.message;
+        }
+
+        // =============================================================================
+        // INPUT MASKS
+        // =============================================================================
+        function applyPhoneMask(input) {
+            input.addEventListener('input', (e) => {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value.length <= 11) {
+                    if (value.length <= 2) {
+                        value = value.replace(/(\d{0,2})/, '($1');
+                    } else if (value.length <= 6) {
+                        value = value.replace(/(\d{2})(\d{0,4})/, '($1) $2');
+                    } else if (value.length <= 10) {
+                        value = value.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+                    } else {
+                        value = value.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
+                    }
+                }
+                e.target.value = value;
+            });
+        }
+
+        function applyPlateMask(input) {
+            input.addEventListener('input', (e) => {
+                let value = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                if (value.length <= 7) {
+                    if (value.length <= 3) {
+                        value = value.replace(/([A-Z]{0,3})/, '$1');
+                    } else {
+                        value = value.replace(/([A-Z]{3})([0-9]{0,4})/, '$1-$2');
+                    }
+                }
+                e.target.value = value;
+            });
+        }
+
+        // =============================================================================
+        // UTILITY FUNCTIONS
+        // =============================================================================
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
+            
+            // Limpar timeout quando mudar de tela
+            clearLoadingTimeout();
         }
 
+        function showLoading(buttonId) {
+            const button = document.getElementById(buttonId);
+            button.classList.add('btn-loading');
+            button.disabled = true;
+        }
+
+        function hideLoading(buttonId) {
+            const button = document.getElementById(buttonId);
+            button.classList.remove('btn-loading');
+            button.disabled = false;
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // =============================================================================
+        // FUNÇÃO PARA EXTRAIR DADOS DO DESTINO - CORRIGIDA PARA ARRAY DE STRINGS
+        // =============================================================================
+        function getDestinationInfo(ride) {
+            console.log('🔥 DEBUG DESTINO ARRAY STRINGS - Analisando corrida:', ride.id);
+            console.log('🔥 ride.destinations (tipo):', typeof ride.destinations);
+            console.log('🔥 ride.destinations (valor):', ride.destinations);
+            console.log('🔥 ride.destinations (JSON):', JSON.stringify(ride.destinations));
+            
+            // Método 1: destinations como JSONB Array de Strings
+            if (ride.destinations) {
+                console.log('🎯 VERIFICANDO destinations...');
+                
+                // Se destinations já é um array JavaScript (Supabase converte JSONB automaticamente)
+                if (Array.isArray(ride.destinations) && ride.destinations.length > 0) {
+                    const firstDestination = ride.destinations[0];
+                    console.log('🎯 PRIMEIRO ITEM destinations[0]:', firstDestination);
+                    console.log('🎯 TIPO do primeiro item:', typeof firstDestination);
+                    
+                    // Se o primeiro item é uma STRING (formato correto baseado na imagem)
+                    if (typeof firstDestination === 'string' && firstDestination.trim() !== '') {
+                        console.log('✅ DESTINO ENCONTRADO (string direta):', firstDestination);
+                        return firstDestination.trim();
+                    }
+                    
+                    // Se ainda for um objeto (fallback)
+                    if (typeof firstDestination === 'object' && firstDestination !== null) {
+                        console.log('🎯 Primeiro item é objeto:', firstDestination);
+                        if (firstDestination.address) {
+                            console.log('✅ DESTINO OBJETO.address:', firstDestination.address);
+                            return firstDestination.address;
+                        }
+                        if (firstDestination.name) {
+                            console.log('✅ DESTINO OBJETO.name:', firstDestination.name);
+                            return firstDestination.name;
+                        }
+                    }
+                }
+                
+                // Se destinations é um objeto único (não array)
+                if (typeof ride.destinations === 'object' && !Array.isArray(ride.destinations) && ride.destinations !== null) {
+                    console.log('🎯 destinations é objeto único:', ride.destinations);
+                    
+                    if (typeof ride.destinations === 'string') {
+                        console.log('✅ DESTINO STRING OBJETO:', ride.destinations);
+                        return ride.destinations.trim();
+                    }
+                    
+                    if (ride.destinations.address) {
+                        console.log('✅ DESTINO OBJETO.address único:', ride.destinations.address);
+                        return ride.destinations.address;
+                    }
+                    if (ride.destinations.name) {
+                        console.log('✅ DESTINO OBJETO.name único:', ride.destinations.name);
+                        return ride.destinations.name;
+                    }
+                }
+                
+                // Se destinations ainda é string JSON (backup)
+                if (typeof ride.destinations === 'string' && ride.destinations.trim() !== '') {
+                    console.log('🎯 destinations é STRING, tentando parse:', ride.destinations);
+                    
+                    try {
+                        const parsed = JSON.parse(ride.destinations);
+                        console.log('🎯 PARSED JSON resultado:', parsed);
+                        
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            const firstParsed = parsed[0];
+                            console.log('🎯 Primeiro item parseado:', firstParsed, 'tipo:', typeof firstParsed);
+                            
+                            // Se é string direta (esperado baseado na imagem)
+                            if (typeof firstParsed === 'string' && firstParsed.trim() !== '') {
+                                console.log('✅ DESTINO STRING PARSEADA:', firstParsed);
+                                return firstParsed.trim();
+                            }
+                            
+                            // Se é objeto (fallback)
+                            if (typeof firstParsed === 'object' && firstParsed !== null) {
+                                if (firstParsed.address) {
+                                    console.log('✅ DESTINO PARSEADO.address:', firstParsed.address);
+                                    return firstParsed.address;
+                                }
+                                if (firstParsed.name) {
+                                    console.log('✅ DESTINO PARSEADO.name:', firstParsed.name);
+                                    return firstParsed.name;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('⚠️ Erro no parse JSON destinations:', e);
+                        // Se o parse falhou, pode ser que seja uma string simples
+                        if (ride.destinations.trim() !== '') {
+                            console.log('✅ USANDO destinations como string direta:', ride.destinations);
+                            return ride.destinations.trim();
+                        }
+                    }
+                }
+            }
+            
+            // Método 2: destination_address (campo separado)
+            if (ride.destination_address && typeof ride.destination_address === 'string' && ride.destination_address.trim() !== '') {
+                console.log('✅ ENCONTRADO em destination_address:', ride.destination_address);
+                return ride.destination_address.trim();
+            }
+            
+            // Método 3: destination_location
+            if (ride.destination_location && typeof ride.destination_location === 'string' && ride.destination_location.trim() !== '') {
+                console.log('✅ ENCONTRADO em destination_location:', ride.destination_location);
+                return 'Coordenadas: ' + ride.destination_location.trim();
+            }
+            
+            console.error('🚨 NENHUM DESTINO ENCONTRADO para corrida:', ride.id);
+            console.log('🚨 DUMP COMPLETO DA CORRIDA:');
+            console.log(JSON.stringify(ride, null, 2));
+            
+            return 'Destino não especificado';
+        }
+
+        // =============================================================================
+        // AUTHENTICATION FUNCTIONS
+        // =============================================================================
         async function handleSignUp(formData) {
-            const { data: authData, error: authError } = await supabaseClient.auth.signUp({
-                email: formData.email, phone: formData.phone, password: formData.password,
-                options: { data: { full_name: formData.fullName, user_type: 'driver' } }
-            });
-            if (authError) return alert('Erro no cadastro: ' + authError.message);
-            if (!authData.user) return alert('Não foi possível criar o usuário. Tente novamente.');
+            if (!validator.validateForm('signup-form')) {
+                toast.show('Por favor, corrija os erros no formulário', 'error');
+                return;
+            }
 
-            const { error: detailsError } = await supabaseClient.from('driver_details').insert({
-                profile_id: authData.user.id, license_plate: formData.plate, car_model: formData.model, car_color: formData.color, approval_status: 'pending'
-            });
-            if (detailsError) return alert('Erro ao salvar detalhes do veículo: ' + detailsError.message);
+            showLoading('signup-btn');
 
-            alert('Cadastro enviado com sucesso! Sua conta está em análise.');
-            await supabaseClient.auth.signOut();
-            showScreen('login-screen');
+            try {
+                const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+                    email: formData.email, 
+                    phone: formData.phone, 
+                    password: formData.password,
+                    options: { data: { full_name: formData.fullName, user_type: 'driver' } }
+                });
+
+                if (authError) {
+                    toast.show(getAuthErrorMessage(authError), 'error');
+                    return;
+                }
+
+                if (!authData.user) {
+                    toast.show('Não foi possível criar o usuário. Tente novamente.', 'error');
+                    return;
+                }
+
+                const { error: detailsError } = await supabaseClient.from('driver_details').insert({
+                    profile_id: authData.user.id, 
+                    license_plate: formData.plate, 
+                    car_model: formData.model, 
+                    car_color: formData.color, 
+                    approval_status: 'pending'
+                });
+
+                if (detailsError) {
+                    toast.show('Erro ao salvar detalhes do veículo: ' + detailsError.message, 'error');
+                    return;
+                }
+
+                toast.show('Cadastro enviado com sucesso! Sua conta está em análise.', 'success');
+                await supabaseClient.auth.signOut();
+                showScreen('login-screen');
+
+            } catch (error) {
+                toast.show('Erro inesperado: ' + error.message, 'error');
+            } finally {
+                hideLoading('signup-btn');
+            }
         }
 
         async function handleSignIn(email, password) {
-            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) alert('Erro no login: ' + error.message);
+            if (!email || !password) {
+                toast.show('Preencha todos os campos', 'warning');
+                return;
+            }
+
+            if (!validateEmail(email)) {
+                toast.show('Digite um e-mail válido', 'error');
+                return;
+            }
+
+            showLoading('login-btn');
+
+            try {
+                console.log('Tentando fazer login com:', email);
+                
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ 
+                    email, 
+                    password 
+                });
+                
+                if (error) {
+                    console.error('Erro de autenticação:', error);
+                    toast.show(getAuthErrorMessage(error), 'error');
+                    return;
+                }
+
+                if (data?.user) {
+                    console.log('Login bem-sucedido:', data.user);
+                    toast.show('Login realizado com sucesso!', 'success');
+                    state.user = data.user;
+                    await loadDriverData(data.user.id);
+                } else {
+                    toast.show('Dados de login inválidos', 'error');
+                }
+                
+            } catch (error) {
+                console.error('Erro inesperado no login:', error);
+                toast.show('Erro inesperado: ' + error.message, 'error');
+            } finally {
+                hideLoading('login-btn');
+            }
         }
 
         async function handleSignOut() {
-            if (state.rideSubscription) {
-                await supabaseClient.removeSubscription(state.rideSubscription);
-                state.rideSubscription = null;
+            try {
+                if (state.rideSubscription) {
+                    await supabaseClient.removeChannel(state.rideSubscription);
+                    state.rideSubscription = null;
+                }
+                stopLocationTracking();
+                if (state.user && state.driverDetails) {
+                    await supabaseClient.from('driver_details').update({ work_status: 'offline' }).eq('profile_id', state.user.id);
+                }
+                
+                // Limpar dados de sessão
+                clearCorruptedData();
+                
+                await supabaseClient.auth.signOut();
+                toast.show('Logout realizado com sucesso', 'success');
+                
+                // Reset do state
+                state.user = null;
+                state.profile = null;
+                state.driverDetails = null;
+                state.rides = [];
+                state.isInitializing = false;
+                
+            } catch (error) {
+                toast.show('Erro ao fazer logout: ' + error.message, 'error');
+                // Force reset mesmo se logout falhar
+                forceReset();
             }
-            stopLocationTracking();
-            if(state.user) {
-                await supabaseClient.from('driver_details').update({ work_status: 'offline' }).eq('profile_id', state.user.id);
-            }
-            await supabaseClient.auth.signOut();
         }
 
         async function checkSession() {
+            if (state.isInitializing) {
+                console.log('⏳ Já inicializando, aguardando...');
+                return;
+            }
+            
+            state.isInitializing = true;
+            setupLoadingTimeout();
+            
             try {
-                const { data: { session } } = await supabaseClient.auth.getSession();
-                if (session) {
+                console.log('🔍 Verificando sessão...');
+                const { data: { session }, error } = await supabaseClient.auth.getSession();
+                
+                if (error) {
+                    console.error('❌ Erro ao verificar sessão:', error);
+                    throw error;
+                }
+                
+                if (session?.user) {
+                    console.log('✅ Sessão encontrada:', session.user.id);
                     state.user = session.user;
                     await loadDriverData(session.user.id);
                 } else {
+                    console.log('ℹ️ Nenhuma sessão ativa');
+                    clearLoadingTimeout();
                     showScreen('login-screen');
                 }
-            } catch (error) { console.error("Erro ao verificar sessão:", error); showScreen('login-screen'); }
+            } catch (error) { 
+                console.error("❌ Erro crítico ao verificar sessão:", error);
+                
+                // Tentar limpeza automática
+                const cleaned = clearCorruptedData();
+                if (cleaned) {
+                    toast.show('Dados corrompidos detectados e limpos. Faça login novamente.', 'warning');
+                } else {
+                    toast.show('Erro ao verificar sessão. Tente fazer login.', 'error');
+                }
+                
+                clearLoadingTimeout();
+                showScreen('login-screen');
+            } finally {
+                state.isInitializing = false;
+            }
         }
         
         async function loadDriverData(userId) {
-            const { data: profileData, error: profileError } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
-            if (profileError || !profileData || profileData.user_type !== 'driver') {
-                return handleSignOut();
-            }
-            state.profile = profileData;
+            try {
+                console.log('📊 Carregando dados do motorista:', userId);
+                
+                const { data: profileData, error: profileError } = await supabaseClient
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', userId)
+                    .single();
 
-            const { data: driverDetailsData, error: driverDetailsError } = await supabaseClient.from('driver_details').select('*').eq('profile_id', userId).single();
-            if (driverDetailsError || !driverDetailsData) {
-                state.driverDetails = { approval_status: 'pending' };
-            } else {
-                state.driverDetails = driverDetailsData;
-            }
+                if (profileError || !profileData || profileData.user_type !== 'driver') {
+                    console.error('❌ Perfil de motorista não encontrado:', profileError?.message);
+                    toast.show('Perfil de motorista não encontrado. Verifique se você se cadastrou como motorista.', 'error');
+                    clearLoadingTimeout();
+                    return handleSignOut();
+                }
+                
+                console.log('✅ Perfil encontrado:', profileData.full_name);
+                state.profile = profileData;
 
-            document.getElementById('driver-welcome-message').textContent = `Olá, ${state.profile.full_name}!`;
+                const { data: driverDetailsData, error: driverDetailsError } = await supabaseClient
+                    .from('driver_details')
+                    .select('*')
+                    .eq('profile_id', userId)
+                    .single();
 
-            if (state.driverDetails.approval_status === 'approved') {
-                showScreen('driver-screen');
-                updateWorkStatusToggle();
-                await loadDriverJobs();
-                subscribeToRides();
-            } else {
-                showScreen('pending-approval-screen');
+                if (driverDetailsError || !driverDetailsData) {
+                    console.log('⚠️ Detalhes do motorista não encontrados, definindo como pendente');
+                    state.driverDetails = { approval_status: 'pending' };
+                } else {
+                    console.log('✅ Detalhes do motorista carregados');
+                    state.driverDetails = driverDetailsData;
+                }
+
+                document.getElementById('driver-welcome-message').textContent = `Olá, ${state.profile.full_name}!`;
+
+                clearLoadingTimeout();
+
+                if (state.driverDetails.approval_status === 'approved') {
+                    console.log('✅ Motorista aprovado, carregando tela principal');
+                    showScreen('driver-screen');
+                    updateWorkStatusToggle();
+                    await loadDriverJobs();
+                    subscribeToRides();
+                } else {
+                    console.log('⏳ Motorista pendente de aprovação');
+                    showScreen('pending-approval-screen');
+                }
+            } catch (error) {
+                console.error('❌ Erro crítico ao carregar dados do motorista:', error);
+                toast.show('Erro ao carregar dados do motorista. Tentando novamente...', 'error');
+                clearLoadingTimeout();
+                
+                // Tentar reset após erro crítico
+                setTimeout(() => {
+                    forceReset();
+                }, 2000);
             }
         }
 
+        // =============================================================================
+        // RIDE MANAGEMENT
+        // =============================================================================
         function subscribeToRides() {
-            if (state.rideSubscription) return;
+            if (state.rideSubscription) {
+                supabaseClient.removeChannel(state.rideSubscription);
+            }
 
             state.rideSubscription = supabaseClient
                 .channel('public:rides')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, payload => {
-                    loadDriverJobs();
+                    console.log('Mudança recebida!', payload);
+                    handleRideChange(payload);
                 })
-                .subscribe();
+                .subscribe(status => {
+                    if (status === 'SUBSCRIBED') {
+                        console.log('Conectado ao canal de corridas!');
+                        toast.show('Conectado ao sistema de corridas', 'success', 2000);
+                    }
+                });
         }
-        
-        async function toggleWorkStatus() {
-            const isChecked = document.getElementById('work-status-toggle').checked;
-            const newStatus = isChecked ? 'online' : 'offline';
+
+        async function handleRideChange(payload) {
+            const { eventType, new: newRecord, old: oldRecord } = payload;
             
-            const { error } = await supabaseClient.from('driver_details').update({ work_status: newStatus }).eq('profile_id', state.user.id);
-            if (error) {
-                alert('Erro ao atualizar status.'); console.error(error);
-                document.getElementById('work-status-toggle').checked = !isChecked;
-            } else {
-                state.driverDetails.work_status = newStatus;
-                if (newStatus === 'online') {
-                    startLocationTracking();
-                } else {
-                    stopLocationTracking();
-                }
+            switch (eventType) {
+                case 'INSERT':
+                    if (newRecord.status === 'requested' && !newRecord.driver_id) {
+                        await addRideToList(newRecord);
+                        startRinging();
+                        toast.show('Nova corrida disponível!', 'info');
+                    }
+                    break;
+                case 'UPDATE':
+                    await updateRideInList(newRecord);
+                    break;
+                case 'DELETE':
+                    removeRideFromList(oldRecord.id);
+                    break;
+                default:
+                    await loadDriverJobs();
             }
         }
 
+        async function addRideToList(ride) {
+            if (!ride.passenger) {
+                const { data: passengerData } = await supabaseClient
+                    .from('profiles')
+                    .select('full_name, phone_number')
+                    .eq('id', ride.passenger_id)
+                    .single();
+                ride.passenger = passengerData;
+            }
+
+            state.rides.unshift(ride);
+            state.ridesCache.set(ride.id, ride);
+            renderSingleRide(ride, 'prepend');
+        }
+
+        async function updateRideInList(ride) {
+            const rideIndex = state.rides.findIndex(r => r.id === ride.id);
+            if (rideIndex !== -1) {
+                state.rides[rideIndex] = { ...state.rides[rideIndex], ...ride };
+                state.ridesCache.set(ride.id, state.rides[rideIndex]);
+                
+                const rideElement = document.querySelector(`[data-ride-id="${ride.id}"]`);
+                if (rideElement) {
+                    const updatedElement = createRideElement(state.rides[rideIndex]);
+                    rideElement.replaceWith(updatedElement);
+                }
+            } else {
+                await loadDriverJobs();
+            }
+        }
+
+        function removeRideFromList(rideId) {
+            state.rides = state.rides.filter(r => r.id !== rideId);
+            state.ridesCache.delete(rideId);
+            const rideElement = document.querySelector(`[data-ride-id="${rideId}"]`);
+            if (rideElement) {
+                rideElement.remove();
+            }
+        }
+
+        function renderSingleRide(ride, position = 'append') {
+            const list = document.getElementById('driver-jobs-list');
+            const rideElement = createRideElement(ride);
+            
+            if (position === 'prepend') {
+                list.insertBefore(rideElement, list.firstChild);
+            } else {
+                list.appendChild(rideElement);
+            }
+        }
+
+        // =============================================================================
+        // FUNÇÃO PARA CRIAR ELEMENTO DE CORRIDA - CORRIGIDA PARA STRINGS
+        // =============================================================================
+        function createRideElement(ride) {
+            console.log('🔥 CRIANDO ELEMENTO - Corrida ID:', ride.id);
+            
+            const passenger = ride.passenger;
+            let actionButton = '';
+            let statusColor = '';
+            let cardClass = '';
+
+            // OBTER DESTINO COM NOVA FUNÇÃO
+            let destinationText = getDestinationInfo(ride);
+            console.log('🔥 DESTINO OBTIDO:', destinationText);
+            
+            // Se ainda está vazio, forçar um valor
+            if (!destinationText || destinationText.trim() === '') {
+                destinationText = '🚨 DESTINO NÃO ENCONTRADO 🚨';
+                console.error('🚨 DESTINO VAZIO FORÇADO PARA:', destinationText);
+            }
+
+            switch (ride.status) {
+                case 'requested':
+                    actionButton = `<button onclick="acceptRide('${ride.id}')" class="w-full py-2 px-4 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors new-ride-alert">🚗 ACEITAR NOVA CORRIDA</button>`;
+                    statusColor = 'status-requested';
+                    cardClass = 'border-yellow-500';
+                    break;
+                case 'assigned':
+                    actionButton = `<button onclick="updateRideStatus('${ride.id}', 'accepted')" class="w-full py-2 px-4 font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors">📍 CHEGUEI AO LOCAL DE PARTIDA</button>`;
+                    statusColor = 'status-assigned';
+                    cardClass = 'border-blue-500';
+                    break;
+                case 'accepted':
+                    actionButton = `<button onclick="updateRideStatus('${ride.id}', 'arrived_pickup')" class="w-full py-2 px-4 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">🚀 INICIAR VIAGEM</button>`;
+                    statusColor = 'status-accepted';
+                    cardClass = 'border-indigo-500';
+                    break;
+                case 'arrived_pickup':
+                    actionButton = `<button onclick="updateRideStatus('${ride.id}', 'in_progress')" class="w-full py-2 px-4 font-semibold rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors">🏁 FINALIZAR VIAGEM</button>`;
+                    statusColor = 'status-arrived_pickup';
+                    cardClass = 'border-purple-500';
+                    break;
+                case 'in_progress':
+                    actionButton = `<button onclick="updateRideStatus('${ride.id}', 'completed')" class="w-full py-2 px-4 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors">✅ VIAGEM CONCLUÍDA</button>`;
+                    statusColor = 'status-in_progress';
+                    cardClass = 'border-green-500';
+                    break;
+                case 'completed':
+                    statusColor = 'status-completed';
+                    cardClass = 'border-green-500 opacity-75';
+                    break;
+                case 'cancelled':
+                    statusColor = 'status-cancelled';
+                    cardClass = 'border-red-500 opacity-75';
+                    break;
+            }
+
+            const div = document.createElement('div');
+            div.className = `p-4 rounded-lg bg-gray-800 border-2 ${cardClass} space-y-2 transition-all`;
+            div.setAttribute('data-ride-id', ride.id);
+            
+            // HTML com destino SUPER DESTACADO
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <p><strong>👤 Passageiro:</strong> ${passenger?.full_name || 'N/A'}</p>
+                    <span class="text-xs px-2 py-1 rounded-full bg-gray-700 ${statusColor}">${ride.status.toUpperCase().replace('_', ' ')}</span>
+                </div>
+                <p><strong>📞 Telefone:</strong> ${passenger?.phone_number || 'N/A'}</p>
+                <p><strong>🏠 Origem:</strong> ${ride.origin_address || ride.origin_location || 'Origem não especificada'}</p>
+                <div style="background: #1f2937; border: 2px solid #22c55e; border-radius: 8px; padding: 8px; margin: 8px 0;">
+                    <p style="margin: 0;"><strong style="color: #fbbf24;">📍 DESTINO:</strong> <span class="destino-super-highlight">${destinationText}</span></p>
+                </div>
+                ${actionButton}
+                ${ride.status !== 'completed' && ride.status !== 'cancelled' ? 
+                    `<button onclick="openMap('${ride.origin_location || ''}', '${destinationText}')" class="w-full py-2 px-4 font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 transition-colors mt-2">
+                        🗺️ VER NO MAPA
+                    </button>` : ''
+                }
+            `;
+            
+            console.log('🔥 ELEMENTO CRIADO COM DESTINO:', destinationText);
+            return div;
+        }
+        
+        async function toggleWorkStatus() {
+            const toggle = document.getElementById('work-status-toggle');
+            const isChecked = toggle.checked;
+            const newStatus = isChecked ? 'online' : 'offline';
+            
+            try {
+                const { error } = await supabaseClient
+                    .from('driver_details')
+                    .update({ work_status: newStatus })
+                    .eq('profile_id', state.user.id);
+
+                if (error) {
+                    toast.show('Erro ao atualizar status: ' + error.message, 'error');
+                    toggle.checked = !isChecked;
+                } else {
+                    state.driverDetails.work_status = newStatus;
+                    if (newStatus === 'online') {
+                        startLocationTracking();
+                        toast.show('Agora você está online para receber corridas!', 'success');
+                    } else {
+                        stopLocationTracking();
+                        toast.show('Você está offline. Não receberá novas corridas.', 'info');
+                    }
+                }
+            } catch (error) {
+                toast.show('Erro inesperado: ' + error.message, 'error');
+                toggle.checked = !isChecked;
+            }
+        }
+
+        const updateLocationDebounced = debounce(async (latitude, longitude) => {
+            const location = `POINT(${longitude} ${latitude})`;
+            const { error } = await supabaseClient
+                .from('driver_details')
+                .update({ current_location: location })
+                .eq('profile_id', state.user.id);
+            
+            if (error) {
+                console.error('Erro ao atualizar localização:', error.message);
+            }
+        }, 5000);
+
         function startLocationTracking() {
-            if (!navigator.geolocation) return alert('Geolocalização não suportada.');
+            if (!navigator.geolocation) {
+                toast.show('Geolocalização não suportada pelo seu navegador', 'warning');
+                return;
+            }
             if (state.locationWatcher) return;
 
             state.locationWatcher = navigator.geolocation.watchPosition(
-                async (position) => {
+                (position) => {
                     const { latitude, longitude } = position.coords;
-                    const location = `POINT(${longitude} ${latitude})`;
-                    const { error } = await supabaseClient.from('driver_details').update({ current_location: location }).eq('profile_id', state.user.id);
-                    if (error) console.error('Erro ao atualizar localização:', error.message);
+                    updateLocationDebounced(latitude, longitude);
                 },
                 (error) => {
                     console.error('Erro no rastreamento:', error.message);
-                    alert('Não foi possível obter sua localização. Verifique as permissões.');
+                    toast.show('Erro ao obter localização. Verifique as permissões.', 'error');
                     stopLocationTracking();
                 },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
             );
         }
 
@@ -227,6 +1206,7 @@
             if (state.locationWatcher) {
                 navigator.geolocation.clearWatch(state.locationWatcher);
                 state.locationWatcher = null;
+                console.log('Rastreamento parado.');
             }
         }
         
@@ -245,121 +1225,242 @@
             if (!state.user) return;
             const list = document.getElementById('driver-jobs-list');
             
-            // CORREÇÃO AQUI: Consulta alterada para ser explícita
-            const { data, error } = await supabaseClient
-                .from('rides')
-                .select('*, passenger:passenger_id(full_name, phone_number)')
-                .eq('driver_id', state.user.id)
-                .in('status', ['assigned', 'accepted', 'arrived_pickup', 'in_progress']);
-                
-            if (error) {
-                console.error("Erro ao buscar corridas:", error);
-                list.innerHTML = `<p class="text-center text-red-500">Erro ao carregar corridas.</p>`;
-                return;
-            }
-            state.rides = data;
-
-            if (state.rides.length === 0) {
-                list.innerHTML = `<p class="text-center text-gray-400">Nenhuma corrida para você no momento.</p>`;
-                stopRinging();
-                return;
-            }
-            
-            const hasAssignedJob = state.rides.some(r => r.status === 'assigned');
-            if(hasAssignedJob) startRinging(); else stopRinging();
-
-            let ridesHtml = state.rides.map(ride => {
-                const passenger = ride.passenger;
-                return `
-                <div class="p-4 rounded-lg bg-gray-800 border border-gray-600 space-y-2">
-                    <p><strong>Passageiro:</strong> ${passenger?.full_name || 'N/A'}</p>
-                    <p><strong>Telefone:</strong> ${passenger?.phone_number || 'N/A'}</p>
-                    <p><strong>Origem:</strong> ${ride.origin_address}</p>
-                    <p><strong>Destinos:</strong> ${Array.isArray(ride.destinations) ? ride.destinations.join(' -> ') : ride.destinations}</p>
-                    <p><strong>Status:</strong> <span class="font-bold text-yellow-400">${ride.status.toUpperCase()}</span></p>
-                    <div class="pt-2 mt-2 border-t border-gray-700">
-                        ${renderRideButtons(ride)}
+            try {
+                list.innerHTML = `
+                    <div class="text-center py-8">
+                        <div class="loader mx-auto mb-4"></div>
+                        <p class="text-gray-400">Carregando corridas...</p>
                     </div>
-                </div>
-            `}).join('');
-            list.innerHTML = ridesHtml;
-        }
-        
-        function renderRideButtons(ride) {
-            let buttons = '';
-            if (ride.status === 'assigned') {
-                buttons = `<button onclick="acceptRide('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-green-600 hover:bg-green-700">ACEITAR</button>`;
-            } else if (ride.status === 'accepted') {
-                buttons = `<button onclick="arriveAtPickup('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-blue-600 hover:bg-blue-700">CHEGUEI NO LOCAL</button>`;
-            } else if (ride.status === 'arrived_pickup') {
-                buttons = `<button onclick="startTrip('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-purple-600 hover:bg-purple-700">INICIAR VIAGEM</button>`;
-            } else if (ride.status === 'in_progress') {
-                buttons = `<button onclick="completeRide('${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-teal-600 hover:bg-teal-700">FINALIZAR CORRIDA</button>`;
+                `;
+
+                console.log('🔄 Buscando corridas do motorista...');
+
+                const { data: assignedRides, error: assignedError } = await supabaseClient
+                    .from('rides')
+                    .select(`
+                        *, 
+                        passenger:profiles!rides_passenger_id_fkey(full_name, phone_number)
+                    `)
+                    .eq('driver_id', state.user.id)
+                    .in('status', ['assigned', 'accepted', 'arrived_pickup', 'in_progress']);
+
+                const { data: requestedRides, error: requestedError } = await supabaseClient
+                    .from('rides')
+                    .select(`
+                        *, 
+                        passenger:profiles!rides_passenger_id_fkey(full_name, phone_number)
+                    `)
+                    .eq('status', 'requested')
+                    .is('driver_id', null);
+                    
+                if (assignedError || requestedError) {
+                    console.error("❌ Erro ao buscar corridas:", assignedError || requestedError);
+                    list.innerHTML = `
+                        <div class="text-center py-8">
+                            <p class="text-red-500 mb-4">❌ Erro ao carregar corridas</p>
+                            <button onclick="loadDriverJobs()" class="px-4 py-2 bg-indigo-600 rounded-lg">
+                                Tentar novamente
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                state.rides = [...(assignedRides || []), ...(requestedRides || [])];
+                
+                console.log('✅ Corridas carregadas:', state.rides.length);
+                console.log('📊 Dados das corridas:', state.rides);
+                
+                state.ridesCache.clear();
+                state.rides.forEach(ride => state.ridesCache.set(ride.id, ride));
+
+                if (state.rides.length === 0) {
+                    list.innerHTML = `
+                        <div class="text-center py-8">
+                            <div class="text-6xl mb-4">🚗</div>
+                            <p class="text-gray-400">Nenhuma corrida disponível no momento</p>
+                            <p class="text-sm text-gray-500 mt-2">Mantenha-se online para receber novas corridas</p>
+                        </div>
+                    `;
+                    stopRinging();
+                    return;
+                }
+                
+                const hasNewRequestedJob = state.rides.some(r => r.status === 'requested' && r.driver_id === null);
+                if (hasNewRequestedJob) {
+                    startRinging();
+                    toast.show(`${state.rides.filter(r => r.status === 'requested').length} nova(s) corrida(s) disponível(is)!`, 'info');
+                } else {
+                    stopRinging();
+                }
+
+                list.innerHTML = '';
+                state.rides.forEach(ride => renderSingleRide(ride));
+
+            } catch (error) {
+                console.error('❌ Erro ao carregar corridas:', error);
+                toast.show('Erro ao carregar corridas: ' + error.message, 'error');
+                list.innerHTML = `
+                    <div class="text-center py-8">
+                        <p class="text-red-500 mb-4">❌ Erro inesperado</p>
+                        <button onclick="loadDriverJobs()" class="px-4 py-2 bg-indigo-600 rounded-lg">
+                            Tentar novamente
+                        </button>
+                    </div>
+                `;
             }
-            
-            const mapButton = `<button onclick="openMap('${ride.status}', '${ride.id}')" class="w-full mt-2 py-2 font-semibold rounded-lg bg-gray-600 hover:bg-gray-700">Ver Rota no Mapa</button>`;
-            return `<div class="space-y-2">${buttons}${mapButton}</div>`;
-        }
-        
-        async function updateRideStatus(rideId, status) {
-            const { error } = await supabaseClient.from('rides').update({ status: status }).eq('id', rideId);
-            if (error) alert(`Erro ao atualizar status: ${error.message}`);
         }
 
-        function acceptRide(rideId) { stopRinging(); updateRideStatus(rideId, 'accepted'); }
-        function arriveAtPickup(rideId) { updateRideStatus(rideId, 'arrived_pickup'); }
-        function startTrip(rideId) { updateRideStatus(rideId, 'in_progress'); }
-        function completeRide(rideId) { updateRideStatus(rideId, 'completed'); }
-        
-        async function openMap(status, rideId) {
-            const ride = state.rides.find(r => r.id === rideId);
-            if (!ride || !ride.origin_location) return alert('Localização da corrida não encontrada.');
-            
-            let destLat, destLng;
-            
-            if (status === 'accepted' || status === 'assigned') {
-                const [lon, lat] = ride.origin_location.replace('POINT(', '').replace(')', '').split(' ');
-                destLat = parseFloat(lat);
-                destLng = parseFloat(lon);
-            } else {
-                alert("Navegação para o destino final ainda não implementada.");
-                return;
-            }
+        async function acceptRide(rideId) {
+            try {
+                const { error } = await supabaseClient
+                    .from('rides')
+                    .update({ driver_id: state.user.id, status: 'assigned' })
+                    .eq('id', rideId);
 
-            if (destLat && destLng) {
-                const url = `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`;
-                window.open(url, '_blank');
+                if (error) {
+                    toast.show('Erro ao aceitar corrida: ' + error.message, 'error');
+                } else {
+                    toast.show('Corrida aceita com sucesso! 🚗', 'success');
+                }
+            } catch (error) {
+                console.error(error);
+                toast.show('Erro inesperado: ' + error.message, 'error');
             }
         }
-        
-        const ringtone = document.getElementById('ringtone');
-        function playRingSound() { ringtone.play().catch(console.error); }
-        function startRinging() { stopRinging(); playRingSound(); ringInterval = setInterval(playRingSound, 6000); document.getElementById('silence-btn').classList.remove('hidden');}
-        function stopRinging() { clearInterval(ringInterval); ringInterval = null; ringtone.pause(); ringtone.currentTime = 0; document.getElementById('silence-btn').classList.add('hidden');}
 
+        async function updateRideStatus(rideId, newStatus) {
+            try {
+                const { error } = await supabaseClient
+                    .from('rides')
+                    .update({ status: newStatus })
+                    .eq('id', rideId);
+
+                if (error) {
+                    toast.show('Erro ao atualizar status: ' + error.message, 'error');
+                } else {
+                    const statusMessages = {
+                        accepted: 'Status atualizado: No local de partida 📍',
+                        arrived_pickup: 'Viagem iniciada! 🚀',
+                        in_progress: 'A caminho do destino 🛣️',
+                        completed: 'Viagem concluída com sucesso! ✅'
+                    };
+                    toast.show(statusMessages[newStatus] || 'Status atualizado!', 'success');
+                }
+            } catch (error) {
+                console.error(error);
+                toast.show('Erro inesperado: ' + error.message, 'error');
+            }
+        }
+
+        function openMap(originLocation, destinationAddress) {
+            try {
+                if (!originLocation || !destinationAddress) {
+                    toast.show('Localização não disponível para navegação', 'warning');
+                    return;
+                }
+                
+                const [lng, lat] = originLocation.replace('POINT(', '').replace(')', '').split(' ').map(Number);
+                const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${lat},${lng}&destination=${encodeURIComponent(destinationAddress)}&travelmode=driving`;
+                window.open(googleMapsUrl, '_blank');
+            } catch (error) {
+                toast.show('Erro ao abrir o mapa', 'error');
+                console.error('Erro no mapa:', error);
+            }
+        }
+
+        function startRinging() {
+            const ringtone = document.getElementById('ringtone');
+            const silenceBtn = document.getElementById('silence-btn');
+            if (ringtone && ringtone.paused) {
+                ringtone.play().catch(e => console.error("Erro ao tocar áudio:", e));
+                silenceBtn.classList.remove('hidden');
+            }
+        }
+
+        function stopRinging() {
+            const ringtone = document.getElementById('ringtone');
+            const silenceBtn = document.getElementById('silence-btn');
+            if (ringtone && !ringtone.paused) {
+                ringtone.pause();
+                ringtone.currentTime = 0;
+                silenceBtn.classList.add('hidden');
+            }
+        }
+
+        // =============================================================================
+        // INITIALIZATION
+        // =============================================================================
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('login-form').addEventListener('submit', (e) => { e.preventDefault(); handleSignIn(document.getElementById('login-email').value, document.getElementById('login-password').value); });
-            document.getElementById('signup-form').addEventListener('submit', (e) => {
-                e.preventDefault();
-                const formData = {
-                    fullName: document.getElementById('signup-fullname').value, email: document.getElementById('signup-email').value, phone: document.getElementById('signup-phone').value,
-                    password: document.getElementById('signup-password').value, plate: document.getElementById('signup-plate').value, model: document.getElementById('signup-model').value, color: document.getElementById('signup-color').value,
-                };
-                handleSignUp(formData);
-});
+            console.log('🚀 Aplicativo inicializando...');
 
             supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                if (event === 'SIGNED_IN') {
-                    state.user = session.user;
-                    await loadDriverData(session.user.id);
+                console.log('🔐 Auth event:', event, session?.user?.id);
+                
+                if (event === 'SIGNED_IN' && session?.user) {
+                    if (!state.user) {
+                        state.user = session.user;
+                        await loadDriverData(session.user.id);
+                    }
                 } else if (event === 'SIGNED_OUT') {
-                    state.user = null; state.profile = null; state.driverDetails = null;
+                    state.user = null;
+                    state.profile = null;
+                    state.driverDetails = null;
+                    state.rides = [];
+                    state.isInitializing = false;
+                    if (state.rideSubscription) {
+                        await supabaseClient.removeChannel(state.rideSubscription);
+                        state.rideSubscription = null;
+                    }
+                    stopLocationTracking();
+                    clearLoadingTimeout();
                     showScreen('login-screen');
                 }
             });
 
-            checkSession();
+            document.getElementById('login-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const email = e.target.elements['login-email'].value;
+                const password = e.target.elements['login-password'].value;
+                handleSignIn(email, password);
+            });
+
+            document.getElementById('signup-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const formData = {
+                    fullName: e.target.elements['signup-fullname'].value,
+                    email: e.target.elements['signup-email'].value,
+                    phone: e.target.elements['signup-phone'].value,
+                    password: e.target.elements['signup-password'].value,
+                    plate: e.target.elements['signup-plate'].value,
+                    model: e.target.elements['signup-model'].value,
+                    color: e.target.elements['signup-color'].value
+                };
+                handleSignUp(formData);
+            });
+
+            document.getElementById('toggle-login-password').addEventListener('click', () => togglePassword('login-password'));
+            document.getElementById('toggle-signup-password').addEventListener('click', () => togglePassword('signup-password'));
+
+            applyPhoneMask(document.getElementById('signup-phone'));
+            applyPlateMask(document.getElementById('signup-plate'));
+
+            // Verificar sessão com delay para dar tempo do Supabase carregar
+            setTimeout(checkSession, 1500);
         });
+
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            const button = document.getElementById(`toggle-${inputId}`);
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                button.textContent = '👁️';
+            }
+        }
     </script>
 </body>
 </html>
