@@ -4,33 +4,79 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GARCIA MOBILIDADE - Passageiro</title>
+    
+    <!-- CDNs Externos -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g&libraries=places"></script>
+    <script src="https://js.stripe.com/v3/"></script>
+    
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g&libraries=places"></script>
-    <script src="https://js.stripe.com/v3/"></script>
-    
     <style>
-        body { font-family: 'Poppins', sans-serif; background-color: black; color: white; }
+        body { 
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background-color: #000000; 
+            color: #ffffff; 
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
         .screen { display: none; }
         .screen.active { display: block; }
-        .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #6d28d9; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        .pac-container { background-color: #1F2937; border-radius: 8px; border: 1px solid #4B5563; }
-        .pac-item { padding: 10px; font-size: 14px; color: #D1D5DB; cursor: pointer; border-top: 1px solid #374151;}
+        .loader { 
+            border: 4px solid #f3f3f3; 
+            border-radius: 50%; 
+            border-top: 4px solid #6d28d9; 
+            width: 40px; 
+            height: 40px; 
+            animation: spin 1s linear infinite; 
+        }
+        
+        @keyframes spin { 
+            0% { transform: rotate(0deg); } 
+            100% { transform: rotate(360deg); } 
+        }
+        
+        .pac-container { 
+            background-color: #1F2937; 
+            border-radius: 8px; 
+            border: 1px solid #4B5563; 
+            z-index: 9999;
+        }
+        .pac-item { 
+            padding: 10px; 
+            font-size: 14px; 
+            color: #D1D5DB; 
+            cursor: pointer; 
+            border-top: 1px solid #374151;
+        }
         .pac-item:first-child { border-top: none; }
         .pac-item:hover { background-color: #374151; }
         .pac-item-query { font-weight: 600; color: #F3F4F6; }
 
-        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 1000; }
+        .toast-container { 
+            position: fixed; 
+            top: 20px; 
+            right: 20px; 
+            z-index: 1000; 
+        }
         .toast { 
-            background: #1f2937; border-left: 4px solid; color: white; padding: 16px; border-radius: 8px; 
-            margin-bottom: 10px; min-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-            transform: translateX(400px); transition: all 0.3s ease;
+            background: #1f2937; 
+            border-left: 4px solid; 
+            color: white; 
+            padding: 16px; 
+            border-radius: 8px; 
+            margin-bottom: 10px; 
+            min-width: 300px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transform: translateX(400px); 
+            transition: all 0.3s ease;
         }
         .toast.show { transform: translateX(0); }
         .toast.success { border-left-color: #22c55e; }
@@ -38,11 +84,22 @@
         .toast.info { border-left-color: #3b82f6; }
         .toast.warning { border-left-color: #f59e0b; }
 
-        .btn-loading { position: relative; color: transparent !important; }
+        .btn-loading { 
+            position: relative; 
+            color: transparent !important; 
+        }
         .btn-loading::after {
-            content: ''; position: absolute; top: 50%; left: 50%; width: 20px; height: 20px;
-            margin: -10px 0 0 -10px; border: 2px solid #ffffff; border-top: 2px solid transparent;
-            border-radius: 50%; animation: spin 1s linear infinite;
+            content: ''; 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            width: 20px; 
+            height: 20px;
+            margin: -10px 0 0 -10px; 
+            border: 2px solid #ffffff; 
+            border-top: 2px solid transparent;
+            border-radius: 50%; 
+            animation: spin 1s linear infinite;
         }
 
         .error-recovery {
@@ -84,15 +141,30 @@
 
         .timeline-item.active { opacity: 1; }
         .timeline-item.completed { opacity: 0.9; }
-        .timeline-item.completed .timeline-icon { background-color: #16a34a; border-color: #22c55e; }
-        .timeline-item.completed::before { border-left: 2px solid #22c55e; }
+        .timeline-item.completed .timeline-icon { 
+            background-color: #16a34a; 
+            border-color: #22c55e; 
+        }
+        .timeline-item.completed::before { 
+            border-left: 2px solid #22c55e; 
+        }
 
         .timeline-icon {
-            width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            background-color: #374151; border: 2px solid #4b5563; flex-shrink: 0; z-index: 1;
+            width: 32px; 
+            height: 32px; 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            background-color: #374151; 
+            border: 2px solid #4b5563; 
+            flex-shrink: 0; 
+            z-index: 1;
         }
         .timeline-item.active .timeline-icon {
-            background-color: #6d28d9; border-color: #8b5cf6; animation: pulse 2s infinite;
+            background-color: #6d28d9; 
+            border-color: #8b5cf6; 
+            animation: pulse 2s infinite;
         }
         
         .timeline-text { font-weight: 500; }
@@ -104,14 +176,50 @@
         }
 
         .StripeElement {
-            background-color: #1f2937; padding: 12px; border-radius: 8px; border: 1px solid #4b5563; transition: border-color 0.2s;
+            background-color: #1f2937; 
+            padding: 12px; 
+            border-radius: 8px; 
+            border: 1px solid #4b5563; 
+            transition: border-color 0.2s;
         }
         .StripeElement--focus { border-color: #6d28d9; }
         .StripeElement--invalid { border-color: #ef4444; }
         .StripeElement--complete { border-color: #22c55e; }
         
         #card-errors {
-            color: #ef4444; font-size: 0.875rem; margin-top: 10px; text-align: center; min-height: 1.25rem;
+            color: #ef4444; 
+            font-size: 0.875rem; 
+            margin-top: 10px; 
+            text-align: center; 
+            min-height: 1.25rem;
+        }
+        
+        /* Logo placeholder */
+        .logo-placeholder {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: bold;
+            color: white;
+            margin: 0 auto 24px;
+            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #059669, #10b981);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: white;
         }
         
         @media (max-width: 480px) {
@@ -125,7 +233,9 @@
 
     <div id="app-container" class="w-full max-w-md mx-auto p-4">
 
+        <!-- Loading Screen -->
         <div id="loading-screen" class="screen active text-center">
+            <div class="logo-placeholder">GM</div>
             <div class="loader mx-auto"></div>
             <p class="mt-4">Carregando aplicativo...</p>
             <div id="loading-error" class="error-recovery hidden">
@@ -137,8 +247,9 @@
             </div>
         </div>
 
+        <!-- Login Screen -->
         <div id="login-screen" class="screen space-y-3">
-            <img src="images/logogarcia.png" alt="Logo Garcia Transportes" class="mx-auto h-16 w-auto mb-6">
+            <div class="logo-placeholder">GM</div>
             <h2 class="text-3xl font-bold text-center">Login</h2>
             
             <div class="space-y-3 pt-2">
@@ -173,6 +284,7 @@
             <p class="text-center text-sm">Não tem uma conta? <a href="#" onclick="showScreen('signup-screen')" class="font-semibold text-indigo-400">Cadastre-se</a></p>
         </div>
         
+        <!-- Forgot Password Screen -->
         <div id="forgot-password-screen" class="screen space-y-4">
             <h2 class="text-3xl font-bold text-center">Recuperar Senha</h2>
             <p class="text-center text-gray-400">Digite seu e-mail e enviaremos um link.</p>
@@ -188,6 +300,7 @@
             </p>
         </div>
         
+        <!-- Update Password Screen -->
         <div id="update-password-screen" class="screen space-y-4">
             <h2 class="text-3xl font-bold text-center">Crie uma Nova Senha</h2>
             <form id="update-password-form" class="space-y-4">
@@ -199,6 +312,7 @@
             </form>
         </div>
         
+        <!-- Complete Profile Screen -->
         <div id="complete-profile-screen" class="screen space-y-4">
             <h2 class="text-3xl font-bold text-center">Complete seu Perfil</h2>
             <p class="text-center text-gray-400">Precisamos de mais uma informação para continuar.</p>
@@ -211,6 +325,7 @@
             </form>
         </div>
 
+        <!-- Signup Screen -->
         <div id="signup-screen" class="screen space-y-3">
             <h2 class="text-3xl font-bold text-center">Cadastro</h2>
             <form id="signup-form" class="space-y-3">
@@ -235,10 +350,11 @@
             <p class="text-center text-sm">Já tem uma conta? <a href="#" onclick="showScreen('login-screen')" class="font-semibold text-indigo-400">Faça o login</a></p>
         </div>
 
+        <!-- User Screen -->
         <div id="user-screen" class="screen space-y-6">
             <div class="flex justify-between items-center">
                 <div class="flex items-center gap-3">
-                    <img src="images/user.png" alt="Ícone do Usuário" class="w-8 h-8">
+                    <div class="user-avatar">👤</div>
                     <h2 class="text-2xl font-bold">Solicitar Viagem</h2>
                 </div>
                 <button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700 transition-colors">Sair</button>
@@ -275,7 +391,7 @@
                 <div id="driver-details-panel" class="bg-gray-800/80 backdrop-blur-sm p-4 rounded-xl space-y-4 transition-all duration-500 transform -translate-y-4 opacity-0">
                     <div class="flex items-center gap-4">
                         <div class="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center shrink-0">
-                            👤 <svg class="w-8 h-8 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path></svg>
+                            👤
                         </div>
                         <div class="flex-1 min-w-0">
                             <h4 id="driver-name" class="text-lg font-bold truncate">Procurando motorista...</h4>
@@ -286,10 +402,10 @@
                         </div>
                         <div class="flex gap-2 shrink-0">
                             <button id="message-driver-btn" onclick="messageDriver()" disabled class="w-10 h-10 bg-blue-600/80 hover:bg-blue-600 disabled:bg-gray-700 disabled:opacity-50 rounded-full flex items-center justify-center transition-all">
-                                <svg class="w-5 h-5 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path></svg>
+                                💬
                             </button>
-                            📞 <button id="call-driver-btn" onclick="callDriver()" disabled class="w-10 h-10 bg-green-600/80 hover:bg-green-600 disabled:bg-gray-700 disabled:opacity-50 rounded-full flex items-center justify-center transition-all">
-                                <svg class="w-5 h-5 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"></path></svg>
+                            <button id="call-driver-btn" onclick="callDriver()" disabled class="w-10 h-10 bg-green-600/80 hover:bg-green-600 disabled:bg-gray-700 disabled:opacity-50 rounded-full flex items-center justify-center transition-all">
+                                📞
                             </button>
                         </div>
                     </div>
@@ -310,6 +426,7 @@
             </div>
         </div>
 
+        <!-- Wallet Screen -->
         <div id="wallet-screen" class="screen space-y-6">
             <div class="flex items-center gap-4">
                 <button onclick="showScreen('user-screen')" class="text-2xl">⬅️</button>
@@ -336,6 +453,7 @@
             </div>
         </div>
 
+        <!-- Wallet Payment Screen -->
         <div id="wallet-payment-screen" class="screen space-y-6">
             <div class="flex items-center gap-4">
                 <button onclick="showWalletScreen()" class="text-2xl">⬅️</button>
@@ -358,12 +476,12 @@
     </div>
 
     <script>
+        // ========== CONFIGURAÇÕES DE PRODUÇÃO ==========
         const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
         const STRIPE_PUBLISHABLE_KEY = 'pk_test_51SEJCBFyO4P04UV0YubwfXu6UD8rmVBuA1AGNlygxvLTTiVCfdnmaAewkyT7H1mfgMBu0JhpvPPbraIC2IIM080G00KH08HO7v';
-        let stripe, cardElement;
+        
+        let supabaseClient, stripe, cardElement;
         
         const state = { 
             user: null, 
@@ -379,6 +497,7 @@
 
         let loadingTimeout = null;
 
+        // ========== FUNÇÕES DE INICIALIZAÇÃO ==========
         function setupLoadingTimeout() {
             loadingTimeout = setTimeout(() => {
                 document.getElementById('loading-error')?.classList.remove('hidden');
@@ -394,28 +513,39 @@
             window.location.reload();
         }
 
-        // Inicialização da aplicação - CORRIGIDO
         async function initializeApp() {
             try {
+                console.log('🚀 Iniciando Garcia Mobilidade (Versão Online)');
                 setupLoadingTimeout();
                 
-                // Inicializar Stripe precocemente
-                if (typeof Stripe !== 'undefined') {
-                    stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
-                    console.log('✅ Stripe inicializado com sucesso');
-                } else {
-                    console.warn('⚠️ Stripe não está disponível ainda, tentando novamente...');
-                    setTimeout(() => {
-                        if (typeof Stripe !== 'undefined') {
-                            stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
-                            console.log('✅ Stripe inicializado com sucesso (retry)');
-                        }
-                    }, 1000);
+                // Inicializar Supabase
+                try {
+                    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    console.log('✅ Supabase inicializado');
+                } catch (error) {
+                    console.error('❌ Erro ao inicializar Supabase:', error);
+                    throw new Error('Falha na conexão com o servidor');
+                }
+                
+                // Inicializar Stripe
+                try {
+                    if (typeof Stripe !== 'undefined') {
+                        stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+                        console.log('✅ Stripe inicializado');
+                    } else {
+                        console.warn('⚠️ Stripe não disponível');
+                    }
+                } catch (error) {
+                    console.error('❌ Erro ao inicializar Stripe:', error);
                 }
 
+                // Inicializar Google Maps Autocomplete
                 initializeAutocomplete();
+                
+                // Configurar event listeners
                 setupEventListeners();
                 
+                // Verificar sessão existente
                 const { data: { session } } = await supabaseClient.auth.getSession();
                 if (session?.user) {
                     state.user = session.user;
@@ -429,41 +559,37 @@
                 console.error('❌ Erro na inicialização:', error);
                 clearLoadingTimeout();
                 showScreen('login-screen');
+                toast.show('Erro ao carregar aplicativo: ' + error.message, 'error');
             }
         }
 
-        window.addEventListener('unhandledrejection', (event) => {
-            console.error('❌ Promise rejection não tratada:', event.reason);
-            if (event.reason?.message?.includes('Auth')) {
-                handleAuthError();
-            }
-        });
-
-        function handleAuthError() {
-            console.log('🔄 Recuperando de erro de autenticação...');
-            state.user = state.profile = state.currentRide = null;
-            if (state.rideSubscription) {
-                try {
-                    supabaseClient.removeChannel(state.rideSubscription);
-                    state.rideSubscription = null;
-                } catch (e) { console.warn('Erro ao remover subscription:', e); }
-            }
-            stopRidePolling();
-            showScreen('login-screen');
-        }
-
+        // ========== SISTEMA DE TOAST ==========
         class ToastManager {
             constructor() {
                 this.container = document.getElementById('toast-container');
             }
+            
             show(message, type = 'info', duration = 4000) {
                 if (!this.container) return;
+                
                 const toast = document.createElement('div');
                 toast.className = `toast ${type}`;
+                
                 const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
                 const titles = { success: 'Sucesso', error: 'Erro', warning: 'Atenção', info: 'Informação' };
-                toast.innerHTML = `<div class="flex justify-between items-start"><div class="flex-1"><p class="font-medium">${icons[type]} ${titles[type]}</p><p class="text-sm opacity-90 mt-1">${message}</p></div><button onclick="this.parentElement.parentElement.remove()" class="ml-3 text-white/60 hover:text-white">✕</button></div>`;
+                
+                toast.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <p class="font-medium">${icons[type]} ${titles[type]}</p>
+                            <p class="text-sm opacity-90 mt-1">${message}</p>
+                        </div>
+                        <button onclick="this.parentElement.parentElement.remove()" class="ml-3 text-white/60 hover:text-white">✕</button>
+                    </div>
+                `;
+                
                 this.container.appendChild(toast);
+                
                 setTimeout(() => toast.classList.add('show'), 100);
                 setTimeout(() => {
                     if (toast.parentElement) {
@@ -475,9 +601,8 @@
         }
         const toast = new ToastManager();
 
-        // Função showScreen corrigida com limpeza do Stripe
+        // ========== GERENCIAMENTO DE TELAS ==========
         function showScreen(screenId) {
-            // Se estiver saindo da tela de pagamento, limpar elementos Stripe
             if (document.querySelector('.screen.active')?.id === 'wallet-payment-screen' && screenId !== 'wallet-payment-screen') {
                 cleanupStripeElements();
             }
@@ -487,7 +612,6 @@
             clearLoadingTimeout();
         }
 
-        // Nova função para limpeza dos elementos Stripe
         function cleanupStripeElements() {
             if (cardElement) {
                 try {
@@ -500,11 +624,11 @@
                     cardElement = null;
                 }
             }
-            // Limpar erros do cartão
             const cardErrors = document.getElementById('card-errors');
             if (cardErrors) cardErrors.textContent = '';
         }
 
+        // ========== UTILITÁRIOS ==========
         function showLoading(buttonId) {
             const btn = document.getElementById(buttonId);
             if(btn) {
@@ -526,124 +650,29 @@
             return `R$ ${number.toFixed(2).replace('.', ',')}`;
         }
 
-        const timelineConfig = {
-            'requested': { icon: '🔍', text: 'Procurando motorista' },
-            'assigned': { icon: '✅', text: 'Motorista encontrado' },
-            'accepted': { icon: '🚗', text: 'Motorista no local' },
-            'arrived_pickup': { icon: '📍', text: 'Viagem em andamento' },
-            'in_progress': { icon: '🛣️', text: 'Viagem em progresso' },
-            'completed': { icon: '🏁', text: 'Viagem concluída' },
-        };
-        const statusOrder = ['requested', 'assigned', 'accepted', 'arrived_pickup', 'in_progress', 'completed'];
-
-        function renderTimeline(currentStatus) {
-            const timelineContainer = document.getElementById('status-timeline');
-            if (!timelineContainer) return;
-            timelineContainer.innerHTML = '';
-            const currentIndex = statusOrder.indexOf(currentStatus);
-            const rideAccepted = currentIndex >= statusOrder.indexOf('accepted');
-
-            if(statusOrder.indexOf('requested') < statusOrder.length){
-                 const item = document.createElement('div');
-                item.className = `timeline-item ${currentIndex >= 0 ? 'completed' : ''} ${currentStatus === 'requested' ? 'active' : ''}`;
-                item.innerHTML = `<div class="timeline-icon">🔍</div><p class="timeline-text">Procurando motorista</p>`;
-                timelineContainer.appendChild(item);
-            }
-             if(statusOrder.indexOf('assigned') < statusOrder.length){
-                const item = document.createElement('div');
-                item.className = `timeline-item ${currentIndex >= 1 ? 'completed' : ''} ${currentStatus === 'assigned' ? 'active' : ''}`;
-                item.innerHTML = `<div class="timeline-icon">✅</div><p class="timeline-text">Motorista encontrado</p>`;
-                timelineContainer.appendChild(item);
-             }
-            if (currentIndex >= 1) {
-                const item = document.createElement('div');
-                item.className = `timeline-item ${rideAccepted ? 'completed' : 'active'}`;
-                item.innerHTML = `<div class="timeline-icon">🚗</div><p class="timeline-text">Motorista a caminho</p>`;
-                timelineContainer.appendChild(item);
-            }
-            if (currentIndex >= 1) {
-                const config = timelineConfig['accepted'];
-                const item = document.createElement('div');
-                item.className = `timeline-item ${currentIndex >= 3 ? 'completed' : ''} ${currentStatus === 'accepted' ? 'active' : ''}`;
-                item.innerHTML = `<div class="timeline-icon">${config.icon}</div><p class="timeline-text">${config.text}</p>`;
-                timelineContainer.appendChild(item);
-            }
-            if (currentIndex >= 2) {
-                const config = timelineConfig['arrived_pickup'];
-                const item = document.createElement('div');
-                item.className = `timeline-item ${currentIndex >= 4 ? 'completed' : ''} ${currentStatus === 'arrived_pickup' ? 'active' : ''}`;
-                item.innerHTML = `<div class="timeline-icon">${config.icon}</div><p class="timeline-text">${config.text}</p>`;
-                timelineContainer.appendChild(item);
-            }
-             if (currentIndex >= 3) {
-                const config = timelineConfig['in_progress'];
-                const item = document.createElement('div');
-                item.className = `timeline-item ${currentIndex >= 5 ? 'completed' : ''} ${currentStatus === 'in_progress' || currentStatus === 'completed' ? 'active' : ''}`;
-                item.innerHTML = `<div class="timeline-icon">${config.icon}</div><p class="timeline-text">${config.text}</p>`;
-                timelineContainer.appendChild(item);
-             }
-        }
-        
-        function updateDriverPanel(driver, details) {
-            const driverPanel = document.getElementById('driver-details-panel');
-            if (!driverPanel) return;
-            document.getElementById('driver-name').textContent = driver?.full_name || 'Motorista';
-            const carInfo = `${details?.car_model || ''} ${details?.car_color || ''}`.trim();
-            document.getElementById('driver-car').textContent = carInfo || 'Veículo';
-            document.getElementById('driver-plate').textContent = details?.license_plate || '';
-            const callBtn = document.getElementById('call-driver-btn');
-            const msgBtn = document.getElementById('message-driver-btn');
-            callBtn.disabled = !driver?.phone_number;
-            msgBtn.disabled = !driver?.phone_number;
-            driverPanel.classList.add('active');
-        }
-
-        function resetRideStatusUI() {
-            const driverPanel = document.getElementById('driver-details-panel');
-            if (driverPanel) {
-                driverPanel.classList.remove('active');
-                driverPanel.style.opacity = '0';
-                driverPanel.style.transform = 'translateY(-1rem)';
-                document.getElementById('driver-name').textContent = 'Procurando motorista...';
-                document.getElementById('driver-car').textContent = 'Aguarde um momento';
-                document.getElementById('driver-plate').textContent = '';
-                document.getElementById('call-driver-btn').disabled = true;
-                document.getElementById('message-driver-btn').disabled = true;
-            }
-            document.getElementById('status-timeline').innerHTML = '';
-        }
-
-        function handleRideStateUpdate(ride) {
-            if (!ride || !ride.status) return;
-            const status = ride.status;
-            renderTimeline(status);
-            const destination = (ride.destinations && ride.destinations[0]) || 'N/A';
-            updateTripDetails(ride.origin_address, destination);
-            const cancelBtn = document.getElementById('cancel-ride-btn');
-            if (['in_progress', 'completed', 'cancelled'].includes(status)) {
-                cancelBtn.classList.add('hidden');
-            } else {
-                cancelBtn.classList.remove('hidden');
-            }
-            if (ride.driver_id) {
-                loadDriverInfo(ride.driver_id);
-            } else {
-                updateDriverPanel(null, null);
-                document.getElementById('driver-details-panel').classList.add('active');
-            }
-        }
-        
+        // ========== AUTENTICAÇÃO ==========
         async function handleSignUp(fullName, email, phone, password) {
             showLoading('signup-btn');
             try {
                 const { error } = await supabaseClient.auth.signUp({ 
-                    email, phone, password, options: { data: { full_name: fullName, user_type: 'passenger' } } 
+                    email, 
+                    password, 
+                    options: { 
+                        data: { 
+                            full_name: fullName, 
+                            phone_number: phone,
+                            user_type: 'passenger' 
+                        } 
+                    } 
                 });
                 if (error) throw error;
                 toast.show('Cadastro realizado! Verifique seu e-mail para ativar sua conta.', 'success');
                 showScreen('login-screen');
-            } catch (error) { toast.show('Erro no cadastro: ' + error.message, 'error');
-            } finally { hideLoading('signup-btn'); }
+            } catch (error) { 
+                toast.show('Erro no cadastro: ' + error.message, 'error');
+            } finally { 
+                hideLoading('signup-btn'); 
+            }
         }
 
         async function handleSignIn(email, password) {
@@ -652,15 +681,25 @@
                 const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
                 if (error) throw error;
                 toast.show('Login realizado com sucesso!', 'success');
-            } catch (error) { toast.show('Erro no login: ' + error.message, 'error');
-            } finally { hideLoading('login-btn'); }
+            } catch (error) { 
+                toast.show('Erro no login: ' + error.message, 'error');
+            } finally { 
+                hideLoading('login-btn'); 
+            }
         }
         
         async function handleSignInWithProvider(provider) {
             try {
-                const { error } = await supabaseClient.auth.signInWithOAuth({ provider });
+                const { error } = await supabaseClient.auth.signInWithOAuth({ 
+                    provider,
+                    options: {
+                        redirectTo: window.location.origin
+                    }
+                });
                 if (error) throw error;
-            } catch (error) { toast.show(`Erro ao tentar login com ${provider}: ` + error.message, 'error'); }
+            } catch (error) { 
+                toast.show(`Erro ao tentar login com ${provider}: ` + error.message, 'error'); 
+            }
         }
 
         async function handleSignOut() {
@@ -670,92 +709,146 @@
                     state.rideSubscription = null;
                 }
                 stopRidePolling();
-                cleanupStripeElements(); // Limpeza do Stripe ao fazer logout
+                cleanupStripeElements();
+                
                 await supabaseClient.auth.signOut();
+                
+                state.user = null;
+                state.profile = null;
+                state.currentRide = null;
+                
                 toast.show('Logout realizado com sucesso', 'success');
+                showScreen('login-screen');
             } catch (error) {
                 toast.show('Erro ao fazer logout: ' + error.message, 'error');
-                handleAuthError();
+                showScreen('login-screen');
             }
         }
         
         async function loadUserProfile(userId) {
             try {
-                const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', userId)
+                    .single();
+                    
                 if (error) throw error;
+                
                 if (!data) {
                     console.error('Perfil não encontrado:', userId);
                     toast.show('Não foi possível carregar seu perfil.', 'error');
                     return handleSignOut();
                 }
+                
                 state.profile = data;
                 document.getElementById('welcome-message').textContent = `Olá, ${state.profile.full_name}!`;
-                document.getElementById('wallet-balance-display').textContent = formatCurrency(state.profile.wallet_balance);
-                document.getElementById('wallet-balance-details').textContent = formatCurrency(state.profile.wallet_balance);
+                document.getElementById('wallet-balance-display').textContent = formatCurrency(state.profile.wallet_balance || 0);
+                document.getElementById('wallet-balance-details').textContent = formatCurrency(state.profile.wallet_balance || 0);
+                
                 showScreen('user-screen');
                 await checkPendingRide();
             } catch (error) { 
                 console.error('❌ Erro ao carregar perfil:', error.message); 
-                handleAuthError();
+                toast.show('Erro ao carregar perfil: ' + error.message, 'error');
+                setTimeout(handleSignOut, 2000);
             }
         }
 
+        // ========== GOOGLE MAPS AUTOCOMPLETE ==========
         function initializeAutocomplete() {
             try {
                 if (typeof google !== 'undefined' && google.maps && google.maps.places) {
-                    const options = { types: ['address'], componentRestrictions: { 'country': 'br' } };
+                    const options = { 
+                        types: ['address'], 
+                        componentRestrictions: { 'country': 'br' } 
+                    };
+                    
                     const originInput = document.getElementById('origin');
                     const destinationInput = document.getElementById('destination');
-                    const originAutocomplete = new google.maps.places.Autocomplete(originInput, options);
-                    originAutocomplete.addListener('place_changed', () => {
-                        state.originPlace = originAutocomplete.getPlace();
-                    });
-                    const destinationAutocomplete = new google.maps.places.Autocomplete(destinationInput, options);
-                    destinationAutocomplete.addListener('place_changed', () => {
-                        state.destinationPlace = destinationAutocomplete.getPlace();
-                    });
-                    originInput.addEventListener('input', () => { state.originPlace = null; });
-                    destinationInput.addEventListener('input', () => { state.destinationPlace = null; });
+                    
+                    if (originInput && destinationInput) {
+                        const originAutocomplete = new google.maps.places.Autocomplete(originInput, options);
+                        originAutocomplete.addListener('place_changed', () => {
+                            state.originPlace = originAutocomplete.getPlace();
+                        });
+                        
+                        const destinationAutocomplete = new google.maps.places.Autocomplete(destinationInput, options);
+                        destinationAutocomplete.addListener('place_changed', () => {
+                            state.destinationPlace = destinationAutocomplete.getPlace();
+                        });
+                        
+                        originInput.addEventListener('input', () => { state.originPlace = null; });
+                        destinationInput.addEventListener('input', () => { state.destinationPlace = null; });
+                        
+                        console.log('✅ Google Maps Autocomplete inicializado');
+                    }
                 } else {
+                    console.warn('⚠️ Google Maps não disponível, tentando novamente...');
                     setTimeout(initializeAutocomplete, 1000);
                 }
-            } catch (error) { console.error('❌ Erro ao inicializar autocomplete:', error); }
+            } catch (error) { 
+                console.error('❌ Erro ao inicializar autocomplete:', error); 
+            }
         }
 
+        // ========== GEOLOCALIZAÇÃO ==========
         function useCurrentLocation() {
-            if (!navigator.geolocation) return toast.show('Geolocalização não suportada.', 'error');
+            if (!navigator.geolocation) {
+                toast.show('Geolocalização não suportada pelo navegador.', 'error');
+                return;
+            }
+
             const originInput = document.getElementById('origin');
             originInput.value = 'Obtendo localização...';
             state.originPlace = null;
+
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     const { latitude: lat, longitude: lng } = position.coords;
-                    if (typeof google !== 'undefined') {
+                    
+                    if (typeof google !== 'undefined' && google.maps) {
                         const latLng = new google.maps.LatLng(lat, lng);
-                        new google.maps.Geocoder().geocode({ 'location': latLng }, (results, status) => {
+                        const geocoder = new google.maps.Geocoder();
+                        
+                        geocoder.geocode({ 'location': latLng }, (results, status) => {
                             if (status === 'OK' && results[0]) {
                                 originInput.value = results[0].formatted_address;
                                 state.originPlace = {
                                     formatted_address: results[0].formatted_address,
                                     geometry: { location: latLng }
                                 };
+                                toast.show('Localização obtida com sucesso!', 'success');
                             } else {
                                 originInput.value = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
+                                toast.show('Localização obtida (coordenadas brutas)', 'info');
                             }
                         });
+                    } else {
+                        originInput.value = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
+                        toast.show('Localização obtida (coordenadas brutas)', 'info');
                     }
                 },
-                () => {
+                (error) => {
+                    console.error('Erro de geolocalização:', error);
                     toast.show('Não foi possível obter sua localização.', 'error');
                     originInput.value = '';
                 }
             );
         }
 
-        // ======= FUNÇÕES DE PAGAMENTO STRIPE CORRIGIDAS =======
+        // ========== CARTEIRA E PAGAMENTOS STRIPE ==========
+        function showWalletScreen() {
+            cleanupStripeElements();
+            showScreen('wallet-screen');
+        }
 
-        // Função corrigida para iniciar recarga da carteira
         function startWalletTopUp(amount) {
+            if (!stripe) {
+                toast.show('Sistema de pagamento não disponível no momento.', 'error');
+                return;
+            }
+
             const parsedAmount = parseFloat(amount);
             if (isNaN(parsedAmount) || parsedAmount < 5) {
                 toast.show('Por favor, insira um valor de recarga de no mínimo R$ 5,00.', 'warning');
@@ -772,20 +865,12 @@
             initializeStripeForTopUp(parsedAmount);
         }
 
-        // Função corrigida para inicializar Stripe para recarga
         async function initializeStripeForTopUp(amount) {
             try {
-                // Limpar elemento anterior se existir
                 cleanupStripeElements();
 
-                // Verificar se Stripe está disponível
                 if (!stripe) {
-                    if (typeof Stripe !== 'undefined') {
-                        stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
-                        console.log('✅ Stripe inicializado para pagamento');
-                    } else {
-                        throw new Error('Stripe não está disponível');
-                    }
+                    stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
                 }
 
                 console.log('🔄 Criando Payment Intent para:', formatCurrency(amount));
@@ -837,12 +922,10 @@
                 
                 cardElement.mount('#card-element');
 
-                // Adicionar listeners para melhor UX
                 cardElement.on('change', ({error}) => {
                     const displayError = document.getElementById('card-errors');
                     if (error) {
                         displayError.textContent = error.message;
-                        console.warn('⚠️ Erro no cartão:', error.message);
                     } else {
                         displayError.textContent = '';
                     }
@@ -854,7 +937,6 @@
 
                 const form = document.getElementById('payment-form');
                 if (form) {
-                    // Remover event listeners anteriores
                     form.onsubmit = null;
                     const newForm = form.cloneNode(true);
                     form.parentNode.replaceChild(newForm, form);
@@ -871,8 +953,8 @@
                 console.error("❌ Erro ao inicializar Stripe:", error);
                 let errorMessage = "Erro ao iniciar recarga: " + error.message;
                 
-                if (error.message.includes('Edge Function')) {
-                    errorMessage = "Erro no servidor de pagamentos. Tente novamente em alguns instantes.";
+                if (error.message.includes('Edge Function') || error.message.includes('FunctionsHttpError')) {
+                    errorMessage = "Servidor de pagamentos indisponível. Tente novamente em alguns instantes.";
                 } else if (error.message.includes('network')) {
                     errorMessage = "Erro de conexão. Verifique sua internet e tente novamente.";
                 }
@@ -882,9 +964,7 @@
             }
         }
 
-        // Função corrigida para processar pagamento
         async function handleWalletPayment(clientSecret) {
-            const paymentBtn = document.getElementById('payment-btn');
             const cardErrors = document.getElementById('card-errors');
             
             if (!cardElement) {
@@ -903,11 +983,9 @@
             cardErrors.textContent = '';
             
             try {
-                // Primeiro, validar se o cartão está completo
                 const cardData = await stripe.createToken(cardElement);
                 if (cardData.error) {
                     cardErrors.textContent = cardData.error.message;
-                    console.error('❌ Erro de validação do cartão:', cardData.error);
                     throw new Error(cardData.error.message);
                 }
 
@@ -933,10 +1011,9 @@
                 if (paymentIntent.status === 'succeeded') {
                     toast.show('Pagamento processado com sucesso! 🎉', 'success');
                     
-                    // Aguardar um pouco para o webhook processar
+                    // Aguardar processamento do webhook
                     setTimeout(async () => {
                         try {
-                            console.log('🔄 Atualizando perfil do usuário...');
                             await loadUserProfile(state.user.id);
                             showScreen('user-screen');
                             toast.show(`Saldo de ${formatCurrency(state.topUpAmount)} adicionado com sucesso!`, 'success');
@@ -956,7 +1033,6 @@
             } catch (error) {
                 console.error("❌ Erro no pagamento:", error);
                 
-                // Mensagens de erro mais específicas
                 let errorMessage = "Falha no pagamento. Tente novamente.";
                 const errorCode = error.code || error.decline_code || '';
                 
@@ -970,8 +1046,6 @@
                     errorMessage = "Cartão expirado.";
                 } else if (error.message.includes('invalid_number')) {
                     errorMessage = "Número do cartão inválido.";
-                } else if (error.message.includes('processing_error')) {
-                    errorMessage = "Erro no processamento. Tente novamente em alguns minutos.";
                 }
                 
                 toast.show(errorMessage, 'error');
@@ -981,33 +1055,7 @@
             }
         }
 
-        // Função corrigida para mostrar tela da carteira
-        function showWalletScreen() {
-            cleanupStripeElements();
-            showScreen('wallet-screen');
-        }
-
-        // ======= FIM DAS FUNÇÕES DE PAGAMENTO =======
-
-        // Funções auxiliares que podem estar faltando
-        async function geocodeAddress(address) {
-            return new Promise((resolve, reject) => {
-                if (typeof google === 'undefined' || !google.maps) {
-                    reject(new Error('Google Maps não carregado'));
-                    return;
-                }
-                
-                const geocoder = new google.maps.Geocoder();
-                geocoder.geocode({ address }, (results, status) => {
-                    if (status === 'OK' && results[0]) {
-                        resolve(results[0]);
-                    } else {
-                        reject(new Error('Endereço não encontrado'));
-                    }
-                });
-            });
-        }
-
+        // ========== VIAGENS ==========
         async function checkPendingRide() {
             try {
                 const { data, error } = await supabaseClient
@@ -1042,9 +1090,97 @@
             resetRideStatusUI();
         }
 
+        function resetRideStatusUI() {
+            const driverPanel = document.getElementById('driver-details-panel');
+            if (driverPanel) {
+                driverPanel.classList.remove('active');
+                driverPanel.style.opacity = '0';
+                driverPanel.style.transform = 'translateY(-1rem)';
+                document.getElementById('driver-name').textContent = 'Procurando motorista...';
+                document.getElementById('driver-car').textContent = 'Aguarde um momento';
+                document.getElementById('driver-plate').textContent = '';
+                document.getElementById('call-driver-btn').disabled = true;
+                document.getElementById('message-driver-btn').disabled = true;
+            }
+            document.getElementById('status-timeline').innerHTML = '';
+        }
+
+        function handleRideStateUpdate(ride) {
+            if (!ride || !ride.status) return;
+            
+            const status = ride.status;
+            renderTimeline(status);
+            const destination = (ride.destinations && ride.destinations[0]) || 'N/A';
+            updateTripDetails(ride.origin_address, destination);
+            
+            const cancelBtn = document.getElementById('cancel-ride-btn');
+            if (['in_progress', 'completed', 'cancelled'].includes(status)) {
+                cancelBtn.classList.add('hidden');
+            } else {
+                cancelBtn.classList.remove('hidden');
+            }
+            
+            if (ride.driver_id) {
+                loadDriverInfo(ride.driver_id);
+            } else {
+                updateDriverPanel(null, null);
+                document.getElementById('driver-details-panel').classList.add('active');
+            }
+        }
+
+        function renderTimeline(currentStatus) {
+            const timelineContainer = document.getElementById('status-timeline');
+            if (!timelineContainer) return;
+            
+            timelineContainer.innerHTML = '';
+            const statusOrder = ['requested', 'assigned', 'accepted', 'arrived_pickup', 'in_progress', 'completed'];
+            const currentIndex = statusOrder.indexOf(currentStatus);
+
+            const timelineSteps = [
+                { status: 'requested', icon: '🔍', text: 'Procurando motorista' },
+                { status: 'assigned', icon: '✅', text: 'Motorista encontrado' },
+                { status: 'accepted', icon: '🚗', text: 'Motorista no local' },
+                { status: 'arrived_pickup', icon: '📍', text: 'Viagem em andamento' },
+                { status: 'in_progress', icon: '🛣️', text: 'Viagem em progresso' },
+                { status: 'completed', icon: '🏁', text: 'Viagem concluída' }
+            ];
+
+            timelineSteps.forEach((step, index) => {
+                const item = document.createElement('div');
+                let className = 'timeline-item';
+                
+                if (index < currentIndex) {
+                    className += ' completed';
+                } else if (index === currentIndex) {
+                    className += ' active';
+                }
+                
+                item.className = className;
+                item.innerHTML = `<div class="timeline-icon">${step.icon}</div><p class="timeline-text">${step.text}</p>`;
+                timelineContainer.appendChild(item);
+            });
+        }
+
         function updateTripDetails(origin, destination) {
             document.getElementById('trip-origin').textContent = origin || '-';
             document.getElementById('trip-destination').textContent = destination || '-';
+        }
+
+        function updateDriverPanel(driver, details) {
+            const driverPanel = document.getElementById('driver-details-panel');
+            if (!driverPanel) return;
+            
+            document.getElementById('driver-name').textContent = driver?.full_name || 'Motorista';
+            const carInfo = `${details?.car_model || ''} ${details?.car_color || ''}`.trim();
+            document.getElementById('driver-car').textContent = carInfo || 'Veículo';
+            document.getElementById('driver-plate').textContent = details?.license_plate || '';
+            
+            const callBtn = document.getElementById('call-driver-btn');
+            const msgBtn = document.getElementById('message-driver-btn');
+            callBtn.disabled = !driver?.phone_number;
+            msgBtn.disabled = !driver?.phone_number;
+            
+            driverPanel.classList.add('active');
         }
 
         async function loadDriverInfo(driverId) {
@@ -1151,9 +1287,9 @@
             toast.show('Suporte: Entre em contato pelo WhatsApp (11) 9999-9999', 'info');
         }
 
-        // Event Listeners
+        // ========== EVENT LISTENERS ==========
         function setupEventListeners() {
-            // Listener para mudanças de autenticação
+            // Auth state listener
             supabaseClient.auth.onAuthStateChange(async (event, session) => {
                 console.log('🔄 Mudança de autenticação:', event);
                 
@@ -1168,7 +1304,7 @@
                 }
             });
 
-            // Event Listeners para formulários
+            // Form listeners
             document.getElementById('login-form')?.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const email = document.getElementById('login-email').value;
@@ -1274,15 +1410,22 @@
             });
         }
 
-        // Inicializar aplicação quando DOM estiver carregado
-        document.addEventListener('DOMContentLoaded', initializeApp);
+        // ========== INICIALIZAÇÃO ==========
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('❌ Promise rejection não tratada:', event.reason);
+            if (event.reason?.message?.includes('Auth')) {
+                handleSignOut();
+            }
+        });
 
-        // Fallback para navegadores mais antigos
+        // Inicializar quando DOM estiver pronto
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', initializeApp);
         } else {
             initializeApp();
         }
+
+        console.log('🎮 Garcia Mobilidade - Versão Online de Produção Carregada');
 
     </script>
 </body>
