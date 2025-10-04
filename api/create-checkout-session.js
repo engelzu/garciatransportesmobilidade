@@ -1,27 +1,26 @@
 /**
- * Vercel Serverless Function - Criar Sessão de Checkout do Stripe
+ * VERCEL SERVERLESS FUNCTION - Garcia Mobilidade
+ * Arquivo: /api/create-checkout-session.js
  * 
- * Endpoint: https://seu-projeto.vercel.app/api/create-checkout-session
+ * Este arquivo deve ser colocado na pasta /api/ do seu projeto Vercel
  */
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
     // Configurar CORS
-    res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    // Handle preflight
+    // Handle preflight request
     if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
+        return res.status(200).end();
     }
 
-    // Apenas POST
+    // Permitir apenas POST
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Método não permitido' });
+        return res.status(405).json({ error: 'Method not allowed' });
     }
 
     try {
@@ -36,8 +35,11 @@ module.exports = async (req, res) => {
             return res.status(400).json({ error: 'ID do usuário não fornecido' });
         }
 
-        // Obter a URL de origem para success/cancel
-        const origin = req.headers.origin || req.headers.referer || 'https://garciatransportesmobilidade.vercel.app';
+        // Verificar se a chave do Stripe está configurada
+        if (!process.env.STRIPE_SECRET_KEY) {
+            console.error('STRIPE_SECRET_KEY não configurada');
+            return res.status(500).json({ error: 'Configuração do servidor incompleta' });
+        }
 
         // Criar sessão do Stripe
         const session = await stripe.checkout.sessions.create({
@@ -49,6 +51,7 @@ module.exports = async (req, res) => {
                         product_data: {
                             name: 'Créditos Garcia Mobilidade',
                             description: `Adicionar R$ ${amount.toFixed(2)} à carteira`,
+                            images: ['https://via.placeholder.com/300x200?text=Garcia+Mobilidade'],
                         },
                         unit_amount: Math.round(amount * 100), // Stripe usa centavos
                     },
@@ -56,8 +59,8 @@ module.exports = async (req, res) => {
                 },
             ],
             mode: 'payment',
-            success_url: `${origin}/passageiro.html?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${origin}/passageiro.html?payment=cancel`,
+            success_url: `${req.headers.origin || req.headers.host}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${req.headers.origin || req.headers.host}?payment=cancel`,
             client_reference_id: userId,
             customer_email: userEmail,
             metadata: {
@@ -67,16 +70,19 @@ module.exports = async (req, res) => {
             }
         });
 
-        res.status(200).json({ 
+        console.log('✅ Sessão criada:', session.id);
+
+        res.json({ 
             sessionId: session.id,
             url: session.url 
         });
 
     } catch (error) {
-        console.error('Erro ao criar sessão:', error);
+        console.error('❌ Erro ao criar sessão:', error);
         res.status(500).json({ 
             error: 'Erro ao processar pagamento',
-            message: error.message 
+            message: error.message,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
-};
+}
