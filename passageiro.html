@@ -3,1473 +3,1862 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GARCIA MOBILIDADE - Passageiro</title>
-    
-    <!-- CDNs Externos -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g&libraries=places"></script>
+    <title>Garcia Mobilidade - Passageiro</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://js.stripe.com/v3/"></script>
-    
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://apis.google.com/js/platform.js" async defer></script>
+    <script async defer crossorigin="anonymous" src="https://connect.facebook.net/pt_BR/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { 
-            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-            background-color: #000000; 
-            color: #ffffff; 
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+            color: #333;
         }
 
-        .screen { display: none; }
-        .screen.active { display: block; }
-        
-        .loader { 
-            border: 4px solid #f3f3f3; 
-            border-radius: 50%; 
-            border-top: 4px solid #6d28d9; 
-            width: 40px; 
-            height: 40px; 
-            animation: spin 1s linear infinite; 
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            position: relative;
+            overflow-x: hidden;
         }
-        
-        @keyframes spin { 
-            0% { transform: rotate(0deg); } 
-            100% { transform: rotate(360deg); } 
-        }
-        
-        .pac-container { 
-            background-color: #1F2937; 
-            border-radius: 8px; 
-            border: 1px solid #4B5563; 
-            z-index: 9999;
-        }
-        .pac-item { 
-            padding: 10px; 
-            font-size: 14px; 
-            color: #D1D5DB; 
-            cursor: pointer; 
-            border-top: 1px solid #374151;
-        }
-        .pac-item:first-child { border-top: none; }
-        .pac-item:hover { background-color: #374151; }
-        .pac-item-query { font-weight: 600; color: #F3F4F6; }
 
-        .toast-container { 
-            position: fixed; 
-            top: 20px; 
-            right: 20px; 
-            z-index: 1000; 
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            position: relative;
         }
-        .toast { 
-            background: #1f2937; 
-            border-left: 4px solid; 
-            color: white; 
-            padding: 16px; 
-            border-radius: 8px; 
-            margin-bottom: 10px; 
-            min-width: 300px; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-            transform: translateX(400px); 
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .back-btn {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .screen {
+            display: none;
+            padding: 20px;
+            min-height: calc(100vh - 80px);
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        .login-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+            width: 90%;
+            max-width: 350px;
+        }
+
+        .logo {
+            font-size: 48px;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .app-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .app-subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 16px;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
             transition: all 0.3s ease;
-        }
-        .toast.show { transform: translateX(0); }
-        .toast.success { border-left-color: #22c55e; }
-        .toast.error { border-left-color: #ef4444; }
-        .toast.info { border-left-color: #3b82f6; }
-        .toast.warning { border-left-color: #f59e0b; }
-
-        .btn-loading { 
-            position: relative; 
-            color: transparent !important; 
-        }
-        .btn-loading::after {
-            content: ''; 
-            position: absolute; 
-            top: 50%; 
-            left: 50%; 
-            width: 20px; 
-            height: 20px;
-            margin: -10px 0 0 -10px; 
-            border: 2px solid #ffffff; 
-            border-top: 2px solid transparent;
-            border-radius: 50%; 
-            animation: spin 1s linear infinite;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
         }
 
-        .error-recovery {
-            background: linear-gradient(135deg, #991b1b, #dc2626);
-            border-radius: 12px;
-            padding: 16px;
-            margin: 16px 0;
+        .google-btn {
+            background: #4285f4;
+            color: white;
+        }
+
+        .google-btn:hover {
+            background: #3367d6;
+            transform: translateY(-2px);
+        }
+
+        .facebook-btn {
+            background: #1877f2;
+            color: white;
+        }
+
+        .facebook-btn:hover {
+            background: #166fe5;
+            transform: translateY(-2px);
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 20px;
+            margin: 10px 0;
+            background: #f8f9fa;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .menu-item:hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+            border-color: #667eea;
+        }
+
+        .menu-item i {
+            font-size: 24px;
+            color: #667eea;
+            margin-right: 20px;
+            width: 30px;
             text-align: center;
         }
 
-        #driver-details-panel {
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        #driver-details-panel.active {
-            opacity: 1;
-            transform: translateY(0);
+        .menu-item .content {
+            flex: 1;
         }
 
-        .timeline-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            opacity: 0.4;
-            transition: all 0.3s ease;
-            position: relative;
-            padding-left: 20px;
-        }
-        .timeline-item::before {
-            content: '';
-            position: absolute;
-            left: 15px;
-            top: 38px;
-            height: calc(100% - 20px);
-            border-left: 2px dashed #4b5563;
-        }
-        .timeline-item:last-child::before {
-            display: none;
-        }
-
-        .timeline-item.active { opacity: 1; }
-        .timeline-item.completed { opacity: 0.9; }
-        .timeline-item.completed .timeline-icon { 
-            background-color: #16a34a; 
-            border-color: #22c55e; 
-        }
-        .timeline-item.completed::before { 
-            border-left: 2px solid #22c55e; 
-        }
-
-        .timeline-icon {
-            width: 32px; 
-            height: 32px; 
-            border-radius: 50%; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
-            background-color: #374151; 
-            border: 2px solid #4b5563; 
-            flex-shrink: 0; 
-            z-index: 1;
-        }
-        .timeline-item.active .timeline-icon {
-            background-color: #6d28d9; 
-            border-color: #8b5cf6; 
-            animation: pulse 2s infinite;
-        }
-        
-        .timeline-text { font-weight: 500; }
-        
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(139, 92, 246, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
-        }
-
-        .StripeElement {
-            background-color: #1f2937; 
-            padding: 12px; 
-            border-radius: 8px; 
-            border: 1px solid #4b5563; 
-            transition: border-color 0.2s;
-        }
-        .StripeElement--focus { border-color: #6d28d9; }
-        .StripeElement--invalid { border-color: #ef4444; }
-        .StripeElement--complete { border-color: #22c55e; }
-        
-        #card-errors {
-            color: #ef4444; 
-            font-size: 0.875rem; 
-            margin-top: 10px; 
-            text-align: center; 
-            min-height: 1.25rem;
-        }
-        
-        /* Logo placeholder */
-        .logo-placeholder {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
+        .menu-item .title {
+            font-size: 18px;
             font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .menu-item .subtitle {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .wallet-balance {
+            background: linear-gradient(135deg, #28a745, #20c997);
             color: white;
-            margin: 0 auto 24px;
-            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
+            padding: 25px;
+            border-radius: 20px;
+            text-align: center;
+            margin: 20px 0;
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.3);
+        }
+
+        .balance-label {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .balance-amount {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .quick-action-btn {
+            flex: 1;
+            padding: 12px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .quick-action-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+
+        .input-group {
+            margin: 15px 0;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-group input:focus, .input-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px 0;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .transaction-info {
+            flex: 1;
+        }
+
+        .transaction-type {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .transaction-date {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .transaction-amount {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .transaction-amount.positive {
+            color: #28a745;
+        }
+
+        .transaction-amount.negative {
+            color: #dc3545;
+        }
+
+        .map-container {
+            height: 300px;
+            border-radius: 15px;
+            margin: 20px 0;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .ride-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 2px solid #e9ecef;
+        }
+
+        .ride-status {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+        }
+
+        .status-searching {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-accepted {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-in-progress {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-completed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .driver-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .driver-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #667eea;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .driver-details h4 {
+            margin: 0 0 5px 0;
+            color: #333;
+        }
+
+        .driver-details .rating {
+            color: #ffc107;
+            font-size: 14px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .loading i {
+            font-size: 48px;
+            color: #667eea;
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading p {
+            margin-top: 20px;
+            color: #666;
+            font-size: 16px;
+        }
+
+        .alert {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
         }
 
         .user-avatar {
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, #059669, #10b981);
-            border-radius: 8px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #667eea;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
             color: white;
+            font-size: 24px;
+            font-weight: bold;
         }
-        
-        @media (max-width: 480px) {
-            .toast { min-width: 280px; }
+
+        .user-info h3 {
+            margin: 0 0 5px 0;
+            color: #333;
+        }
+
+        .user-info p {
+            margin: 0;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+        }
+
+        #payment-element {
+            margin: 20px 0;
+        }
+
+        .payment-methods {
+            margin: 20px 0;
+        }
+
+        .payment-method {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background: #f8f9fa;
+            border-radius: 10px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .payment-method:hover {
+            border-color: #667eea;
+        }
+
+        .payment-method.selected {
+            border-color: #667eea;
+            background: #e7f1ff;
+        }
+
+        .payment-method input[type="radio"] {
+            margin-right: 15px;
+        }
+
+        .payment-method i {
+            font-size: 24px;
+            margin-right: 15px;
+            color: #667eea;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .ride-price {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+
+        .ride-price .price {
+            font-size: 32px;
+            font-weight: bold;
+            color: #28a745;
+            margin-bottom: 10px;
+        }
+
+        .ride-price .description {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .address-item {
+            display: flex;
+            align-items: flex-start;
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .address-item i {
+            font-size: 20px;
+            margin-right: 15px;
+            margin-top: 5px;
+        }
+
+        .address-item .pickup {
+            color: #28a745;
+        }
+
+        .address-item .destination {
+            color: #dc3545;
+        }
+
+        .address-info {
+            flex: 1;
+        }
+
+        .address-info .label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .address-info .address {
+            color: #333;
+            font-size: 16px;
+            line-height: 1.4;
+        }
+
+        .suggestions-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 0 0 10px 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .suggestions-list .suggestion-item {
+            padding: 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            transition: background-color 0.3s ease;
+        }
+
+        .suggestions-list .suggestion-item:hover {
+            background: #f8f9fa;
+        }
+
+        .suggestions-list .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .input-container {
+            position: relative;
+        }
+
+        .auto-detect-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .auto-detect-btn:hover {
+            background: #5a67d8;
         }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen">
-
-    <div id="toast-container" class="toast-container"></div>
-
-    <div id="app-container" class="w-full max-w-md mx-auto p-4">
-
-        <!-- Loading Screen -->
-        <div id="loading-screen" class="screen active text-center">
-            <div class="logo-placeholder">GM</div>
-            <div class="loader mx-auto"></div>
-            <p class="mt-4">Carregando aplicativo...</p>
-            <div id="loading-error" class="error-recovery hidden">
-                <p class="text-white mb-2">⚠️ Problema no carregamento</p>
-                <p class="text-sm text-gray-200 mb-4">Tentando resolver automaticamente...</p>
-                <button onclick="forceReload()" class="py-2 px-4 bg-white text-red-600 rounded-lg font-semibold">
-                    🔄 Recarregar App
-                </button>
+<body>
+    <!-- Tela de Login -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-container">
+            <div class="logo">
+                <i class="fas fa-car"></i>
             </div>
-        </div>
-
-        <!-- Login Screen -->
-        <div id="login-screen" class="screen space-y-3">
-            <div class="logo-placeholder">GM</div>
-            <h2 class="text-3xl font-bold text-center">Login</h2>
+            <h1 class="app-title">Garcia Mobilidade</h1>
+            <p class="app-subtitle">Sua mobilidade urbana</p>
             
-            <div class="space-y-3 pt-2">
-                <button onclick="handleSignInWithProvider('google')" class="w-full py-3 font-semibold rounded-lg bg-white text-gray-800 hover:bg-gray-200 flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.222,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.988,36.635,44,31.023,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
-                    Entrar com Google
-                </button>
-                <button onclick="handleSignInWithProvider('facebook')" class="w-full py-3 font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#3F51B5" d="M42,37c0,2.762-2.238,5-5,5H11c-2.761,0-5-2.238-5-5V11c0-2.762,2.239-5,5-5h26c2.762,0,5,2.238,5,5V37z"></path><path fill="#FFF" d="M34.368,25H31v13h-5V25h-3v-4h3v-2.41c0-3.408,1.72-5.59,5.592-5.59H35v4h-2.287C31.104,17,31,17.6,31,18.723V21h4L34.368,25z"></path></svg>
-                    Entrar com Facebook
-                </button>
-            </div>
-            <div class="relative flex py-1 items-center">
-                <div class="flex-grow border-t border-gray-600"></div>
-                <span class="flex-shrink mx-4 text-gray-400">OU</span>
-                <div class="flex-grow border-t border-gray-600"></div>
-            </div>
-            <form id="login-form" class="space-y-3">
-                <div>
-                    <label for="login-email" class="block mb-1 text-sm font-medium">E-mail</label>
-                    <input type="email" id="login-email" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <div>
-                    <label for="login-password" class="block mb-1 text-sm font-medium">Senha</label>
-                    <input type="password" id="login-password" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <button type="submit" id="login-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENTRAR</button>
-            </form>
-            <div class="text-center">
-                <a href="#" onclick="showScreen('forgot-password-screen')" class="text-sm text-indigo-400">Esqueceu a senha?</a>
-            </div>
-            <p class="text-center text-sm">Não tem uma conta? <a href="#" onclick="showScreen('signup-screen')" class="font-semibold text-indigo-400">Cadastre-se</a></p>
+            <button class="login-btn google-btn" onclick="loginWithGoogle()">
+                <i class="fab fa-google"></i>
+                Entrar com Google
+            </button>
+            
+            <button class="login-btn facebook-btn" onclick="loginWithFacebook()">
+                <i class="fab fa-facebook-f"></i>
+                Entrar com Facebook
+            </button>
         </div>
-        
-        <!-- Forgot Password Screen -->
-        <div id="forgot-password-screen" class="screen space-y-4">
-            <h2 class="text-3xl font-bold text-center">Recuperar Senha</h2>
-            <p class="text-center text-gray-400">Digite seu e-mail e enviaremos um link.</p>
-            <form id="forgot-password-form" class="space-y-4">
-                <div>
-                    <label for="forgot-email" class="block mb-2 text-sm font-medium">E-mail</label>
-                    <input type="email" id="forgot-email" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <button type="submit" id="forgot-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENVIAR LINK</button>
-            </form>
-            <p class="text-center">
-                <a href="#" onclick="showScreen('login-screen')" class="font-semibold text-indigo-400">Voltar para o Login</a>
-            </p>
-        </div>
-        
-        <!-- Update Password Screen -->
-        <div id="update-password-screen" class="screen space-y-4">
-            <h2 class="text-3xl font-bold text-center">Crie uma Nova Senha</h2>
-            <form id="update-password-form" class="space-y-4">
-                <div>
-                    <label for="update-password" class="block mb-2 text-sm font-medium">Nova Senha</label>
-                    <input type="password" id="update-password" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <button type="submit" id="update-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">SALVAR NOVA SENHA</button>
-            </form>
-        </div>
-        
-        <!-- Complete Profile Screen -->
-        <div id="complete-profile-screen" class="screen space-y-4">
-            <h2 class="text-3xl font-bold text-center">Complete seu Perfil</h2>
-            <p class="text-center text-gray-400">Precisamos de mais uma informação para continuar.</p>
-            <form id="complete-profile-form" class="space-y-4">
-                <div>
-                    <label for="profile-phone" class="block mb-2 text-sm font-medium">Telefone</label>
-                    <input type="tel" id="profile-phone" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="(XX) XXXXX-XXXX" required>
-                </div>
-                <button type="submit" id="profile-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">SALVAR E CONTINUAR</button>
-            </form>
-        </div>
-
-        <!-- Signup Screen -->
-        <div id="signup-screen" class="screen space-y-3">
-            <h2 class="text-3xl font-bold text-center">Cadastro</h2>
-            <form id="signup-form" class="space-y-3">
-                <div>
-                    <label for="signup-fullname" class="block mb-1 text-sm font-medium">Nome Completo</label>
-                    <input type="text" id="signup-fullname" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <div>
-                    <label for="signup-email" class="block mb-1 text-sm font-medium">E-mail</label>
-                    <input type="email" id="signup-email" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <div>
-                    <label for="signup-phone" class="block mb-1 text-sm font-medium">Telefone</label>
-                    <input type="tel" id="signup-phone" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="(XX) XXXXX-XXXX" required>
-                </div>
-                <div>
-                    <label for="signup-password" class="block mb-1 text-sm font-medium">Senha</label>
-                    <input type="password" id="signup-password" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <button type="submit" id="signup-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">CADASTRAR</button>
-            </form>
-            <p class="text-center text-sm">Já tem uma conta? <a href="#" onclick="showScreen('login-screen')" class="font-semibold text-indigo-400">Faça o login</a></p>
-        </div>
-
-        <!-- User Screen -->
-        <div id="user-screen" class="screen space-y-6">
-            <div class="flex justify-between items-center">
-                <div class="flex items-center gap-3">
-                    <div class="user-avatar">👤</div>
-                    <h2 class="text-2xl font-bold">Solicitar Viagem</h2>
-                </div>
-                <button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700 transition-colors">Sair</button>
-            </div>
-            <p id="welcome-message" class="text-lg"></p>
-            <div id="wallet-panel" class="p-4 rounded-xl bg-gray-800 flex justify-between items-center">
-                <div>
-                    <p class="text-sm text-gray-400">Meu Saldo</p>
-                    <p id="wallet-balance-display" class="text-2xl font-bold">R$ 0,00</p>
-                </div>
-                <button onclick="showWalletScreen()" class="py-2 px-4 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors">
-                    Adicionar Saldo
-                </button>
-            </div>
-            <div id="ride-request-container">
-                <form id="ride-request-form" class="space-y-4">
-                    <div>
-                        <label for="origin" class="block mb-2 text-sm font-medium">Origem</label>
-                        <input type="text" id="origin" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="Digite o endereço de partida" required>
-                        <button type="button" onclick="useCurrentLocation()" id="location-button" class="w-full mt-2 py-2 px-4 text-sm font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 transition-colors">
-                            📍 Usar Localização Atual
-                        </button>
-                    </div>
-                    <div>
-                        <label for="destination" class="block mb-2 text-sm font-medium">Destino</label>
-                        <input type="text" id="destination" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="Digite o destino" required>
-                    </div>
-                    <button type="submit" id="request-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">
-                        🚗 SOLICITAR AGORA
-                    </button>
-                </form>
-            </div>
-            <div id="ride-status-container" class="hidden space-y-4">
-                <div id="driver-details-panel" class="bg-gray-800/80 backdrop-blur-sm p-4 rounded-xl space-y-4 transition-all duration-500 transform -translate-y-4 opacity-0">
-                    <div class="flex items-center gap-4">
-                        <div class="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center shrink-0">
-                            👤
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h4 id="driver-name" class="text-lg font-bold truncate">Procurando motorista...</h4>
-                            <p class="text-sm text-gray-300">
-                                <span id="driver-car">Aguarde um momento</span>
-                                <span id="driver-plate" class="font-mono ml-2"></span>
-                            </p>
-                        </div>
-                        <div class="flex gap-2 shrink-0">
-                            <button id="message-driver-btn" onclick="messageDriver()" disabled class="w-10 h-10 bg-blue-600/80 hover:bg-blue-600 disabled:bg-gray-700 disabled:opacity-50 rounded-full flex items-center justify-center transition-all">
-                                💬
-                            </button>
-                            <button id="call-driver-btn" onclick="callDriver()" disabled class="w-10 h-10 bg-green-600/80 hover:bg-green-600 disabled:bg-gray-700 disabled:opacity-50 rounded-full flex items-center justify-center transition-all">
-                                📞
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div id="status-timeline" class="p-4 bg-gray-800/80 backdrop-blur-sm rounded-xl space-y-3"></div>
-                <div id="trip-details" class="p-4 bg-gray-800/80 backdrop-blur-sm rounded-xl text-sm space-y-2">
-                    <p class="flex items-start gap-2"><strong class="text-green-400">🟢 Origem:</strong> <span id="trip-origin" class="flex-1">-</span></p>
-                    <p class="flex items-start gap-2"><strong class="text-red-400">🔴 Destino:</strong> <span id="trip-destination" class="flex-1">-</span></p>
-                </div>
-                <div class="flex gap-3 pt-2">
-                    <button id="cancel-ride-btn" onclick="cancelRide()" class="flex-1 py-3 font-semibold rounded-lg bg-red-600/90 hover:bg-red-600 transition-colors">
-                        ❌ CANCELAR VIAGEM
-                    </button>
-                    <button id="help-btn" onclick="getHelp()" class="py-3 px-5 font-semibold rounded-lg bg-gray-600/90 hover:bg-gray-600 transition-colors">
-                        ❓
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Wallet Screen -->
-        <div id="wallet-screen" class="screen space-y-6">
-            <div class="flex items-center gap-4">
-                <button onclick="showScreen('user-screen')" class="text-2xl">⬅️</button>
-                <h2 class="text-3xl font-bold text-center">Minha Carteira</h2>
-            </div>
-            <div class="p-6 bg-gradient-to-br from-indigo-700 to-purple-800 rounded-xl text-center">
-                <p class="text-lg text-indigo-200">Saldo Atual</p>
-                <p id="wallet-balance-details" class="font-bold text-5xl">R$ 0,00</p>
-            </div>
-            <div class="space-y-3">
-                <p class="font-semibold">Adicionar Saldo Rápido</p>
-                <div class="grid grid-cols-3 gap-3">
-                    <button onclick="startWalletTopUp(20)" class="p-3 font-semibold rounded-lg bg-gray-700 hover:bg-gray-600">R$ 20</button>
-                    <button onclick="startWalletTopUp(50)" class="p-3 font-semibold rounded-lg bg-gray-700 hover:bg-gray-600">R$ 50</button>
-                    <button onclick="startWalletTopUp(100)" class="p-3 font-semibold rounded-lg bg-gray-700 hover:bg-gray-600">R$ 100</button>
-                </div>
-            </div>
-            <div class="space-y-3">
-                <label for="custom-amount" class="font-semibold">Outro Valor</label>
-                <input type="number" id="custom-amount" min="5" step="0.01" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="Ex: 15,50">
-                <button onclick="startWalletTopUp(document.getElementById('custom-amount').value)" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">
-                    Adicionar Valor
-                </button>
-            </div>
-        </div>
-
-        <!-- Wallet Payment Screen -->
-        <div id="wallet-payment-screen" class="screen space-y-6">
-            <div class="flex items-center gap-4">
-                <button onclick="showWalletScreen()" class="text-2xl">⬅️</button>
-                <h2 class="text-3xl font-bold">Adicionar Saldo</h2>
-            </div>
-            <div class="p-4 bg-gray-800 rounded-lg text-center">
-                <p class="text-gray-400">Valor da Recarga</p>
-                <p id="top-up-amount" class="font-bold text-4xl text-green-400">R$ 0,00</p>
-            </div>
-            <form id="payment-form">
-                <label class="block mb-2 text-sm font-medium">Dados do Cartão</label>
-                <div id="card-element" class="mb-3"></div>
-                <div id="card-errors" role="alert"></div>
-                <button type="submit" id="payment-btn" class="w-full mt-6 py-3 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    💳 Pagar Agora
-                </button>
-            </form>
-        </div>
-
     </div>
 
-    <script>
-        // ========== CONFIGURAÇÕES CORRETAS (DO CÓDIGO QUE FUNCIONA) ==========
-        const SUPABASE_URL = 'https://emhxlsmukcwgukcxshrr.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
-        const STRIPE_PUBLISHABLE_KEY = 'pk_test_51SEJCBFyO4P04UV0YubwfXu6UD8rmVBuA1AGNlygxvLTTiVCfdnmaAewkyT7H1mfgMBu0JhpvPPbraIC2IIM080G00KH08HO7v';
-
-        let supabaseClient, stripe, cardElement;
+    <!-- Container Principal (oculto inicialmente) -->
+    <div class="container" id="mainContainer" style="display: none;">
         
-        const state = { 
-            user: null, 
-            profile: null, 
-            currentRide: null, 
-            rideSubscription: null,
-            ridePollInterval: null,
-            isInitializing: false,
-            originPlace: null,
-            destinationPlace: null,
-            topUpAmount: 0,
+        <!-- Tela Principal -->
+        <div id="homeScreen" class="screen active">
+            <div class="header">
+                <h1><i class="fas fa-car"></i> Garcia Mobilidade</h1>
+                <p>Bem-vindo, <span id="userName">Usuário</span>!</p>
+            </div>
+            
+            <div class="user-profile">
+                <div class="user-avatar" id="userAvatar">U</div>
+                <div class="user-info">
+                    <h3 id="userDisplayName">Nome do Usuário</h3>
+                    <p id="userEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="ceaba3afa7a28eabb6aba3bea2a1e0ada1a3">[email&#160;protected]</a></p>
+                </div>
+            </div>
+
+            <div class="wallet-balance">
+                <div class="balance-label">Saldo da Carteira</div>
+                <div class="balance-amount" id="walletBalance">R$ 0,00</div>
+                <div class="quick-actions">
+                    <button class="quick-action-btn" onclick="showScreen('addCreditScreen')">
+                        <i class="fas fa-plus"></i> Adicionar
+                    </button>
+                    <button class="quick-action-btn" onclick="showScreen('walletScreen')">
+                        <i class="fas fa-history"></i> Histórico
+                    </button>
+                </div>
+            </div>
+
+            <div class="menu-item" onclick="showScreen('requestRideScreen')">
+                <i class="fas fa-car"></i>
+                <div class="content">
+                    <div class="title">Solicitar Corrida</div>
+                    <div class="subtitle">Vá para qualquer lugar</div>
+                </div>
+            </div>
+
+            <div class="menu-item" onclick="showScreen('rideHistoryScreen')">
+                <i class="fas fa-history"></i>
+                <div class="content">
+                    <div class="title">Histórico de Corridas</div>
+                    <div class="subtitle">Veja suas corridas anteriores</div>
+                </div>
+            </div>
+
+            <div class="menu-item" onclick="showScreen('profileScreen')">
+                <i class="fas fa-user"></i>
+                <div class="content">
+                    <div class="title">Perfil</div>
+                    <div class="subtitle">Gerenciar conta</div>
+                </div>
+            </div>
+
+            <button class="logout-btn" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Sair
+            </button>
+        </div>
+
+        <!-- Tela de Solicitar Corrida -->
+        <div id="requestRideScreen" class="screen">
+            <div class="header">
+                <button class="back-btn" onclick="showScreen('homeScreen')">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h1>Solicitar Corrida</h1>
+            </div>
+
+            <div class="input-group">
+                <label>De onde?</label>
+                <div class="input-container">
+                    <input type="text" id="pickupLocation" placeholder="Digite o endereço de origem" autocomplete="off">
+                    <button class="auto-detect-btn" onclick="detectCurrentLocation()">
+                        <i class="fas fa-location-arrow"></i> Auto
+                    </button>
+                    <div id="pickupSuggestions" class="suggestions-list hidden"></div>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>Para onde?</label>
+                <div class="input-container">
+                    <input type="text" id="destinationLocation" placeholder="Digite o endereço de destino" autocomplete="off">
+                    <div id="destinationSuggestions" class="suggestions-list hidden"></div>
+                </div>
+            </div>
+
+            <div id="mapContainer" class="map-container hidden">
+                <div id="map"></div>
+            </div>
+
+            <div id="ridePrice" class="ride-price hidden">
+                <div class="price" id="priceAmount">R$ 0,00</div>
+                <div class="description">Preço estimado da corrida</div>
+            </div>
+
+            <button id="requestRideBtn" class="btn btn-primary" onclick="requestRide()">
+                <i class="fas fa-car"></i> Solicitar Corrida
+            </button>
+        </div>
+
+        <!-- Tela de Corrida em Andamento -->
+        <div id="currentRideScreen" class="screen">
+            <div class="header">
+                <h1>Corrida em Andamento</h1>
+            </div>
+
+            <div class="ride-card">
+                <div id="rideStatus" class="ride-status status-searching">Procurando motorista...</div>
+                
+                <div id="driverInfo" class="driver-info hidden">
+                    <div class="driver-avatar" id="driverAvatar">M</div>
+                    <div class="driver-details">
+                        <h4 id="driverName">Nome do Motorista</h4>
+                        <div class="rating">
+                            <span id="driverRating">5.0</span>
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <p>Veículo: <span id="driverVehicle">Modelo do Carro</span></p>
+                        <p>Placa: <span id="driverPlate">ABC-1234</span></p>
+                    </div>
+                </div>
+
+                <div class="address-item">
+                    <i class="fas fa-circle pickup"></i>
+                    <div class="address-info">
+                        <div class="label">Origem</div>
+                        <div class="address" id="currentRidePickup">Endereço de origem</div>
+                    </div>
+                </div>
+
+                <div class="address-item">
+                    <i class="fas fa-map-marker-alt destination"></i>
+                    <div class="address-info">
+                        <div class="label">Destino</div>
+                        <div class="address" id="currentRideDestination">Endereço de destino</div>
+                    </div>
+                </div>
+
+                <div class="ride-price">
+                    <div class="price" id="currentRidePrice">R$ 0,00</div>
+                    <div class="description">Preço da corrida</div>
+                </div>
+            </div>
+
+            <div id="rideMapContainer" class="map-container">
+                <div id="rideMap"></div>
+            </div>
+
+            <button id="cancelRideBtn" class="btn btn-secondary" onclick="cancelRide()">
+                <i class="fas fa-times"></i> Cancelar Corrida
+            </button>
+        </div>
+
+        <!-- Tela de Carteira -->
+        <div id="walletScreen" class="screen">
+            <div class="header">
+                <button class="back-btn" onclick="showScreen('homeScreen')">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h1>Carteira</h1>
+            </div>
+
+            <div class="wallet-balance">
+                <div class="balance-label">Saldo Atual</div>
+                <div class="balance-amount" id="currentBalance">R$ 0,00</div>
+                <div class="quick-actions">
+                    <button class="quick-action-btn" onclick="showScreen('addCreditScreen')">
+                        <i class="fas fa-plus"></i> Adicionar Crédito
+                    </button>
+                </div>
+            </div>
+
+            <h3 style="margin: 30px 0 20px 0; color: #333;">Histórico de Transações</h3>
+            <div id="transactionHistory">
+                <div class="loading">
+                    <i class="fas fa-spinner"></i>
+                    <p>Carregando histórico...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tela de Adicionar Crédito -->
+        <div id="addCreditScreen" class="screen">
+            <div class="header">
+                <button class="back-btn" onclick="showScreen('walletScreen')">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h1>Adicionar Crédito</h1>
+            </div>
+
+            <div class="input-group">
+                <label>Valor (R$)</label>
+                <input type="number" id="creditAmount" placeholder="0,00" min="5" step="0.01">
+            </div>
+
+            <div class="payment-methods">
+                <h3>Método de Pagamento</h3>
+                
+                <div class="payment-method selected" onclick="selectPaymentMethod('stripe')">
+                    <input type="radio" name="paymentMethod" value="stripe" checked>
+                    <i class="fas fa-credit-card"></i>
+                    <div>
+                        <div class="title">Cartão de Crédito/Débito</div>
+                        <div class="subtitle">Visa, Mastercard, American Express</div>
+                    </div>
+                </div>
+
+                <div class="payment-method" onclick="selectPaymentMethod('pix')">
+                    <input type="radio" name="paymentMethod" value="pix">
+                    <i class="fas fa-qrcode"></i>
+                    <div>
+                        <div class="title">PIX</div>
+                        <div class="subtitle">Transferência instantânea</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="stripePaymentSection">
+                <div id="payment-element"></div>
+                <div id="payment-message" class="hidden"></div>
+            </div>
+
+            <div id="pixPaymentSection" class="hidden">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    O PIX será implementado em breve. Use cartão de crédito por enquanto.
+                </div>
+            </div>
+
+            <button id="addCreditBtn" class="btn btn-success" onclick="addCredit()">
+                <i class="fas fa-plus"></i> Adicionar Crédito
+            </button>
+        </div>
+
+        <!-- Tela de Histórico de Corridas -->
+        <div id="rideHistoryScreen" class="screen">
+            <div class="header">
+                <button class="back-btn" onclick="showScreen('homeScreen')">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h1>Histórico de Corridas</h1>
+            </div>
+
+            <div id="rideHistoryList">
+                <div class="loading">
+                    <i class="fas fa-spinner"></i>
+                    <p>Carregando histórico...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tela de Perfil -->
+        <div id="profileScreen" class="screen">
+            <div class="header">
+                <button class="back-btn" onclick="showScreen('homeScreen')">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h1>Perfil</h1>
+            </div>
+
+            <div class="user-profile">
+                <img id="profilePhoto" class="user-avatar" style="background: none; border-radius: 50%;" alt="Foto do Usuário">
+                <div class="user-info">
+                    <h3 id="profileName">Nome do Usuário</h3>
+                    <p id="profileEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="7d18101c14113d180518100d1112531e1210">[email&#160;protected]</a></p>
+                </div>
+            </div>
+
+            <div class="menu-item">
+                <i class="fas fa-phone"></i>
+                <div class="content">
+                    <div class="title">Telefone</div>
+                    <div class="subtitle" id="profilePhone">Não informado</div>
+                </div>
+            </div>
+
+            <div class="menu-item">
+                <i class="fas fa-calendar"></i>
+                <div class="content">
+                    <div class="title">Membro desde</div>
+                    <div class="subtitle" id="memberSince">2024</div>
+                </div>
+            </div>
+
+            <div class="menu-item">
+                <i class="fas fa-star"></i>
+                <div class="content">
+                    <div class="title">Avaliação</div>
+                    <div class="subtitle">⭐⭐⭐⭐⭐ 5.0</div>
+                </div>
+            </div>
+
+            <button class="logout-btn" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Sair da Conta
+            </button>
+        </div>
+    </div>
+
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+        // Configurações globais
+        const SUPABASE_URL = 'https://emhxlsmukcwgukcxshrr.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3hzaHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMyMzYzNzcsImV4cCI6MjA0ODgxMjM3N30.GRgCEHM8pTp4NtFRzxgqEcRtVzYdNI5FGy3WERAe6mY';
+        const STRIPE_PUBLISHABLE_KEY = 'pk_test_51SEJCBFyO4P04UV0JDOxKgdnR1xJGCHxvdqEhFKRhvGg4HkXPsZZPcjE1M7aUKp7AprZKQKNxz79aL9tgc2Qvmha00wRHnmshI';
+        const GOOGLE_MAPS_API_KEY = 'AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g';
+
+        // Inicialização do Supabase
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Inicialização do Stripe
+        const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+        let elements;
+        let paymentElement;
+
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g",
+            authDomain: "garcia-mobilidade.firebaseapp.com",
+            databaseURL: "https://garcia-mobilidade-default-rtdb.firebaseio.com",
+            projectId: "garcia-mobilidade",
+            storageBucket: "garcia-mobilidade.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abc123def456"
         };
 
-        let loadingTimeout = null;
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const database = firebase.database();
 
-        // ========== FUNÇÕES DE INICIALIZAÇÃO ==========
-        function setupLoadingTimeout() {
-            loadingTimeout = setTimeout(() => {
-                document.getElementById('loading-error')?.classList.remove('hidden');
-            }, 15000);
-        }
+        // Configuração do Google Sign-In
+        window.gapi.load('auth2', function() {
+            gapi.auth2.init({
+                client_id: '1234567890-abcdefghijklmnop.apps.googleusercontent.com'
+            });
+        });
 
-        function clearLoadingTimeout() {
-            if (loadingTimeout) clearTimeout(loadingTimeout);
-            loadingTimeout = null;
-        }
+        // Configuração do Facebook SDK
+        window.fbAsyncInit = function() {
+            FB.init({
+                appId: '1234567890',
+                cookie: true,
+                xfbml: true,
+                version: 'v18.0'
+            });
+        };
 
-        function forceReload() {
-            window.location.reload();
-        }
+        // Variables globais
+        let currentUser = null;
+        let currentRide = null;
+        let autocompleteService;
+        let placesService;
+        let map;
+        let rideMap;
+        let directionsService;
+        let directionsRenderer;
+        let pickupMarker;
+        let destinationMarker;
+        let userBalance = 0;
 
-        async function initializeApp() {
-            try {
-                console.log('🚀 Iniciando Garcia Mobilidade (Versão FUNCIONANDO)');
-                setupLoadingTimeout();
-                
-                // Inicializar Supabase
-                try {
-                    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                    console.log('✅ Supabase inicializado com:', SUPABASE_URL);
-                } catch (error) {
-                    console.error('❌ Erro ao inicializar Supabase:', error);
-                    throw new Error('Falha na conexão com o servidor');
-                }
-                
-                // Inicializar Stripe
-                try {
-                    if (typeof Stripe !== 'undefined') {
-                        stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
-                        console.log('✅ Stripe inicializado');
-                    } else {
-                        console.warn('⚠️ Stripe não disponível');
-                    }
-                } catch (error) {
-                    console.error('❌ Erro ao inicializar Stripe:', error);
-                }
+        // Inicializar aplicação
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthState();
+            initializeGoogleMaps();
+            loadWalletBalance();
+        });
 
-                // Inicializar Google Maps Autocomplete
-                initializeAutocomplete();
-                
-                // Configurar event listeners
-                setupEventListeners();
-                
-                // Verificar sessão existente
-                const { data: { session } } = await supabaseClient.auth.getSession();
-                if (session?.user) {
-                    state.user = session.user;
-                    await loadUserProfile(session.user.id);
+        // Verificar estado de autenticação
+        function checkAuthState() {
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    currentUser = user;
+                    showMainApp();
+                    updateUserInfo(user);
+                    loadWalletBalance();
+                    loadTransactionHistory();
+                    loadRideHistory();
                 } else {
-                    showScreen('login-screen');
+                    showLoginScreen();
                 }
-                
-                clearLoadingTimeout();
-            } catch (error) {
-                console.error('❌ Erro na inicialização:', error);
-                clearLoadingTimeout();
-                showScreen('login-screen');
-                toast.show('Erro ao carregar aplicativo: ' + error.message, 'error');
-            }
+            });
         }
 
-        // ========== SISTEMA DE TOAST ==========
-        class ToastManager {
-            constructor() {
-                this.container = document.getElementById('toast-container');
-            }
+        // Login com Google
+        function loginWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider)
+                .then((result) => {
+                    console.log('Login com Google bem-sucedido:', result.user);
+                })
+                .catch((error) => {
+                    console.error('Erro no login com Google:', error);
+                    alert('Erro ao fazer login com Google. Tente novamente.');
+                });
+        }
+
+        // Login com Facebook
+        function loginWithFacebook() {
+            FB.login(function(response) {
+                if (response.authResponse) {
+                    const credential = firebase.auth.FacebookAuthProvider.credential(
+                        response.authResponse.accessToken
+                    );
+                    auth.signInWithCredential(credential)
+                        .then((result) => {
+                            console.log('Login com Facebook bem-sucedido:', result.user);
+                        })
+                        .catch((error) => {
+                            console.error('Erro no login com Facebook:', error);
+                            alert('Erro ao fazer login com Facebook. Tente novamente.');
+                        });
+                } else {
+                    console.log('Login com Facebook cancelado');
+                }
+            }, {scope: 'email'});
+        }
+
+        // Logout
+        function logout() {
+            auth.signOut().then(() => {
+                currentUser = null;
+                showLoginScreen();
+            }).catch((error) => {
+                console.error('Erro ao fazer logout:', error);
+            });
+        }
+
+        // Mostrar tela de login
+        function showLoginScreen() {
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('mainContainer').style.display = 'none';
+        }
+
+        // Mostrar aplicativo principal
+        function showMainApp() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('mainContainer').style.display = 'block';
+        }
+
+        // Atualizar informações do usuário
+        function updateUserInfo(user) {
+            const userName = user.displayName || 'Usuário';
+            const userEmail = user.email || '';
+            const userPhoto = user.photoURL || '';
             
-            show(message, type = 'info', duration = 4000) {
-                if (!this.container) return;
-                
-                const toast = document.createElement('div');
-                toast.className = `toast ${type}`;
-                
-                const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
-                const titles = { success: 'Sucesso', error: 'Erro', warning: 'Atenção', info: 'Informação' };
-                
-                toast.innerHTML = `
-                    <div class="flex justify-between items-start">
-                        <div class="flex-1">
-                            <p class="font-medium">${icons[type]} ${titles[type]}</p>
-                            <p class="text-sm opacity-90 mt-1">${message}</p>
-                        </div>
-                        <button onclick="this.parentElement.parentElement.remove()" class="ml-3 text-white/60 hover:text-white">✕</button>
-                    </div>
-                `;
-                
-                this.container.appendChild(toast);
-                
-                setTimeout(() => toast.classList.add('show'), 100);
-                setTimeout(() => {
-                    if (toast.parentElement) {
-                        toast.classList.remove('show');
-                        setTimeout(() => toast.remove(), 300);
-                    }
-                }, duration);
+            // Atualizar elementos da interface
+            document.getElementById('userName').textContent = userName.split(' ')[0];
+            document.getElementById('userDisplayName').textContent = userName;
+            document.getElementById('userEmail').textContent = userEmail;
+            document.getElementById('profileName').textContent = userName;
+            document.getElementById('profileEmail').textContent = userEmail;
+            
+            // Atualizar avatar
+            const avatars = document.querySelectorAll('.user-avatar, #userAvatar');
+            avatars.forEach(avatar => {
+                if (userPhoto) {
+                    avatar.style.backgroundImage = `url(${userPhoto})`;
+                    avatar.style.backgroundSize = 'cover';
+                    avatar.style.backgroundPosition = 'center';
+                    avatar.textContent = '';
+                } else {
+                    avatar.textContent = userName.charAt(0).toUpperCase();
+                }
+            });
+
+            // Atualizar foto do perfil
+            const profilePhoto = document.getElementById('profilePhoto');
+            if (userPhoto) {
+                profilePhoto.src = userPhoto;
+                profilePhoto.style.display = 'block';
+            } else {
+                profilePhoto.style.display = 'none';
             }
         }
-        const toast = new ToastManager();
 
-        // ========== GERENCIAMENTO DE TELAS ==========
+        // Mostrar tela específica
         function showScreen(screenId) {
-            if (document.querySelector('.screen.active')?.id === 'wallet-payment-screen' && screenId !== 'wallet-payment-screen') {
-                cleanupStripeElements();
-            }
+            // Ocultar todas as telas
+            const screens = document.querySelectorAll('.screen');
+            screens.forEach(screen => screen.classList.remove('active'));
             
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(screenId)?.classList.add('active');
-            clearLoadingTimeout();
-        }
+            // Mostrar tela específica
+            document.getElementById(screenId).classList.add('active');
 
-        function cleanupStripeElements() {
-            if (cardElement) {
-                try {
-                    cardElement.unmount();
-                    cardElement.destroy();
-                    cardElement = null;
-                    console.log('🧹 Elementos Stripe limpos');
-                } catch (e) {
-                    console.warn('⚠️ Erro ao limpar cardElement:', e);
-                    cardElement = null;
-                }
-            }
-            const cardErrors = document.getElementById('card-errors');
-            if (cardErrors) cardErrors.textContent = '';
-        }
-
-        // ========== UTILITÁRIOS ==========
-        function showLoading(buttonId) {
-            const btn = document.getElementById(buttonId);
-            if(btn) {
-                btn.classList.add('btn-loading');
-                btn.disabled = true;
+            // Ações específicas por tela
+            if (screenId === 'addCreditScreen') {
+                initializeStripeElements();
+            } else if (screenId === 'walletScreen') {
+                loadTransactionHistory();
+            } else if (screenId === 'rideHistoryScreen') {
+                loadRideHistory();
             }
         }
 
-        function hideLoading(buttonId) {
-            const btn = document.getElementById(buttonId);
-            if(btn) {
-                btn.classList.remove('btn-loading');
-                btn.disabled = false;
-            }
-        }
-        
-        function formatCurrency(value) {
-            const number = Number(value) || 0;
-            return `R$ ${number.toFixed(2).replace('.', ',')}`;
-        }
-
-        // ========== AUTENTICAÇÃO ==========
-        async function handleSignUp(fullName, email, phone, password) {
-            showLoading('signup-btn');
-            try {
-                const { error } = await supabaseClient.auth.signUp({ 
-                    email, 
-                    password, 
-                    options: { 
-                        data: { 
-                            full_name: fullName, 
-                            phone_number: phone,
-                            user_type: 'passenger' 
-                        } 
-                    } 
-                });
-                if (error) throw error;
-                toast.show('Cadastro realizado! Verifique seu e-mail para ativar sua conta.', 'success');
-                showScreen('login-screen');
-            } catch (error) { 
-                toast.show('Erro no cadastro: ' + error.message, 'error');
-            } finally { 
-                hideLoading('signup-btn'); 
-            }
-        }
-
-        async function handleSignIn(email, password) {
-            showLoading('login-btn');
-            try {
-                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) throw error;
+        // Inicializar Google Maps
+        function initializeGoogleMaps() {
+            if (typeof google !== 'undefined') {
+                autocompleteService = new google.maps.places.AutocompleteService();
                 
-                if (data?.user) {
-                    state.user = data.user;
-                    toast.show('Login realizado com sucesso!', 'success');
-                    await loadUserProfile(data.user.id);
-                }
-            } catch (error) { 
-                console.error('❌ Erro no login:', error);
-                toast.show('Erro no login: ' + error.message, 'error');
-            } finally { 
-                hideLoading('login-btn'); 
-            }
-        }
-        
-        async function handleSignInWithProvider(provider) {
-            try {
-                const { error } = await supabaseClient.auth.signInWithOAuth({ 
-                    provider,
-                    options: {
-                        redirectTo: window.location.origin
-                    }
-                });
-                if (error) throw error;
-            } catch (error) { 
-                toast.show(`Erro ao tentar login com ${provider}: ` + error.message, 'error'); 
-            }
-        }
-
-        async function handleSignOut() {
-            try {
-                if (state.rideSubscription) {
-                    supabaseClient.removeChannel(state.rideSubscription);
-                    state.rideSubscription = null;
-                }
-                stopRidePolling();
-                cleanupStripeElements();
-                
-                await supabaseClient.auth.signOut();
-                
-                state.user = null;
-                state.profile = null;
-                state.currentRide = null;
-                
-                toast.show('Logout realizado com sucesso', 'success');
-                showScreen('login-screen');
-            } catch (error) {
-                toast.show('Erro ao fazer logout: ' + error.message, 'error');
-                showScreen('login-screen');
-            }
-        }
-        
-        async function loadUserProfile(userId) {
-            try {
-                console.log('🔄 Carregando perfil do usuário:', userId);
-                
-                const { data, error } = await supabaseClient
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', userId)
-                    .single();
-                    
-                if (error && error.code !== 'PGRST116') {
-                    console.error('❌ Erro na consulta do perfil:', error);
-                    throw error;
-                }
-                
-                if (!data) {
-                    const userEmail = state.user?.email || 'Usuário';
-                    state.profile = {
-                        id: userId,
-                        full_name: userEmail.split('@')[0],
-                        email: userEmail,
-                        wallet_balance: 0
-                    };
-                } else {
-                    state.profile = data;
-                }
-                
-                // Atualizar interface
-                const welcomeMsg = document.getElementById('welcome-message');
-                const walletDisplay = document.getElementById('wallet-balance-display');
-                const walletDetails = document.getElementById('wallet-balance-details');
-                
-                if (welcomeMsg) {
-                    welcomeMsg.textContent = `Olá, ${state.profile.full_name}!`;
-                }
-                if (walletDisplay) {
-                    walletDisplay.textContent = formatCurrency(state.profile.wallet_balance || 0);
-                }
-                if (walletDetails) {
-                    walletDetails.textContent = formatCurrency(state.profile.wallet_balance || 0);
-                }
-                
-                console.log('✅ Perfil carregado com sucesso');
-                showScreen('user-screen');
-                
-            } catch (error) { 
-                console.error('❌ Erro crítico ao carregar perfil:', error); 
-                toast.show('Erro ao carregar dados do perfil. Redirecionando...', 'warning');
-                
-                const userEmail = state.user?.email || 'Usuário';
-                state.profile = {
-                    id: userId,
-                    full_name: userEmail.split('@')[0],
-                    email: userEmail,
-                    wallet_balance: 0
-                };
-                
-                showScreen('user-screen');
-            }
-        }
-
-        // ========== GOOGLE MAPS AUTOCOMPLETE ==========
-        function initializeAutocomplete() {
-            try {
-                if (typeof google !== 'undefined' && google.maps && google.maps.places) {
-                    const options = { 
-                        types: ['address'], 
-                        componentRestrictions: { 'country': 'br' } 
-                    };
-                    
-                    const originInput = document.getElementById('origin');
-                    const destinationInput = document.getElementById('destination');
-                    
-                    if (originInput && destinationInput) {
-                        const originAutocomplete = new google.maps.places.Autocomplete(originInput, options);
-                        originAutocomplete.addListener('place_changed', () => {
-                            state.originPlace = originAutocomplete.getPlace();
-                        });
-                        
-                        const destinationAutocomplete = new google.maps.places.Autocomplete(destinationInput, options);
-                        destinationAutocomplete.addListener('place_changed', () => {
-                            state.destinationPlace = destinationAutocomplete.getPlace();
-                        });
-                        
-                        originInput.addEventListener('input', () => { state.originPlace = null; });
-                        destinationInput.addEventListener('input', () => { state.destinationPlace = null; });
-                        
-                        console.log('✅ Google Maps Autocomplete inicializado');
-                    }
-                } else {
-                    console.warn('⚠️ Google Maps não disponível, tentando novamente...');
-                    setTimeout(initializeAutocomplete, 1000);
-                }
-            } catch (error) { 
-                console.error('❌ Erro ao inicializar autocomplete:', error); 
-            }
-        }
-
-        // ========== GEOLOCALIZAÇÃO ==========
-        function useCurrentLocation() {
-            if (!navigator.geolocation) {
-                toast.show('Geolocalização não suportada pelo navegador.', 'error');
-                return;
-            }
-
-            const originInput = document.getElementById('origin');
-            originInput.value = 'Obtendo localização...';
-            state.originPlace = null;
-
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const { latitude: lat, longitude: lng } = position.coords;
-                    
-                    if (typeof google !== 'undefined' && google.maps) {
-                        const latLng = new google.maps.LatLng(lat, lng);
-                        const geocoder = new google.maps.Geocoder();
-                        
-                        geocoder.geocode({ 'location': latLng }, (results, status) => {
-                            if (status === 'OK' && results[0]) {
-                                originInput.value = results[0].formatted_address;
-                                state.originPlace = {
-                                    formatted_address: results[0].formatted_address,
-                                    geometry: { location: latLng }
-                                };
-                                toast.show('Localização obtida com sucesso!', 'success');
-                            } else {
-                                originInput.value = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
-                                toast.show('Localização obtida (coordenadas brutas)', 'info');
-                            }
-                        });
-                    } else {
-                        originInput.value = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
-                        toast.show('Localização obtida (coordenadas brutas)', 'info');
-                    }
-                },
-                (error) => {
-                    console.error('Erro de geolocalização:', error);
-                    toast.show('Não foi possível obter sua localização.', 'error');
-                    originInput.value = '';
-                }
-            );
-        }
-
-        // ========== CARTEIRA E PAGAMENTOS STRIPE ==========
-        function showWalletScreen() {
-            cleanupStripeElements();
-            showScreen('wallet-screen');
-        }
-
-        function startWalletTopUp(amount) {
-            if (!stripe) {
-                toast.show('Sistema de pagamento não disponível no momento.', 'error');
-                return;
-            }
-
-            const parsedAmount = parseFloat(amount);
-            if (isNaN(parsedAmount) || parsedAmount < 5) {
-                toast.show('Por favor, insira um valor de recarga de no mínimo R$ 5,00.', 'warning');
-                return;
-            }
-            if (parsedAmount > 1000) {
-                toast.show('Valor máximo para recarga é R$ 1.000,00.', 'warning');
-                return;
-            }
-            
-            state.topUpAmount = parsedAmount;
-            document.getElementById('top-up-amount').textContent = formatCurrency(parsedAmount);
-            showScreen('wallet-payment-screen');
-            initializeStripeForTopUp(parsedAmount);
-        }
-
-        async function initializeStripeForTopUp(amount) {
-            try {
-                cleanupStripeElements();
-
-                if (!stripe) {
-                    stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
-                }
-
-                console.log('🔄 Criando Payment Intent para:', formatCurrency(amount));
-
-               const { data, error: invokeError } = await supabaseClient.functions.invoke('create-payment-intent', {
-                    body: { 
-                        amount: Math.round(amount * 100),
-                        user_id: state.user?.id
-                    },
-                });
-
-                if (invokeError) {
-                    console.error('❌ Erro na Edge Function:', invokeError);
-                    throw invokeError;
-                }
-                if (data.error) {
-                    console.error('❌ Erro retornado pela API:', data.error);
-                    throw new Error(data.error);
-                }
-                
-                const { clientSecret } = data;
-                
-                if (!clientSecret) {
-                    throw new Error('Client secret não recebido do servidor');
-                }
-
-                console.log('✅ Client secret recebido, configurando elementos Stripe...');
-
-                const elements = stripe.elements();
-                const style = {
-                    base: { 
-                        color: '#ffffff', 
-                        fontFamily: '"Poppins", sans-serif', 
-                        fontSize: '16px', 
-                        '::placeholder': { color: '#a0aec0' } 
-                    },
-                    invalid: { 
-                        color: '#ef4444', 
-                        iconColor: '#ef4444' 
-                    }
-                };
-
-                cardElement = elements.create('card', { 
-                    style, 
-                    hidePostalCode: true,
-                    hideIcon: false
-                });
-                
-                cardElement.mount('#card-element');
-
-                cardElement.on('change', ({error}) => {
-                    const displayError = document.getElementById('card-errors');
-                    if (error) {
-                        displayError.textContent = error.message;
-                    } else {
-                        displayError.textContent = '';
-                    }
-                });
-
-                cardElement.on('ready', () => {
-                    console.log('✅ Elemento do cartão pronto');
-                });
-
-                const form = document.getElementById('payment-form');
-                if (form) {
-                    form.onsubmit = null;
-                    const newForm = form.cloneNode(true);
-                    form.parentNode.replaceChild(newForm, form);
-                    
-                    newForm.addEventListener('submit', async (event) => {
-                        event.preventDefault();
-                        await handleWalletPayment(clientSecret);
-                    });
-                }
-
-                toast.show('Formulário de pagamento carregado com sucesso!', 'success');
-
-            } catch (error) {
-                console.error("❌ Erro ao inicializar Stripe:", error);
-                let errorMessage = "Erro ao iniciar recarga: " + error.message;
-                
-                if (error.message.includes('Edge Function') || error.message.includes('FunctionsHttpError')) {
-                    errorMessage = "Servidor de pagamentos indisponível. Tente novamente em alguns instantes.";
-                } else if (error.message.includes('network')) {
-                    errorMessage = "Erro de conexão. Verifique sua internet e tente novamente.";
-                }
-                
-                toast.show(errorMessage, 'error');
-                showWalletScreen();
-            }
-        }
-
-        async function handleWalletPayment(clientSecret) {
-            const cardErrors = document.getElementById('card-errors');
-            
-            if (!cardElement) {
-                toast.show("Erro: Elemento do cartão não inicializado", 'error');
-                return;
-            }
-
-            if (!clientSecret) {
-                toast.show("Erro: Token de pagamento inválido", 'error');
-                return;
-            }
-
-            console.log('🔄 Iniciando processamento do pagamento...');
-
-            showLoading('payment-btn');
-            cardErrors.textContent = '';
-            
-            try {
-                const cardData = await stripe.createToken(cardElement);
-                if (cardData.error) {
-                    cardErrors.textContent = cardData.error.message;
-                    throw new Error(cardData.error.message);
-                }
-
-                console.log('✅ Cartão validado, confirmando pagamento...');
-
-                const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-                    payment_method: { 
-                        card: cardElement,
-                        billing_details: {
-                            name: state.profile?.full_name || 'Cliente'
+                // Inicializar mapa principal
+                const mapOptions = {
+                    center: { lat: -23.5505, lng: -46.6333 }, // São Paulo
+                    zoom: 12,
+                    styles: [
+                        {
+                            featureType: "poi",
+                            elementType: "labels",
+                            stylers: [{ visibility: "off" }]
                         }
+                    ]
+                };
+                
+                map = new google.maps.Map(document.getElementById('map'), mapOptions);
+                rideMap = new google.maps.Map(document.getElementById('rideMap'), mapOptions);
+                
+                directionsService = new google.maps.DirectionsService();
+                directionsRenderer = new google.maps.DirectionsRenderer({
+                    suppressMarkers: false,
+                    polylineOptions: {
+                        strokeColor: '#667eea',
+                        strokeWeight: 4
                     }
+                });
+                directionsRenderer.setMap(map);
+
+                // Configurar autocomplete
+                setupAutocomplete();
+            } else {
+                // Carregar API do Google Maps se não estiver carregada
+                const script = document.createElement('script');
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&callback=initializeGoogleMaps`;
+                document.head.appendChild(script);
+            }
+        }
+
+        // Configurar autocomplete
+        function setupAutocomplete() {
+            const pickupInput = document.getElementById('pickupLocation');
+            const destinationInput = document.getElementById('destinationLocation');
+            
+            pickupInput.addEventListener('input', () => handleAutocomplete('pickup'));
+            destinationInput.addEventListener('input', () => handleAutocomplete('destination'));
+            
+            // Fechar sugestões quando clicar fora
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.input-container')) {
+                    document.getElementById('pickupSuggestions').classList.add('hidden');
+                    document.getElementById('destinationSuggestions').classList.add('hidden');
+                }
+            });
+        }
+
+        // Manipular autocomplete
+        function handleAutocomplete(type) {
+            const input = document.getElementById(`${type}Location`);
+            const suggestionsDiv = document.getElementById(`${type}Suggestions`);
+            
+            if (input.value.length < 3) {
+                suggestionsDiv.classList.add('hidden');
+                return;
+            }
+
+            const request = {
+                input: input.value,
+                componentRestrictions: { country: 'br' },
+                types: ['geocode', 'establishment']
+            };
+
+            autocompleteService.getPlacePredictions(request, (predictions, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+                    showSuggestions(predictions, type);
+                } else {
+                    suggestionsDiv.classList.add('hidden');
+                }
+            });
+        }
+
+        // Mostrar sugestões
+        function showSuggestions(predictions, type) {
+            const suggestionsDiv = document.getElementById(`${type}Suggestions`);
+            suggestionsDiv.innerHTML = '';
+            
+            predictions.slice(0, 5).forEach(prediction => {
+                const item = document.createElement('div');
+                item.className = 'suggestion-item';
+                item.textContent = prediction.description;
+                item.onclick = () => selectSuggestion(prediction, type);
+                suggestionsDiv.appendChild(item);
+            });
+            
+            suggestionsDiv.classList.remove('hidden');
+        }
+
+        // Selecionar sugestão
+        function selectSuggestion(prediction, type) {
+            const input = document.getElementById(`${type}Location`);
+            const suggestionsDiv = document.getElementById(`${type}Suggestions`);
+            
+            input.value = prediction.description;
+            suggestionsDiv.classList.add('hidden');
+            
+            // Verificar se ambos os endereços foram preenchidos
+            const pickup = document.getElementById('pickupLocation').value;
+            const destination = document.getElementById('destinationLocation').value;
+            
+            if (pickup && destination) {
+                calculateRoute();
+            }
+        }
+
+        // Detectar localização atual
+        function detectCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    
+                    const geocoder = new google.maps.Geocoder();
+                    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+                        if (status === 'OK' && results[0]) {
+                            document.getElementById('pickupLocation').value = results[0].formatted_address;
+                        }
+                    });
+                }, (error) => {
+                    alert('Não foi possível obter sua localização atual.');
+                });
+            } else {
+                alert('Geolocalização não é suportada pelo seu navegador.');
+            }
+        }
+
+        // Calcular rota
+        function calculateRoute() {
+            const pickup = document.getElementById('pickupLocation').value;
+            const destination = document.getElementById('destinationLocation').value;
+            
+            if (!pickup || !destination) return;
+
+            const request = {
+                origin: pickup,
+                destination: destination,
+                travelMode: google.maps.TravelMode.DRIVING,
+                unitSystem: google.maps.UnitSystem.METRIC,
+                avoidHighways: false,
+                avoidTolls: false
+            };
+
+            directionsService.route(request, (result, status) => {
+                if (status === google.maps.DirectionsStatus.OK) {
+                    directionsRenderer.setDirections(result);
+                    
+                    // Mostrar mapa e calcular preço
+                    document.getElementById('mapContainer').classList.remove('hidden');
+                    calculatePrice(result.routes[0].legs[0].distance.value);
+                    
+                    // Atualizar botão
+                    document.getElementById('requestRideBtn').disabled = false;
+                } else {
+                    alert('Não foi possível calcular a rota. Verifique os endereços.');
+                }
+            });
+        }
+
+        // Calcular preço da corrida
+        function calculatePrice(distanceInMeters) {
+            const distanceInKm = distanceInMeters / 1000;
+            const basePrice = 5.00; // Taxa base
+            const pricePerKm = 2.50; // Preço por km
+            const totalPrice = basePrice + (distanceInKm * pricePerKm);
+            
+            document.getElementById('priceAmount').textContent = `R$ ${totalPrice.toFixed(2).replace('.', ',')}`;
+            document.getElementById('ridePrice').classList.remove('hidden');
+        }
+
+        // Solicitar corrida
+        function requestRide() {
+            const pickup = document.getElementById('pickupLocation').value;
+            const destination = document.getElementById('destinationLocation').value;
+            const priceText = document.getElementById('priceAmount').textContent;
+            const price = parseFloat(priceText.replace('R$ ', '').replace(',', '.'));
+            
+            if (!pickup || !destination) {
+                alert('Por favor, preencha origem e destino.');
+                return;
+            }
+
+            // Verificar saldo
+            if (userBalance < price) {
+                alert('Saldo insuficiente. Adicione créditos à sua carteira.');
+                showScreen('addCreditScreen');
+                return;
+            }
+
+            // Criar corrida no Firebase
+            const rideData = {
+                passengerId: currentUser.uid,
+                passengerName: currentUser.displayName,
+                pickup: pickup,
+                destination: destination,
+                price: price,
+                status: 'waiting',
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            };
+
+            database.ref('rides').push(rideData)
+                .then((rideRef) => {
+                    currentRide = rideRef.key;
+                    
+                    // Atualizar interface
+                    document.getElementById('currentRidePickup').textContent = pickup;
+                    document.getElementById('currentRideDestination').textContent = destination;
+                    document.getElementById('currentRidePrice').textContent = priceText;
+                    
+                    // Mostrar tela de corrida
+                    showScreen('currentRideScreen');
+                    
+                    // Monitorar status da corrida
+                    monitorRideStatus(rideRef.key);
+                })
+                .catch((error) => {
+                    console.error('Erro ao solicitar corrida:', error);
+                    alert('Erro ao solicitar corrida. Tente novamente.');
+                });
+        }
+
+        // Monitorar status da corrida
+        function monitorRideStatus(rideId) {
+            database.ref(`rides/${rideId}`).on('value', (snapshot) => {
+                const ride = snapshot.val();
+                if (!ride) return;
+
+                const statusElement = document.getElementById('rideStatus');
+                const driverInfo = document.getElementById('driverInfo');
+
+                switch (ride.status) {
+                    case 'waiting':
+                        statusElement.textContent = 'Procurando motorista...';
+                        statusElement.className = 'ride-status status-searching';
+                        driverInfo.classList.add('hidden');
+                        break;
+                        
+                    case 'accepted':
+                        statusElement.textContent = 'Motorista encontrado!';
+                        statusElement.className = 'ride-status status-accepted';
+                        
+                        if (ride.driver) {
+                            showDriverInfo(ride.driver);
+                        }
+                        break;
+                        
+                    case 'in-progress':
+                        statusElement.textContent = 'Corrida em andamento';
+                        statusElement.className = 'ride-status status-in-progress';
+                        break;
+                        
+                    case 'completed':
+                        statusElement.textContent = 'Corrida finalizada';
+                        statusElement.className = 'ride-status status-completed';
+                        
+                        // Processar pagamento
+                        processRidePayment(ride.price);
+                        
+                        setTimeout(() => {
+                            showScreen('homeScreen');
+                            currentRide = null;
+                        }, 3000);
+                        break;
+                }
+            });
+        }
+
+        // Mostrar informações do motorista
+        function showDriverInfo(driver) {
+            document.getElementById('driverName').textContent = driver.name;
+            document.getElementById('driverRating').textContent = driver.rating || '5.0';
+            document.getElementById('driverVehicle').textContent = driver.vehicle || 'Veículo não informado';
+            document.getElementById('driverPlate').textContent = driver.plate || 'ABC-1234';
+            document.getElementById('driverAvatar').textContent = driver.name.charAt(0).toUpperCase();
+            
+            document.getElementById('driverInfo').classList.remove('hidden');
+        }
+
+        // Processar pagamento da corrida
+        async function processRidePayment(amount) {
+            try {
+                // Debitar do saldo do usuário
+                await debitFromWallet(amount, 'ride_payment', `Pagamento de corrida - R$ ${amount.toFixed(2)}`);
+                
+                // Atualizar saldo na interface
+                loadWalletBalance();
+                
+                alert('Pagamento processado com sucesso!');
+            } catch (error) {
+                console.error('Erro ao processar pagamento:', error);
+                alert('Erro ao processar pagamento. Entre em contato conosco.');
+            }
+        }
+
+        // Cancelar corrida
+        function cancelRide() {
+            if (currentRide) {
+                database.ref(`rides/${currentRide}`).update({
+                    status: 'cancelled',
+                    cancelledBy: 'passenger'
+                });
+                
+                currentRide = null;
+                showScreen('homeScreen');
+            }
+        }
+
+        // Carregar saldo da carteira
+        async function loadWalletBalance() {
+            if (!currentUser) return;
+
+            try {
+                const { data, error } = await supabase
+                    .from('wallet_transactions')
+                    .select('amount, transaction_type')
+                    .eq('profile_id', currentUser.uid);
+
+                if (error) throw error;
+
+                let balance = 0;
+                data.forEach(transaction => {
+                    if (transaction.transaction_type === 'credit') {
+                        balance += transaction.amount;
+                    } else if (transaction.transaction_type === 'debit') {
+                        balance -= transaction.amount;
+                    }
+                });
+
+                userBalance = balance;
+                const balanceText = `R$ ${balance.toFixed(2).replace('.', ',')}`;
+                
+                document.getElementById('walletBalance').textContent = balanceText;
+                document.getElementById('currentBalance').textContent = balanceText;
+            } catch (error) {
+                console.error('Erro ao carregar saldo:', error);
+            }
+        }
+
+        // Inicializar elementos do Stripe
+        async function initializeStripeElements() {
+            if (!elements) {
+                const appearance = {
+                    theme: 'stripe',
+                    variables: {
+                        colorPrimary: '#667eea',
+                        colorBackground: '#ffffff',
+                        colorText: '#30313d',
+                        colorDanger: '#df1b41',
+                        fontFamily: '"Segoe UI", sans-serif',
+                        spacingUnit: '4px',
+                        borderRadius: '8px'
+                    }
+                };
+
+                elements = stripe.elements({ appearance });
+                
+                paymentElement = elements.create('payment', {
+                    layout: 'tabs'
+                });
+                
+                paymentElement.mount('#payment-element');
+            }
+        }
+
+        // Selecionar método de pagamento
+        function selectPaymentMethod(method) {
+            // Remover seleção anterior
+            document.querySelectorAll('.payment-method').forEach(pm => {
+                pm.classList.remove('selected');
+                pm.querySelector('input[type="radio"]').checked = false;
+            });
+            
+            // Selecionar método atual
+            const selectedMethod = document.querySelector(`input[value="${method}"]`).closest('.payment-method');
+            selectedMethod.classList.add('selected');
+            selectedMethod.querySelector('input[type="radio"]').checked = true;
+            
+            // Mostrar/ocultar seções de pagamento
+            if (method === 'stripe') {
+                document.getElementById('stripePaymentSection').classList.remove('hidden');
+                document.getElementById('pixPaymentSection').classList.add('hidden');
+            } else {
+                document.getElementById('stripePaymentSection').classList.add('hidden');
+                document.getElementById('pixPaymentSection').classList.remove('hidden');
+            }
+        }
+
+        // Adicionar crédito
+        async function addCredit() {
+            const amount = parseFloat(document.getElementById('creditAmount').value);
+            const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
+            
+            if (!amount || amount < 5) {
+                alert('O valor mínimo é R$ 5,00');
+                return;
+            }
+
+            if (paymentMethod === 'stripe') {
+                await processStripePayment(amount);
+            } else {
+                alert('PIX será implementado em breve. Use cartão de crédito.');
+            }
+        }
+
+        // Processar pagamento Stripe
+        async function processStripePayment(amount) {
+            const addCreditBtn = document.getElementById('addCreditBtn');
+            addCreditBtn.disabled = true;
+            addCreditBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
+
+            try {
+                // Criar Payment Intent via Edge Function
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/create-payment-intent`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    },
+                    body: JSON.stringify({
+                        amount: Math.round(amount * 100), // Converter para centavos
+                        currency: 'brl',
+                        metadata: {
+                            user_id: currentUser.uid,
+                            type: 'wallet_credit'
+                        }
+                    })
+                });
+
+                const { client_secret } = await response.json();
+
+                // Confirmar pagamento
+                const { error } = await stripe.confirmPayment({
+                    elements,
+                    clientSecret: client_secret,
+                    confirmParams: {
+                        return_url: window.location.href
+                    },
+                    redirect: 'if_required'
                 });
 
                 if (error) {
-                    cardErrors.textContent = error.message;
-                    console.error('❌ Erro do Stripe:', error);
-                    throw new Error(error.message);
-                }
-
-                console.log('✅ Status do pagamento:', paymentIntent.status);
-
-                if (paymentIntent.status === 'succeeded') {
-                    toast.show('Pagamento processado com sucesso! 🎉', 'success');
-                    
-                    setTimeout(async () => {
-                        try {
-                            await loadUserProfile(state.user.id);
-                            showScreen('user-screen');
-                            toast.show(`Saldo de ${formatCurrency(state.topUpAmount)} adicionado com sucesso!`, 'success');
-                        } catch (profileError) {
-                            console.error('❌ Erro ao recarregar perfil:', profileError);
-                            toast.show('Pagamento realizado, atualize a página para ver o saldo', 'info');
-                            showScreen('user-screen');
-                        }
-                    }, 3000);
-                    
-                } else if (paymentIntent.status === 'requires_action') {
-                    toast.show('Ação adicional necessária. Siga as instruções.', 'warning');
+                    console.error('Erro no pagamento:', error);
+                    showMessage(error.message, 'error');
                 } else {
-                    throw new Error('Status inesperado do pagamento: ' + paymentIntent.status);
+                    // Adicionar crédito à carteira
+                    await addCreditToWallet(amount);
+                    showMessage('Crédito adicionado com sucesso!', 'success');
+                    
+                    // Resetar formulário
+                    document.getElementById('creditAmount').value = '';
+                    
+                    // Voltar para a carteira
+                    setTimeout(() => {
+                        showScreen('walletScreen');
+                    }, 2000);
                 }
-
             } catch (error) {
-                console.error("❌ Erro no pagamento:", error);
-                
-                let errorMessage = "Falha no pagamento. Tente novamente.";
-                const errorCode = error.code || error.decline_code || '';
-                
-                if (error.message.includes('card_declined') || errorCode.includes('declined')) {
-                    errorMessage = "Cartão recusado. Verifique os dados ou tente outro cartão.";
-                } else if (error.message.includes('insufficient_funds')) {
-                    errorMessage = "Saldo insuficiente no cartão.";
-                } else if (error.message.includes('incorrect_cvc')) {
-                    errorMessage = "Código de segurança (CVC) incorreto.";
-                } else if (error.message.includes('expired_card')) {
-                    errorMessage = "Cartão expirado.";
-                } else if (error.message.includes('invalid_number')) {
-                    errorMessage = "Número do cartão inválido.";
-                }
-                
-                toast.show(errorMessage, 'error');
-                
+                console.error('Erro ao processar pagamento:', error);
+                showMessage('Erro ao processar pagamento. Tente novamente.', 'error');
             } finally {
-                hideLoading('payment-btn');
+                addCreditBtn.disabled = false;
+                addCreditBtn.innerHTML = '<i class="fas fa-plus"></i> Adicionar Crédito';
             }
         }
 
-        // ========== VIAGENS ==========
-        async function checkPendingRide() {
+        // Adicionar crédito à carteira
+        async function addCreditToWallet(amount) {
             try {
-                const { data, error } = await supabaseClient
-                    .from('rides')
-                    .select('*')
-                    .eq('passenger_id', state.user.id)
-                    .in('status', ['requested', 'assigned', 'accepted', 'arrived_pickup', 'in_progress'])
-                    .order('created_at', { ascending: false })
-                    .limit(1);
+                const { error } = await supabase
+                    .from('wallet_transactions')
+                    .insert([{
+                        profile_id: currentUser.uid,
+                        amount: amount,
+                        transaction_type: 'credit',
+                        description: `Crédito adicionado via cartão - R$ ${amount.toFixed(2)}`,
+                        created_at: new Date().toISOString()
+                    }]);
 
                 if (error) throw error;
-                
-                if (data && data.length > 0) {
-                    state.currentRide = data[0];
-                    showRideStatus();
-                    handleRideStateUpdate(state.currentRide);
-                    startRidePolling();
-                }
+
+                // Atualizar saldo
+                await loadWalletBalance();
             } catch (error) {
-                console.error('❌ Erro ao verificar viagens pendentes:', error);
+                console.error('Erro ao adicionar crédito:', error);
+                throw error;
             }
         }
 
-        function showRideStatus() {
-            document.getElementById('ride-request-container').classList.add('hidden');
-            document.getElementById('ride-status-container').classList.remove('hidden');
-        }
-
-        function hideRideStatus() {
-            document.getElementById('ride-request-container').classList.remove('hidden');
-            document.getElementById('ride-status-container').classList.add('hidden');
-            resetRideStatusUI();
-        }
-
-        function resetRideStatusUI() {
-            const driverPanel = document.getElementById('driver-details-panel');
-            if (driverPanel) {
-                driverPanel.classList.remove('active');
-                driverPanel.style.opacity = '0';
-                driverPanel.style.transform = 'translateY(-1rem)';
-                document.getElementById('driver-name').textContent = 'Procurando motorista...';
-                document.getElementById('driver-car').textContent = 'Aguarde um momento';
-                document.getElementById('driver-plate').textContent = '';
-                document.getElementById('call-driver-btn').disabled = true;
-                document.getElementById('message-driver-btn').disabled = true;
-            }
-            document.getElementById('status-timeline').innerHTML = '';
-        }
-
-        function handleRideStateUpdate(ride) {
-            if (!ride || !ride.status) return;
-            
-            const status = ride.status;
-            renderTimeline(status);
-            const destination = (ride.destinations && ride.destinations[0]) || 'N/A';
-            updateTripDetails(ride.origin_address, destination);
-            
-            const cancelBtn = document.getElementById('cancel-ride-btn');
-            if (['in_progress', 'completed', 'cancelled'].includes(status)) {
-                cancelBtn.classList.add('hidden');
-            } else {
-                cancelBtn.classList.remove('hidden');
-            }
-            
-            if (ride.driver_id) {
-                loadDriverInfo(ride.driver_id);
-            } else {
-                updateDriverPanel(null, null);
-                document.getElementById('driver-details-panel').classList.add('active');
-            }
-        }
-
-        function renderTimeline(currentStatus) {
-            const timelineContainer = document.getElementById('status-timeline');
-            if (!timelineContainer) return;
-            
-            timelineContainer.innerHTML = '';
-            const statusOrder = ['requested', 'assigned', 'accepted', 'arrived_pickup', 'in_progress', 'completed'];
-            const currentIndex = statusOrder.indexOf(currentStatus);
-
-            const timelineSteps = [
-                { status: 'requested', icon: '🔍', text: 'Procurando motorista' },
-                { status: 'assigned', icon: '✅', text: 'Motorista encontrado' },
-                { status: 'accepted', icon: '🚗', text: 'Motorista no local' },
-                { status: 'arrived_pickup', icon: '📍', text: 'Viagem em andamento' },
-                { status: 'in_progress', icon: '🛣️', text: 'Viagem em progresso' },
-                { status: 'completed', icon: '🏁', text: 'Viagem concluída' }
-            ];
-
-            timelineSteps.forEach((step, index) => {
-                const item = document.createElement('div');
-                let className = 'timeline-item';
-                
-                if (index < currentIndex) {
-                    className += ' completed';
-                } else if (index === currentIndex) {
-                    className += ' active';
-                }
-                
-                item.className = className;
-                item.innerHTML = `<div class="timeline-icon">${step.icon}</div><p class="timeline-text">${step.text}</p>`;
-                timelineContainer.appendChild(item);
-            });
-        }
-
-        function updateTripDetails(origin, destination) {
-            document.getElementById('trip-origin').textContent = origin || '-';
-            document.getElementById('trip-destination').textContent = destination || '-';
-        }
-
-        function updateDriverPanel(driver, details) {
-            const driverPanel = document.getElementById('driver-details-panel');
-            if (!driverPanel) return;
-            
-            document.getElementById('driver-name').textContent = driver?.full_name || 'Motorista';
-            const carInfo = `${details?.car_model || ''} ${details?.car_color || ''}`.trim();
-            document.getElementById('driver-car').textContent = carInfo || 'Veículo';
-            document.getElementById('driver-plate').textContent = details?.license_plate || '';
-            
-            const callBtn = document.getElementById('call-driver-btn');
-            const msgBtn = document.getElementById('message-driver-btn');
-            callBtn.disabled = !driver?.phone_number;
-            msgBtn.disabled = !driver?.phone_number;
-            
-            driverPanel.classList.add('active');
-        }
-
-        async function loadDriverInfo(driverId) {
+        // Debitar da carteira
+        async function debitFromWallet(amount, type, description) {
             try {
-                const { data: driver, error: driverError } = await supabaseClient
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', driverId)
-                    .single();
+                const { error } = await supabase
+                    .from('wallet_transactions')
+                    .insert([{
+                        profile_id: currentUser.uid,
+                        amount: amount,
+                        transaction_type: 'debit',
+                        description: description,
+                        created_at: new Date().toISOString()
+                    }]);
 
-                if (driverError) throw driverError;
-
-                const { data: driverDetails, error: detailsError } = await supabaseClient
-                    .from('driver_details')
-                    .select('*')
-                    .eq('driver_id', driverId)
-                    .single();
-
-                if (detailsError) console.warn('Detalhes do motorista não encontrados:', detailsError);
-
-                updateDriverPanel(driver, driverDetails);
+                if (error) throw error;
             } catch (error) {
-                console.error('❌ Erro ao carregar informações do motorista:', error);
+                console.error('Erro ao debitar da carteira:', error);
+                throw error;
             }
         }
 
-        function startRidePolling() {
-            if (state.ridePollInterval) return;
+        // Mostrar mensagem
+        function showMessage(messageText, type) {
+            const messageElement = document.getElementById('payment-message');
+            messageElement.classList.remove('hidden', 'alert-success', 'alert-danger');
             
-            state.ridePollInterval = setInterval(async () => {
-                if (!state.currentRide) return;
-                
-                try {
-                    const { data, error } = await supabaseClient
-                        .from('rides')
-                        .select('*')
-                        .eq('id', state.currentRide.id)
-                        .single();
-
-                    if (error) throw error;
-                    
-                    if (data) {
-                        state.currentRide = data;
-                        handleRideStateUpdate(data);
-                        
-                        if (['completed', 'cancelled'].includes(data.status)) {
-                            stopRidePolling();
-                            if (data.status === 'completed') {
-                                toast.show('Viagem concluída com sucesso!', 'success');
-                            }
-                            setTimeout(() => {
-                                hideRideStatus();
-                                state.currentRide = null;
-                            }, 3000);
-                        }
-                    }
-                } catch (error) {
-                    console.error('❌ Erro no polling da viagem:', error);
-                }
+            if (type === 'success') {
+                messageElement.classList.add('alert-success');
+            } else {
+                messageElement.classList.add('alert-danger');
+            }
+            
+            messageElement.textContent = messageText;
+            
+            setTimeout(() => {
+                messageElement.classList.add('hidden');
             }, 5000);
         }
 
-        function stopRidePolling() {
-            if (state.ridePollInterval) {
-                clearInterval(state.ridePollInterval);
-                state.ridePollInterval = null;
-            }
-        }
+        // Carregar histórico de transações
+        async function loadTransactionHistory() {
+            if (!currentUser) return;
 
-        async function cancelRide() {
-            if (!state.currentRide) return;
-            
+            const historyContainer = document.getElementById('transactionHistory');
+            historyContainer.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i><p>Carregando histórico...</p></div>';
+
             try {
-                const { error } = await supabaseClient
-                    .from('rides')
-                    .update({ status: 'cancelled' })
-                    .eq('id', state.currentRide.id);
+                const { data, error } = await supabase
+                    .from('wallet_transactions')
+                    .select('*')
+                    .eq('profile_id', currentUser.uid)
+                    .order('created_at', { ascending: false })
+                    .limit(20);
 
                 if (error) throw error;
-                
-                toast.show('Viagem cancelada', 'info');
-                stopRidePolling();
-                hideRideStatus();
-                state.currentRide = null;
-            } catch (error) {
-                console.error('❌ Erro ao cancelar viagem:', error);
-                toast.show('Erro ao cancelar viagem: ' + error.message, 'error');
-            }
-        }
 
-        function messageDriver() {
-            if (state.currentRide?.driver_id) {
-                toast.show('Função de mensagem em desenvolvimento', 'info');
-            }
-        }
-
-        function callDriver() {
-            if (state.currentRide?.driver_id) {
-                toast.show('Função de chamada em desenvolvimento', 'info');
-            }
-        }
-
-        function getHelp() {
-            toast.show('Suporte: Entre em contato pelo WhatsApp (11) 9999-9999', 'info');
-        }
-
-        // ========== EVENT LISTENERS ==========
-        function setupEventListeners() {
-            // Auth state listener
-            supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                console.log('🔄 Mudança de autenticação:', event, session?.user?.id);
-                
-                if (event === 'SIGNED_IN' && session?.user) {
-                    if (!state.user || state.user.id !== session.user.id) {
-                        console.log('👤 Novo login detectado via listener');
-                        state.user = session.user;
-                        try {
-                            await loadUserProfile(session.user.id);
-                        } catch (error) {
-                            console.error('❌ Erro no listener de autenticação:', error);
-                        }
-                    }
-                } else if (event === 'SIGNED_OUT') {
-                    console.log('🚪 Logout detectado');
-                    state.user = null;
-                    state.profile = null;
-                    cleanupStripeElements();
-                    showScreen('login-screen');
-                }
-            });
-
-            // Form listeners
-            document.getElementById('login-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const email = document.getElementById('login-email').value;
-                const password = document.getElementById('login-password').value;
-                await handleSignIn(email, password);
-            });
-
-            document.getElementById('signup-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const fullName = document.getElementById('signup-fullname').value;
-                const email = document.getElementById('signup-email').value;
-                const phone = document.getElementById('signup-phone').value;
-                const password = document.getElementById('signup-password').value;
-                await handleSignUp(fullName, email, phone, password);
-            });
-
-            document.getElementById('forgot-password-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const email = document.getElementById('forgot-email').value;
-                showLoading('forgot-btn');
-                try {
-                    const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
-                    if (error) throw error;
-                    toast.show('Link de recuperação enviado para seu e-mail!', 'success');
-                    showScreen('login-screen');
-                } catch (error) {
-                    toast.show('Erro ao enviar link: ' + error.message, 'error');
-                } finally {
-                    hideLoading('forgot-btn');
-                }
-            });
-
-            document.getElementById('update-password-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const password = document.getElementById('update-password').value;
-                showLoading('update-btn');
-                try {
-                    const { error } = await supabaseClient.auth.updateUser({ password });
-                    if (error) throw error;
-                    toast.show('Senha atualizada com sucesso!', 'success');
-                    showScreen('user-screen');
-                } catch (error) {
-                    toast.show('Erro ao atualizar senha: ' + error.message, 'error');
-                } finally {
-                    hideLoading('update-btn');
-                }
-            });
-
-            document.getElementById('complete-profile-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const phone = document.getElementById('profile-phone').value;
-                showLoading('profile-btn');
-                try {
-                    const { error } = await supabaseClient
-                        .from('profiles')
-                        .update({ phone_number: phone })
-                        .eq('id', state.user.id);
-                    if (error) throw error;
-                    toast.show('Perfil completado!', 'success');
-                    await loadUserProfile(state.user.id);
-                } catch (error) {
-                    toast.show('Erro ao atualizar perfil: ' + error.message, 'error');
-                } finally {
-                    hideLoading('profile-btn');
-                }
-            });
-
-            document.getElementById('ride-request-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const origin = document.getElementById('origin').value;
-                const destination = document.getElementById('destination').value;
-                
-                if (!origin || !destination) {
-                    toast.show('Preencha origem e destino', 'warning');
+                if (data.length === 0) {
+                    historyContainer.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">Nenhuma transação encontrada.</p>';
                     return;
                 }
 
-                showLoading('request-btn');
-                try {
-                    const { data, error } = await supabaseClient
-                        .from('rides')
-                        .insert({
-                            passenger_id: state.user.id,
-                            origin_address: origin,
-                            destinations: [destination],
-                            status: 'requested'
-                        })
-                        .select()
-                        .single();
-
-                    if (error) throw error;
+                historyContainer.innerHTML = '';
+                data.forEach(transaction => {
+                    const transactionDiv = document.createElement('div');
+                    transactionDiv.className = 'transaction-item';
                     
-                    state.currentRide = data;
-                    showRideStatus();
-                    handleRideStateUpdate(data);
-                    startRidePolling();
-                    toast.show('Viagem solicitada! Procurando motorista...', 'success');
-                } catch (error) {
-                    toast.show('Erro ao solicitar viagem: ' + error.message, 'error');
-                } finally {
-                    hideLoading('request-btn');
-                }
-            });
-        }
-
-        // ========== INICIALIZAÇÃO ==========
-        window.addEventListener('unhandledrejection', (event) => {
-            console.error('❌ Promise rejection não tratada:', event.reason);
-            if (event.reason?.message?.includes('Auth')) {
-                handleSignOut();
+                    const isCredit = transaction.transaction_type === 'credit';
+                    const amountClass = isCredit ? 'positive' : 'negative';
+                    const amountSign = isCredit ? '+' : '-';
+                    
+                    transactionDiv.innerHTML = `
+                        <div class="transaction-info">
+                            <div class="transaction-type">${transaction.description}</div>
+                            <div class="transaction-date">${new Date(transaction.created_at).toLocaleString('pt-BR')}</div>
+                        </div>
+                        <div class="transaction-amount ${amountClass}">
+                            ${amountSign}R$ ${transaction.amount.toFixed(2).replace('.', ',')}
+                        </div>
+                    `;
+                    
+                    historyContainer.appendChild(transactionDiv);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar histórico:', error);
+                historyContainer.innerHTML = '<p style="text-align: center; color: #dc3545; padding: 40px;">Erro ao carregar histórico.</p>';
             }
-        });
-
-        // Inicializar quando DOM estiver pronto
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initializeApp);
-        } else {
-            initializeApp();
         }
 
-        console.log('🎮 Garcia Mobilidade - Versão FUNCIONANDO FINAL Carregada');
+        // Carregar histórico de corridas
+        function loadRideHistory() {
+            if (!currentUser) return;
 
+            const historyContainer = document.getElementById('rideHistoryList');
+            historyContainer.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i><p>Carregando histórico...</p></div>';
+
+            database.ref('rides')
+                .orderByChild('passengerId')
+                .equalTo(currentUser.uid)
+                .limitToLast(20)
+                .once('value')
+                .then((snapshot) => {
+                    const rides = [];
+                    snapshot.forEach((childSnapshot) => {
+                        rides.unshift({
+                            id: childSnapshot.key,
+                            ...childSnapshot.val()
+                        });
+                    });
+
+                    if (rides.length === 0) {
+                        historyContainer.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">Nenhuma corrida encontrada.</p>';
+                        return;
+                    }
+
+                    historyContainer.innerHTML = '';
+                    rides.forEach(ride => {
+                        const rideDiv = document.createElement('div');
+                        rideDiv.className = 'ride-card';
+                        
+                        const statusClass = `status-${ride.status}`;
+                        const statusText = getStatusText(ride.status);
+                        const rideDate = new Date(ride.timestamp).toLocaleString('pt-BR');
+                        
+                        rideDiv.innerHTML = `
+                            <div class="ride-status ${statusClass}">${statusText}</div>
+                            
+                            <div class="address-item">
+                                <i class="fas fa-circle pickup"></i>
+                                <div class="address-info">
+                                    <div class="label">Origem</div>
+                                    <div class="address">${ride.pickup}</div>
+                                </div>
+                            </div>
+                            
+                            <div class="address-item">
+                                <i class="fas fa-map-marker-alt destination"></i>
+                                <div class="address-info">
+                                    <div class="label">Destino</div>
+                                    <div class="address">${ride.destination}</div>
+                                </div>
+                            </div>
+                            
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+                                <div>
+                                    <strong>R$ ${ride.price.toFixed(2).replace('.', ',')}</strong>
+                                </div>
+                                <div style="font-size: 12px; color: #666;">
+                                    ${rideDate}
+                                </div>
+                            </div>
+                        `;
+                        
+                        historyContainer.appendChild(rideDiv);
+                    });
+                })
+                .catch((error) => {
+                    console.error('Erro ao carregar histórico de corridas:', error);
+                    historyContainer.innerHTML = '<p style="text-align: center; color: #dc3545; padding: 40px;">Erro ao carregar histórico.</p>';
+                });
+        }
+
+        // Obter texto do status
+        function getStatusText(status) {
+            const statusMap = {
+                'waiting': 'Aguardando',
+                'accepted': 'Aceita',
+                'in-progress': 'Em andamento',
+                'completed': 'Finalizada',
+                'cancelled': 'Cancelada'
+            };
+            return statusMap[status] || status;
+        }
     </script>
+
+    <!-- Carregar Google Maps API -->
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g&libraries=places&callback=initializeGoogleMaps"></script>
 </body>
 </html>
