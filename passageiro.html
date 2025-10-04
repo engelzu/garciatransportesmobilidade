@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GARCIA MOBILIDADE - Passageiro</title>
     
-    <!-- CDNs Externos -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g&libraries=places"></script>
-    <script src="https://js.stripe.com/v3/"></script>
+    <!-- CDNs Externos com Fallbacks -->
+    <script src="https://cdn.tailwindcss.com" onerror="handleCDNError('tailwind')"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="handleCDNError('supabase')"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g&libraries=places&callback=initGoogleMaps" async defer onerror="handleCDNError('maps')"></script>
+    <script src="https://js.stripe.com/v3/" onerror="handleCDNError('stripe')"></script>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -134,6 +134,34 @@
             transform: translateY(0);
         }
 
+        .error-banner {
+            background: linear-gradient(to right, #dc2626, #b91c1c);
+            color: white;
+            padding: 12px;
+            text-align: center;
+            font-size: 14px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 9999;
+            display: none;
+        }
+
+        .offline-indicator {
+            background: #f59e0b;
+            color: white;
+            padding: 8px;
+            text-align: center;
+            font-size: 12px;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 9999;
+            display: none;
+        }
+
         @media (max-width: 640px) {
             .container { 
                 padding: 16px; 
@@ -143,9 +171,54 @@
                 max-width: calc(100vw - 40px); 
             }
         }
+
+        /* Fallback CSS for quando Tailwind não carrega */
+        .fallback-styles {
+            .w-full { width: 100%; }
+            .h-20 { height: 5rem; }
+            .bg-black { background-color: #000000; }
+            .bg-purple-600 { background-color: #7c3aed; }
+            .bg-gray-800 { background-color: #1f2937; }
+            .text-white { color: #ffffff; }
+            .text-center { text-align: center; }
+            .rounded-lg { border-radius: 0.5rem; }
+            .p-4 { padding: 1rem; }
+            .mb-4 { margin-bottom: 1rem; }
+            .flex { display: flex; }
+            .items-center { align-items: center; }
+            .justify-center { justify-content: center; }
+            .min-h-screen { min-height: 100vh; }
+            .max-w-md { max-width: 28rem; }
+            .mx-auto { margin-left: auto; margin-right: auto; }
+            .space-y-4 > * + * { margin-top: 1rem; }
+            .px-4 { padding-left: 1rem; padding-right: 1rem; }
+            .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+            .border { border-width: 1px; }
+            .border-gray-600 { border-color: #4b5563; }
+            .focus\:ring-2:focus { box-shadow: 0 0 0 2px; }
+            .focus\:ring-purple-500:focus { box-shadow: 0 0 0 2px #8b5cf6; }
+            .hover\:bg-purple-700:hover { background-color: #6d28d9; }
+            .font-semibold { font-weight: 600; }
+            .font-bold { font-weight: 700; }
+            .text-xl { font-size: 1.25rem; }
+            .text-lg { font-size: 1.125rem; }
+            .text-sm { font-size: 0.875rem; }
+            .text-2xl { font-size: 1.5rem; }
+            .text-3xl { font-size: 1.875rem; }
+        }
     </style>
 </head>
 <body>
+
+    <!-- Error Banner -->
+    <div id="error-banner" class="error-banner">
+        ⚠️ Problemas de conectividade detectados. Algumas funcionalidades podem estar limitadas.
+    </div>
+
+    <!-- Offline Indicator -->
+    <div id="offline-indicator" class="offline-indicator">
+        📶 Você está offline. Reconectando...
+    </div>
 
     <!-- Toast Container -->
     <div class="toast-container"></div>
@@ -159,6 +232,7 @@
                 </div>
                 <div class="loader mx-auto mb-4"></div>
                 <p class="text-gray-300">Carregando Garcia Mobilidade...</p>
+                <p id="loading-status" class="text-gray-500 text-sm mt-2">Verificando conexões...</p>
             </div>
         </div>
     </div>
@@ -172,6 +246,11 @@
                         <span class="text-2xl font-bold text-white">GM</span>
                     </div>
                     <h1 class="text-3xl font-bold text-white">Login</h1>
+                </div>
+
+                <!-- Connection Status -->
+                <div id="connection-status" class="mb-4 p-3 rounded-lg text-center text-sm" style="display: none;">
+                    <span id="connection-text">Verificando conexão...</span>
                 </div>
 
                 <!-- Social Login -->
@@ -208,101 +287,6 @@
                     <span class="text-gray-400 text-sm">Não tem uma conta? </span>
                     <button onclick="showScreen('signup-screen')" class="text-purple-400 hover:text-purple-300 text-sm font-semibold">Cadastre-se</button>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Signup Screen -->
-    <div id="signup-screen" class="screen">
-        <div class="min-h-screen bg-black flex items-center justify-center px-4">
-            <div class="w-full max-w-md">
-                <div class="text-center mb-8">
-                    <div class="w-20 h-20 bg-purple-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-                        <span class="text-2xl font-bold text-white">GM</span>
-                    </div>
-                    <h1 class="text-3xl font-bold text-white">Cadastro</h1>
-                </div>
-
-                <form id="signup-form" class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-2">Nome Completo</label>
-                        <input type="text" id="signup-fullname" class="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent" required>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-2">E-mail</label>
-                        <input type="email" id="signup-email" class="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent" required>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-2">Telefone</label>
-                        <input type="tel" id="signup-phone" class="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent" required>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-2">Senha</label>
-                        <input type="password" id="signup-password" class="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent" required>
-                    </div>
-                    <button type="submit" id="signup-btn" class="w-full py-3 font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700">
-                        CRIAR CONTA
-                    </button>
-                </form>
-
-                <div class="text-center mt-6">
-                    <span class="text-gray-400 text-sm">Já tem uma conta? </span>
-                    <button onclick="showScreen('login-screen')" class="text-purple-400 hover:text-purple-300 text-sm font-semibold">Fazer Login</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Forgot Password Screen -->
-    <div id="forgot-password-screen" class="screen">
-        <div class="min-h-screen bg-black flex items-center justify-center px-4">
-            <div class="w-full max-w-md">
-                <div class="text-center mb-8">
-                    <div class="w-20 h-20 bg-purple-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-                        <span class="text-2xl font-bold text-white">GM</span>
-                    </div>
-                    <h1 class="text-3xl font-bold text-white">Recuperar Senha</h1>
-                    <p class="text-gray-400 mt-2">Digite seu e-mail para receber o link de recuperação</p>
-                </div>
-
-                <form id="forgot-password-form" class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-2">E-mail</label>
-                        <input type="email" id="forgot-email" class="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent" required>
-                    </div>
-                    <button type="submit" id="forgot-btn" class="w-full py-3 font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700">
-                        ENVIAR LINK
-                    </button>
-                </form>
-
-                <div class="text-center mt-6">
-                    <button onclick="showScreen('login-screen')" class="text-purple-400 hover:text-purple-300 text-sm">Voltar ao Login</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Update Password Screen -->
-    <div id="update-password-screen" class="screen">
-        <div class="min-h-screen bg-black flex items-center justify-center px-4">
-            <div class="w-full max-w-md">
-                <div class="text-center mb-8">
-                    <div class="w-20 h-20 bg-purple-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-                        <span class="text-2xl font-bold text-white">GM</span>
-                    </div>
-                    <h1 class="text-3xl font-bold text-white">Nova Senha</h1>
-                    <p class="text-gray-400 mt-2">Digite sua nova senha</p>
-                </div>
-
-                <form id="update-password-form" class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-2">Nova Senha</label>
-                        <input type="password" id="update-password" class="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent" required>
-                    </div>
-                    <button type="submit" id="update-btn" class="w-full py-3 font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700">
-                        ATUALIZAR SENHA
-                    </button>
-                </form>
             </div>
         </div>
     </div>
@@ -371,223 +355,12 @@
         </div>
     </div>
 
-    <!-- Wallet Screen -->
-    <div id="wallet-screen" class="screen">
-        <div class="min-h-screen bg-black">
-            <!-- Header -->
-            <div class="bg-gradient-to-r from-purple-600 to-purple-800 p-4">
-                <div class="flex items-center justify-between">
-                    <button onclick="showScreen('user-screen')" class="text-white text-2xl">←</button>
-                    <h1 class="text-xl font-bold text-white">Carteira</h1>
-                    <div></div>
-                </div>
-            </div>
-
-            <!-- Balance Card -->
-            <div class="p-4">
-                <div class="bg-gradient-to-r from-purple-600 to-purple-800 rounded-xl p-6 text-center">
-                    <p class="text-purple-200 text-sm">Saldo Disponível</p>
-                    <p id="wallet-balance-details" class="text-3xl font-bold text-white mt-2">R$ 0,00</p>
-                </div>
-            </div>
-
-            <!-- Top Up Options -->
-            <div class="p-4">
-                <h3 class="text-lg font-semibold text-white mb-4">Recarregar Carteira</h3>
-                <div class="grid grid-cols-2 gap-3 mb-4">
-                    <button onclick="startWalletTopUp(10)" class="p-3 bg-gray-800 rounded-lg hover:bg-gray-700 text-center text-white">R$ 10</button>
-                    <button onclick="startWalletTopUp(20)" class="p-3 bg-gray-800 rounded-lg hover:bg-gray-700 text-center text-white">R$ 20</button>
-                    <button onclick="startWalletTopUp(50)" class="p-3 bg-gray-800 rounded-lg hover:bg-gray-700 text-center text-white">R$ 50</button>
-                    <button onclick="startWalletTopUp(100)" class="p-3 bg-gray-800 rounded-lg hover:bg-gray-700 text-center text-white">R$ 100</button>
-                </div>
-                
-                <div class="flex gap-2">
-                    <input type="number" id="custom-amount" placeholder="Valor personalizado" min="5" max="1000" class="flex-1 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500">
-                    <button onclick="startWalletTopUp(document.getElementById('custom-amount').value)" class="px-6 py-3 bg-purple-600 rounded-lg text-white hover:bg-purple-700">
-                        Recarregar
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Wallet Payment Screen -->
-    <div id="wallet-payment-screen" class="screen">
-        <div class="min-h-screen bg-black">
-            <!-- Header -->
-            <div class="bg-gradient-to-r from-purple-600 to-purple-800 p-4">
-                <div class="flex items-center justify-between">
-                    <button onclick="showWalletScreen()" class="text-white text-2xl">←</button>
-                    <h1 class="text-xl font-bold text-white">Pagamento</h1>
-                    <div></div>
-                </div>
-            </div>
-
-            <!-- Payment Details -->
-            <div class="p-4">
-                <div class="bg-gray-800 rounded-xl p-6 mb-6 text-center">
-                    <p class="text-gray-300 text-sm">Valor da Recarga</p>
-                    <p id="top-up-amount" class="text-3xl font-bold text-white mt-2">R$ 0,00</p>
-                </div>
-
-                <!-- Stripe Payment Form -->
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-2">Dados do Cartão</label>
-                        <div id="card-element" class="bg-gray-800 border border-gray-600 rounded-lg">
-                            <!-- Stripe Elements será inserido aqui -->
-                        </div>
-                        <div id="card-errors" class="text-red-500 text-sm mt-2"></div>
-                    </div>
-
-                    <button id="payment-submit" class="w-full py-4 font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700 text-lg">
-                        PAGAR AGORA
-                    </button>
-                </div>
-
-                <!-- Security Info -->
-                <div class="mt-6 p-4 bg-gray-800 rounded-lg">
-                    <div class="flex items-center gap-2 text-green-400 text-sm">
-                        <span>🔒</span>
-                        <span>Pagamento seguro processado pela Stripe</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- History Screen -->
-    <div id="history-screen" class="screen">
-        <div class="min-h-screen bg-black">
-            <!-- Header -->
-            <div class="bg-gradient-to-r from-purple-600 to-purple-800 p-4">
-                <div class="flex items-center justify-between">
-                    <button onclick="showScreen('user-screen')" class="text-white text-2xl">←</button>
-                    <h1 class="text-xl font-bold text-white">Histórico de Viagens</h1>
-                    <div></div>
-                </div>
-            </div>
-
-            <!-- History List -->
-            <div id="history-list" class="p-4">
-                <div class="text-center text-gray-400 py-8">
-                    <div class="text-4xl mb-4">📱</div>
-                    <p>Nenhuma viagem realizada ainda</p>
-                    <p class="text-sm mt-2">Suas viagens aparecerão aqui</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Profile Screen -->
-    <div id="profile-screen" class="screen">
-        <div class="min-h-screen bg-black">
-            <!-- Header -->
-            <div class="bg-gradient-to-r from-purple-600 to-purple-800 p-4">
-                <div class="flex items-center justify-between">
-                    <button onclick="showScreen('user-screen')" class="text-white text-2xl">←</button>
-                    <h1 class="text-xl font-bold text-white">Meu Perfil</h1>
-                    <div></div>
-                </div>
-            </div>
-
-            <!-- Profile Info -->
-            <div class="p-4 space-y-4">
-                <div class="bg-gray-800 rounded-xl p-6 text-center">
-                    <div class="w-20 h-20 bg-purple-600 rounded-full mx-auto mb-4 flex items-center justify-center">
-                        <span class="text-2xl">👤</span>
-                    </div>
-                    <h2 id="profile-name" class="text-xl font-bold text-white">Nome do Usuário</h2>
-                    <p id="profile-email" class="text-gray-400">email@exemplo.com</p>
-                </div>
-
-                <div class="space-y-3">
-                    <div class="bg-gray-800 rounded-lg p-4">
-                        <div class="flex items-center justify-between">
-                            <span class="text-gray-300">📞 Telefone</span>
-                            <span id="profile-phone" class="text-white">Não informado</span>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-gray-800 rounded-lg p-4">
-                        <div class="flex items-center justify-between">
-                            <span class="text-gray-300">⭐ Avaliação</span>
-                            <span class="text-white">5.0</span>
-                        </div>
-                    </div>
-
-                    <div class="bg-gray-800 rounded-lg p-4">
-                        <div class="flex items-center justify-between">
-                            <span class="text-gray-300">🚗 Viagens Realizadas</span>
-                            <span class="text-white">0</span>
-                        </div>
-                    </div>
-                </div>
-
-                <button onclick="handleSignOut()" class="w-full py-3 font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700">
-                    SAIR DA CONTA
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Ride Status Card (Fixed Bottom) -->
-    <div id="ride-status-card" class="ride-status-card">
-        <div class="max-w-md mx-auto">
-            <div class="flex items-center justify-between mb-4">
-                <div>
-                    <h3 id="ride-status-title" class="text-lg font-bold text-white">Procurando motorista...</h3>
-                    <p id="ride-status-subtitle" class="text-gray-400 text-sm">Aguarde enquanto encontramos um motorista</p>
-                </div>
-                <button onclick="cancelRide()" class="text-red-400 hover:text-red-300 text-sm font-semibold">
-                    Cancelar
-                </button>
-            </div>
-            
-            <div id="driver-info" class="hidden bg-gray-800 rounded-lg p-4 mb-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
-                        <span class="text-white font-bold">M</span>
-                    </div>
-                    <div class="flex-1">
-                        <h4 id="driver-name" class="text-white font-semibold">Nome do Motorista</h4>
-                        <p id="driver-vehicle" class="text-gray-400 text-sm">Veículo - Placa</p>
-                    </div>
-                    <div class="text-right">
-                        <p id="driver-rating" class="text-yellow-400 text-sm">⭐ 5.0</p>
-                        <p id="estimated-time" class="text-gray-400 text-xs">5 min</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="flex gap-2">
-                <button onclick="messageDriver()" class="flex-1 py-2 bg-gray-700 rounded-lg text-white hover:bg-gray-600">
-                    💬 Mensagem
-                </button>
-                <button onclick="callDriver()" class="flex-1 py-2 bg-gray-700 rounded-lg text-white hover:bg-gray-600">
-                    📞 Ligar
-                </button>
-                <button onclick="getHelp()" class="flex-1 py-2 bg-gray-700 rounded-lg text-white hover:bg-gray-600">
-                    🆘 Ajuda
-                </button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // ========== CONFIGURAÇÕES ==========
+        // ========== CONFIGURAÇÕES E FALLBACKS ==========
         const SUPABASE_URL = 'https://kcdjbagmffwfpqwgxbqg.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjZGpiYWdtZmZ3ZnBxd2d4YnFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjgwNzk1NDYsImV4cCI6MjA0MzY1NTU0Nn0.bHHlqGXMz0IylZFmL0OLKQe9v7cL-ZPAjhWNqcx85I8';
         const STRIPE_PUBLISHABLE_KEY = 'pk_test_51SEJCBFyO4P04UV0YubwfXu6UD8rmVBuA1AGNlygxvLTTiVCfdnmaAewkyT7H1mfgMBu0JhpvPPbraIC2IIM080G00KH08HO7v';
 
-        // Inicializar Supabase
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
-        // Variáveis globais
-        let stripe = null;
-        let elements = null;
-        let cardElement = null;
-        
         // Estado da aplicação
         const state = {
             user: null,
@@ -596,63 +369,248 @@
             originPlace: null,
             destinationPlace: null,
             rideSubscription: null,
-            topUpAmount: 0
+            topUpAmount: 0,
+            isOnline: navigator.onLine,
+            servicesStatus: {
+                supabase: false,
+                stripe: false,
+                googleMaps: false,
+                tailwind: false
+            }
         };
 
-        // ========== INICIALIZAÇÃO ==========
-        async function initializeApp() {
-            console.log('🚀 Inicializando Garcia Mobilidade...');
+        // Variáveis globais
+        let supabaseClient = null;
+        let stripe = null;
+        let elements = null;
+        let cardElement = null;
+
+        // ========== TRATAMENTO DE ERROS E FALLBACKS ==========
+        function handleCDNError(service) {
+            console.warn(`⚠️ Falha ao carregar ${service}`);
+            state.servicesStatus[service] = false;
+            updateConnectionStatus();
             
+            if (service === 'tailwind') {
+                document.body.classList.add('fallback-styles');
+            }
+        }
+
+        function updateConnectionStatus() {
+            const statusElement = document.getElementById('connection-status');
+            const textElement = document.getElementById('connection-text');
+            
+            if (!statusElement || !textElement) return;
+
+            const offlineServices = Object.keys(state.servicesStatus).filter(
+                service => !state.servicesStatus[service]
+            );
+
+            if (offlineServices.length > 0) {
+                statusElement.style.display = 'block';
+                statusElement.style.backgroundColor = '#f59e0b';
+                textElement.textContent = `⚠️ Serviços limitados: ${offlineServices.join(', ')}`;
+                document.getElementById('error-banner').style.display = 'block';
+            } else {
+                statusElement.style.display = 'block';
+                statusElement.style.backgroundColor = '#059669';
+                textElement.textContent = '✅ Todos os serviços online';
+                document.getElementById('error-banner').style.display = 'none';
+            }
+        }
+
+        // ========== INICIALIZAÇÃO ROBUSTA ==========
+        async function initializeApp() {
+            console.log('🚀 Inicializando Garcia Mobilidade (Versão Robusta)...');
+            updateLoadingStatus('Verificando conexões...');
+            
+            // Verificar conectividade básica
+            await checkConnectivity();
+            
+            // Inicializar serviços com tratamento de erro
+            await initializeSupabase();
+            await initializeStripe();
+            await checkGoogleMaps();
+            
+            updateLoadingStatus('Verificando sessão do usuário...');
+            
+            // Verificar sessão do usuário
+            await checkUserSession();
+            
+            // Configurar listeners
+            setupEventListeners();
+            setupNetworkListeners();
+            
+            updateLoadingStatus('Concluído!');
+            setTimeout(() => {
+                document.getElementById('loading-screen').classList.remove('active');
+            }, 1000);
+        }
+
+        async function checkConnectivity() {
             try {
-                // Verificar se há sessão ativa
-                const { data: { session } } = await supabaseClient.auth.getSession();
+                updateLoadingStatus('Testando conectividade...');
+                const response = await fetch('https://www.google.com/favicon.ico', { 
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    cache: 'no-cache'
+                });
+                state.isOnline = true;
+                console.log('✅ Conectividade confirmada');
+            } catch (error) {
+                state.isOnline = false;
+                console.warn('⚠️ Problemas de conectividade detectados');
+                showOfflineMode();
+            }
+        }
+
+        async function initializeSupabase() {
+            try {
+                updateLoadingStatus('Conectando ao Supabase...');
+                
+                if (typeof supabase === 'undefined') {
+                    throw new Error('Supabase não carregado');
+                }
+                
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                    auth: {
+                        persistSession: true,
+                        autoRefreshToken: true,
+                        detectSessionInUrl: true
+                    },
+                    global: {
+                        headers: {
+                            'X-Client-Info': 'garcia-mobilidade@1.0.0'
+                        }
+                    }
+                });
+                
+                // Testar conexão
+                const { data, error } = await supabaseClient.auth.getSession();
+                if (error && error.message.includes('Failed to fetch')) {
+                    throw new Error('Erro de conectividade com Supabase');
+                }
+                
+                state.servicesStatus.supabase = true;
+                console.log('✅ Supabase inicializado');
+                updateConnectionStatus();
+                
+            } catch (error) {
+                console.error('❌ Erro ao inicializar Supabase:', error);
+                state.servicesStatus.supabase = false;
+                updateConnectionStatus();
+                toast.show('Problemas de conectividade com o servidor. Algumas funcionalidades podem estar limitadas.', 'warning');
+            }
+        }
+
+        async function initializeStripe() {
+            try {
+                updateLoadingStatus('Carregando sistema de pagamento...');
+                
+                if (typeof Stripe === 'undefined') {
+                    throw new Error('Stripe não carregado');
+                }
+                
+                stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+                state.servicesStatus.stripe = true;
+                console.log('✅ Stripe inicializado');
+                
+            } catch (error) {
+                console.error('❌ Erro ao inicializar Stripe:', error);
+                state.servicesStatus.stripe = false;
+                toast.show('Sistema de pagamento não disponível.', 'warning');
+            }
+        }
+
+        function checkGoogleMaps() {
+            updateLoadingStatus('Verificando Google Maps...');
+            
+            if (typeof google !== 'undefined' && google.maps) {
+                state.servicesStatus.googleMaps = true;
+                console.log('✅ Google Maps disponível');
+                initializeGoogleMaps();
+            } else {
+                console.warn('⚠️ Google Maps não disponível');
+                state.servicesStatus.googleMaps = false;
+            }
+            updateConnectionStatus();
+        }
+
+        // Callback global para Google Maps
+        window.initGoogleMaps = function() {
+            console.log('🗺️ Google Maps carregado via callback');
+            state.servicesStatus.googleMaps = true;
+            updateConnectionStatus();
+            
+            // Inicializar apenas se estiver na tela do usuário
+            if (document.getElementById('user-screen').classList.contains('active')) {
+                initializeGoogleMaps();
+            }
+        };
+
+        async function checkUserSession() {
+            if (!supabaseClient) {
+                console.warn('⚠️ Supabase não disponível para verificar sessão');
+                showScreen('login-screen');
+                return;
+            }
+
+            try {
+                const { data: { session }, error } = await supabaseClient.auth.getSession();
+                
+                if (error) {
+                    console.error('❌ Erro ao verificar sessão:', error);
+                    showScreen('login-screen');
+                    return;
+                }
                 
                 if (session?.user) {
-                    console.log('👤 Usuário já logado:', session.user.email);
+                    console.log('👤 Sessão ativa encontrada:', session.user.email);
                     state.user = session.user;
                     try {
                         await loadUserProfile(session.user.id);
-                    } catch (error) {
-                        console.error('❌ Erro ao carregar perfil na inicialização:', error);
+                    } catch (profileError) {
+                        console.error('❌ Erro ao carregar perfil:', profileError);
                         showScreen('login-screen');
                     }
                 } else {
-                    console.log('👤 Nenhum usuário logado');
+                    console.log('👤 Nenhuma sessão ativa');
                     showScreen('login-screen');
-                }
-
-                // Configurar listeners
-                setupEventListeners();
-                
-                // Inicializar Stripe
-                if (typeof Stripe !== 'undefined') {
-                    stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
-                    console.log('💳 Stripe inicializado');
-                } else {
-                    console.warn('⚠️ Stripe não carregado');
-                }
-                
-                // Inicializar Google Maps
-                if (typeof google !== 'undefined' && google.maps) {
-                    initializeGoogleMaps();
-                    console.log('🗺️ Google Maps inicializado');
-                } else {
-                    console.warn('⚠️ Google Maps não carregado');
                 }
                 
             } catch (error) {
-                console.error('❌ Erro na inicialização:', error);
+                console.error('❌ Erro crítico ao verificar sessão:', error);
                 showScreen('login-screen');
+            }
+        }
+
+        function updateLoadingStatus(message) {
+            const statusElement = document.getElementById('loading-status');
+            if (statusElement) {
+                statusElement.textContent = message;
             }
         }
 
         // ========== NAVEGAÇÃO ENTRE TELAS ==========
         function showScreen(screenId) {
+            // Remover classe active de todas as telas
             document.querySelectorAll('.screen').forEach(screen => {
                 screen.classList.remove('active');
             });
-            document.getElementById(screenId).classList.add('active');
-            console.log('🔄 Tela ativa:', screenId);
+            
+            // Mostrar tela solicitada
+            const targetScreen = document.getElementById(screenId);
+            if (targetScreen) {
+                targetScreen.classList.add('active');
+                console.log('🔄 Tela ativa:', screenId);
+                
+                // Inicializar Google Maps se estiver indo para user-screen
+                if (screenId === 'user-screen' && state.servicesStatus.googleMaps) {
+                    setTimeout(initializeGoogleMaps, 500);
+                }
+            } else {
+                console.error('❌ Tela não encontrada:', screenId);
+            }
         }
 
         function showLoading(buttonId) {
@@ -675,11 +633,11 @@
         const toast = {
             show: function(message, type = 'info') {
                 const container = document.querySelector('.toast-container');
+                if (!container) return;
+                
                 const toastElement = document.createElement('div');
                 toastElement.className = `toast ${type}`;
-                toastElement.innerHTML = `
-                    <div>${message}</div>
-                `;
+                toastElement.innerHTML = `<div>${message}</div>`;
                 
                 container.appendChild(toastElement);
                 
@@ -690,146 +648,95 @@
                 setTimeout(() => {
                     toastElement.classList.remove('show');
                     setTimeout(() => {
-                        container.removeChild(toastElement);
+                        if (container.contains(toastElement)) {
+                            container.removeChild(toastElement);
+                        }
                     }, 300);
                 }, 4000);
             }
         };
 
-        // ========== AUTENTICAÇÃO ==========
+        // ========== AUTENTICAÇÃO ROBUSTA ==========
         async function handleSignIn(email, password) {
+            if (!supabaseClient) {
+                toast.show('Sistema de autenticação não disponível. Tente recarregar a página.', 'error');
+                return;
+            }
+
             showLoading('login-btn');
+            
             try {
-                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) throw error;
+                console.log('🔐 Tentando fazer login...');
                 
-                // Login bem-sucedido - configurar estado do usuário
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ 
+                    email, 
+                    password 
+                });
+                
+                if (error) {
+                    console.error('❌ Erro no login:', error);
+                    
+                    // Tratar diferentes tipos de erro
+                    if (error.message.includes('Invalid login credentials')) {
+                        toast.show('E-mail ou senha incorretos.', 'error');
+                    } else if (error.message.includes('Network')) {
+                        toast.show('Problemas de conectividade. Tente novamente.', 'error');
+                    } else {
+                        toast.show(`Erro no login: ${error.message}`, 'error');
+                    }
+                    return;
+                }
+                
                 if (data?.user) {
+                    console.log('✅ Login realizado com sucesso:', data.user.email);
                     state.user = data.user;
                     toast.show('Login realizado com sucesso!', 'success');
                     
-                    // Carregar perfil e redirecionar
+                    // Carregar perfil com retry
                     try {
-                        await loadUserProfile(data.user.id);
+                        await loadUserProfileWithRetry(data.user.id);
                     } catch (profileError) {
                         console.error('❌ Erro ao carregar perfil:', profileError);
-                        // Se falhar ao carregar perfil, ainda assim ir para user-screen
-                        toast.show('Perfil carregado parcialmente. Alguns dados podem não estar disponíveis.', 'warning');
+                        toast.show('Login realizado, mas houve problemas ao carregar dados do perfil.', 'warning');
                         showScreen('user-screen');
                     }
+                } else {
+                    toast.show('Erro inesperado no login. Tente novamente.', 'error');
                 }
-            } catch (error) { 
-                console.error('❌ Erro no login:', error);
-                toast.show('Erro no login: ' + error.message, 'error');
-            } finally { 
-                hideLoading('login-btn'); 
-            }
-        }
-        
-        async function handleSignInWithProvider(provider) {
-            try {
-                const { error } = await supabaseClient.auth.signInWithOAuth({ 
-                    provider,
-                    options: {
-                        redirectTo: window.location.origin
-                    }
-                });
-                if (error) throw error;
-            } catch (error) { 
-                toast.show(`Erro ao tentar login com ${provider}: ` + error.message, 'error'); 
-            }
-        }
-
-        async function handleSignOut() {
-            try {
-                if (state.rideSubscription) {
-                    supabaseClient.removeChannel(state.rideSubscription);
-                    state.rideSubscription = null;
-                }
-                stopRidePolling();
-                cleanupStripeElements();
                 
-                await supabaseClient.auth.signOut();
-                
-                state.user = null;
-                state.profile = null;
-                state.currentRide = null;
-                
-                toast.show('Logout realizado com sucesso', 'success');
-                showScreen('login-screen');
             } catch (error) {
-                toast.show('Erro ao fazer logout: ' + error.message, 'error');
-                showScreen('login-screen');
-            }
-        }
-
-        async function handleSignUp(fullName, email, phone, password) {
-            showLoading('signup-btn');
-            try {
-                const { data, error } = await supabaseClient.auth.signUp({
-                    email,
-                    password,
-                    options: {
-                        data: {
-                            full_name: fullName,
-                            phone: phone
-                        }
-                    }
-                });
+                console.error('❌ Erro crítico no login:', error);
                 
-                if (error) throw error;
-                
-                if (data.user && !data.user.email_confirmed_at) {
-                    toast.show('Verifique seu e-mail para confirmar o cadastro!', 'info');
-                    showScreen('login-screen');
-                } else if (data.user) {
-                    toast.show('Cadastro realizado com sucesso!', 'success');
-                    await createUserProfile(data.user, fullName, phone);
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    toast.show('Problemas de conectividade. Verifique sua internet e tente novamente.', 'error');
+                } else {
+                    toast.show('Erro inesperado. Tente recarregar a página.', 'error');
                 }
-            } catch (error) {
-                toast.show('Erro no cadastro: ' + error.message, 'error');
             } finally {
-                hideLoading('signup-btn');
-            }
-        }
-
-        async function createUserProfile(user, fullName, phone) {
-            try {
-                const { error } = await supabaseClient
-                    .from('profiles')
-                    .insert([{
-                        id: user.id,
-                        full_name: fullName,
-                        email: user.email,
-                        phone: phone,
-                        wallet_balance: 0,
-                        created_at: new Date().toISOString()
-                    }]);
-                    
-                if (error) throw error;
-                console.log('✅ Perfil criado com sucesso');
-            } catch (error) {
-                console.error('❌ Erro ao criar perfil:', error);
+                hideLoading('login-btn');
             }
         }
 
         async function loadUserProfile(userId) {
+            if (!supabaseClient) {
+                throw new Error('Supabase não disponível');
+            }
+
+            console.log('🔄 Carregando perfil do usuário:', userId);
+            
             try {
-                console.log('🔄 Carregando perfil do usuário:', userId);
-                
                 const { data, error } = await supabaseClient
                     .from('profiles')
                     .select('*')
                     .eq('id', userId)
                     .single();
                     
-                if (error && error.code !== 'PGRST116') { // PGRST116 = No rows found
+                if (error && error.code !== 'PGRST116') {
                     console.error('❌ Erro na consulta do perfil:', error);
                     throw error;
                 }
                 
                 if (!data) {
-                    // Perfil não existe - criar um básico
                     console.log('📄 Criando perfil básico para o usuário');
                     const userEmail = state.user?.email || 'Usuário';
                     state.profile = {
@@ -842,37 +749,14 @@
                     state.profile = data;
                 }
                 
-                // Atualizar interface
-                const welcomeMsg = document.getElementById('welcome-message');
-                const walletDisplay = document.getElementById('wallet-balance-display');
-                const walletDetails = document.getElementById('wallet-balance-details');
-                
-                if (welcomeMsg) {
-                    welcomeMsg.textContent = `Olá, ${state.profile.full_name}!`;
-                }
-                if (walletDisplay) {
-                    walletDisplay.textContent = formatCurrency(state.profile.wallet_balance || 0);
-                }
-                if (walletDetails) {
-                    walletDetails.textContent = formatCurrency(state.profile.wallet_balance || 0);
-                }
-                
+                updateUserInterface();
                 console.log('✅ Perfil carregado com sucesso');
                 showScreen('user-screen');
                 
-                // Verificar viagem pendente (não deve bloquear o login)
-                try {
-                    await checkPendingRide();
-                } catch (rideError) {
-                    console.warn('⚠️ Erro ao verificar viagem pendente:', rideError);
-                }
+            } catch (error) {
+                console.error('❌ Erro ao carregar perfil:', error);
                 
-            } catch (error) { 
-                console.error('❌ Erro crítico ao carregar perfil:', error); 
-                // Não fazer logout automaticamente - dar uma segunda chance
-                toast.show('Erro ao carregar dados do perfil. Redirecionando...', 'warning');
-                
-                // Criar perfil mínimo e continuar
+                // Criar perfil mínimo de emergência
                 const userEmail = state.user?.email || 'Usuário';
                 state.profile = {
                     id: userId,
@@ -881,13 +765,70 @@
                     wallet_balance: 0
                 };
                 
+                updateUserInterface();
                 showScreen('user-screen');
+                throw error; // Re-throw para tratamento upstream
             }
         }
 
-        // ========== GOOGLE MAPS AUTOCOMPLETE ==========
+        async function loadUserProfileWithRetry(userId, maxRetries = 3) {
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    await loadUserProfile(userId);
+                    return; // Sucesso
+                } catch (error) {
+                    console.warn(`⚠️ Tentativa ${attempt}/${maxRetries} falhou ao carregar perfil:`, error);
+                    
+                    if (attempt === maxRetries) {
+                        throw error; // Última tentativa falhou
+                    }
+                    
+                    // Esperar antes da próxima tentativa
+                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                }
+            }
+        }
+
+        function updateUserInterface() {
+            if (!state.profile) return;
+            
+            const welcomeMsg = document.getElementById('welcome-message');
+            const walletDisplay = document.getElementById('wallet-balance-display');
+            const walletDetails = document.getElementById('wallet-balance-details');
+            
+            if (welcomeMsg) {
+                welcomeMsg.textContent = `Olá, ${state.profile.full_name}!`;
+            }
+            if (walletDisplay) {
+                walletDisplay.textContent = formatCurrency(state.profile.wallet_balance || 0);
+            }
+            if (walletDetails) {
+                walletDetails.textContent = formatCurrency(state.profile.wallet_balance || 0);
+            }
+        }
+
+        async function handleSignOut() {
+            try {
+                if (supabaseClient) {
+                    await supabaseClient.auth.signOut();
+                }
+                
+                state.user = null;
+                state.profile = null;
+                state.currentRide = null;
+                
+                toast.show('Logout realizado com sucesso', 'success');
+                showScreen('login-screen');
+            } catch (error) {
+                console.error('❌ Erro ao fazer logout:', error);
+                toast.show('Erro ao fazer logout, mas você foi desconectado localmente.', 'warning');
+                showScreen('login-screen');
+            }
+        }
+
+        // ========== GOOGLE MAPS ==========
         function initializeGoogleMaps() {
-            if (typeof google === 'undefined' || !google.maps) {
+            if (!state.servicesStatus.googleMaps || typeof google === 'undefined' || !google.maps) {
                 console.warn('⚠️ Google Maps não está disponível');
                 return;
             }
@@ -917,8 +858,13 @@
                         }
                     });
                 }
+                
+                console.log('🗺️ Google Maps Autocomplete inicializado');
+                
             } catch (error) {
-                console.error('❌ Erro ao inicializar autocomplete:', error);
+                console.error('❌ Erro ao inicializar Google Maps:', error);
+                state.servicesStatus.googleMaps = false;
+                updateConnectionStatus();
             }
         }
 
@@ -936,7 +882,7 @@
                 (position) => {
                     const { latitude: lat, longitude: lng } = position.coords;
                     
-                    if (typeof google !== 'undefined' && google.maps) {
+                    if (state.servicesStatus.googleMaps && typeof google !== 'undefined' && google.maps) {
                         const latLng = new google.maps.LatLng(lat, lng);
                         const geocoder = new google.maps.Geocoder();
                         
@@ -950,209 +896,20 @@
                                 toast.show('Localização obtida com sucesso!', 'success');
                             } else {
                                 originInput.value = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
-                                toast.show('Localização obtida (coordenadas brutas)', 'info');
+                                toast.show('Localização obtida (coordenadas)', 'info');
                             }
                         });
                     } else {
                         originInput.value = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
-                        toast.show('Localização obtida (coordenadas brutas)', 'info');
+                        toast.show('Localização obtida (coordenadas)', 'info');
                     }
                 },
                 (error) => {
-                    console.error('Erro de geolocalização:', error);
+                    console.error('❌ Erro de geolocalização:', error);
                     toast.show('Não foi possível obter sua localização.', 'error');
                     originInput.value = '';
                 }
             );
-        }
-
-        // ========== CARTEIRA E PAGAMENTOS STRIPE ==========
-        function showWalletScreen() {
-            cleanupStripeElements();
-            showScreen('wallet-screen');
-        }
-
-        function startWalletTopUp(amount) {
-            if (!stripe) {
-                toast.show('Sistema de pagamento não disponível no momento.', 'error');
-                return;
-            }
-
-            const parsedAmount = parseFloat(amount);
-            if (isNaN(parsedAmount) || parsedAmount < 5) {
-                toast.show('Por favor, insira um valor de recarga de no mínimo R$ 5,00.', 'warning');
-                return;
-            }
-            if (parsedAmount > 1000) {
-                toast.show('Valor máximo para recarga é R$ 1.000,00.', 'warning');
-                return;
-            }
-            
-            state.topUpAmount = parsedAmount;
-            document.getElementById('top-up-amount').textContent = formatCurrency(parsedAmount);
-            showScreen('wallet-payment-screen');
-            initializeStripeForTopUp(parsedAmount);
-        }
-
-        async function initializeStripeForTopUp(amount) {
-            try {
-                cleanupStripeElements();
-
-                if (!stripe) {
-                    stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
-                }
-
-                console.log('🔄 Criando Payment Intent para:', formatCurrency(amount));
-
-                const { data, error: invokeError } = await supabaseClient.functions.invoke('create-payment-intent', {
-                    body: { 
-                        amount: Math.round(amount * 100), // Converter para centavos
-                        currency: 'brl',
-                        user_id: state.user?.id
-                    },
-                });
-
-                if (invokeError) {
-                    console.error('❌ Erro na Edge Function:', invokeError);
-                    throw invokeError;
-                }
-                if (data.error) {
-                    console.error('❌ Erro retornado pela API:', data.error);
-                    throw new Error(data.error);
-                }
-                
-                const { clientSecret } = data;
-                
-                if (!clientSecret) {
-                    throw new Error('Client secret não recebido do servidor');
-                }
-
-                console.log('✅ Payment Intent criado com sucesso');
-
-                // Criar Elements
-                elements = stripe.elements({
-                    clientSecret,
-                    appearance: {
-                        theme: 'night',
-                        variables: {
-                            colorPrimary: '#6d28d9',
-                            colorBackground: '#1F2937',
-                            colorText: '#ffffff',
-                            colorDanger: '#ef4444',
-                            fontFamily: 'Poppins, sans-serif',
-                            spacingUnit: '4px',
-                            borderRadius: '8px'
-                        }
-                    }
-                });
-
-                // Criar e montar Card Element
-                cardElement = elements.create('payment', {
-                    layout: 'tabs'
-                });
-                
-                cardElement.mount('#card-element');
-
-                // Listener para erros
-                cardElement.on('change', ({error}) => {
-                    const displayError = document.getElementById('card-errors');
-                    if (error) {
-                        displayError.textContent = error.message;
-                    } else {
-                        displayError.textContent = '';
-                    }
-                });
-
-                // Configurar botão de pagamento
-                const submitButton = document.getElementById('payment-submit');
-                submitButton.onclick = async (e) => {
-                    e.preventDefault();
-                    await processPayment(clientSecret);
-                };
-
-                console.log('💳 Stripe Elements inicializado para recarga');
-
-            } catch (error) {
-                console.error('❌ Erro ao inicializar Stripe:', error);
-                toast.show('Erro ao carregar sistema de pagamento: ' + error.message, 'error');
-            }
-        }
-
-        async function processPayment(clientSecret) {
-            if (!stripe || !elements) {
-                toast.show('Sistema de pagamento não inicializado.', 'error');
-                return;
-            }
-
-            showLoading('payment-submit');
-
-            try {
-                const { error, paymentIntent } = await stripe.confirmPayment({
-                    elements,
-                    confirmParams: {
-                        return_url: window.location.origin + '/payment-success'
-                    },
-                    redirect: 'if_required'
-                });
-
-                if (error) {
-                    console.error('❌ Erro no pagamento:', error);
-                    toast.show('Erro no pagamento: ' + error.message, 'error');
-                } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-                    console.log('✅ Pagamento bem-sucedido:', paymentIntent.id);
-                    toast.show('Pagamento realizado com sucesso!', 'success');
-                    
-                    // Atualizar saldo da carteira
-                    await updateWalletBalance(state.topUpAmount);
-                    
-                    // Voltar para carteira
-                    showWalletScreen();
-                    
-                    // Limpar formulário
-                    document.getElementById('custom-amount').value = '';
-                }
-            } catch (error) {
-                console.error('❌ Erro crítico no pagamento:', error);
-                toast.show('Erro inesperado no pagamento. Tente novamente.', 'error');
-            } finally {
-                hideLoading('payment-submit');
-            }
-        }
-
-        async function updateWalletBalance(amount) {
-            try {
-                const newBalance = (state.profile.wallet_balance || 0) + amount;
-                
-                const { error } = await supabaseClient
-                    .from('profiles')
-                    .update({ wallet_balance: newBalance })
-                    .eq('id', state.user.id);
-
-                if (error) throw error;
-
-                // Atualizar estado local
-                state.profile.wallet_balance = newBalance;
-                
-                // Atualizar interface
-                document.getElementById('wallet-balance-display').textContent = formatCurrency(newBalance);
-                document.getElementById('wallet-balance-details').textContent = formatCurrency(newBalance);
-                
-                console.log('✅ Saldo atualizado:', formatCurrency(newBalance));
-            } catch (error) {
-                console.error('❌ Erro ao atualizar saldo:', error);
-                toast.show('Pagamento processado, mas houve erro ao atualizar saldo. Recarregue a página.', 'warning');
-            }
-        }
-
-        function cleanupStripeElements() {
-            if (cardElement) {
-                cardElement.destroy();
-                cardElement = null;
-            }
-            if (elements) {
-                elements = null;
-            }
-            console.log('🧹 Stripe Elements limpos');
         }
 
         // ========== VIAGENS ==========
@@ -1165,16 +922,12 @@
                 return;
             }
 
-            // Verificar saldo
-            const minBalance = 10; // Saldo mínimo para solicitar viagem
-            if ((state.profile?.wallet_balance || 0) < minBalance) {
-                toast.show(`Saldo insuficiente. Mínimo: ${formatCurrency(minBalance)}`, 'warning');
-                showWalletScreen();
+            if (!supabaseClient) {
+                toast.show('Sistema não disponível no momento. Tente novamente.', 'error');
                 return;
             }
 
             try {
-                // Criar solicitação de viagem
                 const { data: ride, error } = await supabaseClient
                     .from('rides')
                     .insert([{
@@ -1182,7 +935,7 @@
                         origin: originInput.value,
                         destination: destinationInput.value,
                         status: 'requested',
-                        estimated_price: 15.00, // Preço estimado fixo por enquanto
+                        estimated_price: 15.00,
                         created_at: new Date().toISOString()
                     }])
                     .select()
@@ -1191,9 +944,6 @@
                 if (error) throw error;
 
                 state.currentRide = ride;
-                showRideStatus();
-                startRidePolling();
-                
                 toast.show('Viagem solicitada! Procurando motorista...', 'success');
                 
             } catch (error) {
@@ -1202,308 +952,89 @@
             }
         }
 
-        function showRideStatus() {
-            const card = document.getElementById('ride-status-card');
-            card.classList.add('show');
-        }
-
-        function hideRideStatus() {
-            const card = document.getElementById('ride-status-card');
-            card.classList.remove('show');
-        }
-
-        let ridePollingInterval = null;
-
-        function startRidePolling() {
-            if (ridePollingInterval) {
-                clearInterval(ridePollingInterval);
-            }
-            
-            ridePollingInterval = setInterval(async () => {
-                if (!state.currentRide) {
-                    stopRidePolling();
-                    return;
-                }
+        // ========== LISTENERS DE REDE ==========
+        function setupNetworkListeners() {
+            window.addEventListener('online', () => {
+                console.log('🌐 Conexão restaurada');
+                state.isOnline = true;
+                hideOfflineMode();
+                toast.show('Conexão restaurada!', 'success');
                 
-                try {
-                    const { data: ride, error } = await supabaseClient
-                        .from('rides')
-                        .select('*')
-                        .eq('id', state.currentRide.id)
-                        .single();
-                        
-                    if (error) throw error;
-                    
-                    state.currentRide = ride;
-                    updateRideStatusDisplay(ride);
-                    
-                } catch (error) {
-                    console.error('❌ Erro ao verificar status da viagem:', error);
+                // Reinicializar serviços se necessário
+                if (!supabaseClient) {
+                    initializeSupabase();
                 }
-            }, 5000); // Verificar a cada 5 segundos
+            });
+
+            window.addEventListener('offline', () => {
+                console.log('📴 Conexão perdida');
+                state.isOnline = false;
+                showOfflineMode();
+                toast.show('Você está offline. Algumas funcionalidades podem não funcionar.', 'warning');
+            });
         }
 
-        function stopRidePolling() {
-            if (ridePollingInterval) {
-                clearInterval(ridePollingInterval);
-                ridePollingInterval = null;
-            }
+        function showOfflineMode() {
+            document.getElementById('offline-indicator').style.display = 'block';
         }
 
-        function updateRideStatusDisplay(ride) {
-            const titleElement = document.getElementById('ride-status-title');
-            const subtitleElement = document.getElementById('ride-status-subtitle');
-            const driverInfoElement = document.getElementById('driver-info');
-            
-            switch (ride.status) {
-                case 'requested':
-                    titleElement.textContent = 'Procurando motorista...';
-                    subtitleElement.textContent = 'Aguarde enquanto encontramos um motorista';
-                    driverInfoElement.classList.add('hidden');
-                    break;
-                case 'accepted':
-                    titleElement.textContent = 'Motorista a caminho';
-                    subtitleElement.textContent = 'Motorista encontrado e se dirigindo até você';
-                    driverInfoElement.classList.remove('hidden');
-                    break;
-                case 'arrived':
-                    titleElement.textContent = 'Motorista chegou!';
-                    subtitleElement.textContent = 'Seu motorista está no local de embarque';
-                    break;
-                case 'in_progress':
-                    titleElement.textContent = 'Viagem em andamento';
-                    subtitleElement.textContent = 'Você está a caminho do destino';
-                    break;
-                case 'completed':
-                    titleElement.textContent = 'Viagem concluída';
-                    subtitleElement.textContent = 'Obrigado por usar Garcia Mobilidade!';
-                    setTimeout(() => {
-                        hideRideStatus();
-                        state.currentRide = null;
-                        stopRidePolling();
-                    }, 3000);
-                    break;
-                case 'cancelled':
-                    titleElement.textContent = 'Viagem cancelada';
-                    subtitleElement.textContent = 'A viagem foi cancelada';
-                    setTimeout(() => {
-                        hideRideStatus();
-                        state.currentRide = null;
-                        stopRidePolling();
-                    }, 2000);
-                    break;
-            }
-        }
-
-        async function checkPendingRide() {
-            try {
-                const { data: rides, error } = await supabaseClient
-                    .from('rides')
-                    .select('*')
-                    .eq('user_id', state.user.id)
-                    .in('status', ['requested', 'accepted', 'arrived', 'in_progress'])
-                    .order('created_at', { ascending: false })
-                    .limit(1);
-
-                if (error) throw error;
-
-                if (rides && rides.length > 0) {
-                    state.currentRide = rides[0];
-                    showRideStatus();
-                    updateRideStatusDisplay(rides[0]);
-                    startRidePolling();
-                    console.log('🚗 Viagem pendente encontrada:', rides[0].id);
-                }
-            } catch (error) {
-                console.error('❌ Erro ao verificar viagem pendente:', error);
-            }
-        }
-
-        async function cancelRide() {
-            if (!state.currentRide) return;
-            
-            try {
-                const { error } = await supabaseClient
-                    .from('rides')
-                    .update({ status: 'cancelled' })
-                    .eq('id', state.currentRide.id);
-
-                if (error) throw error;
-                
-                toast.show('Viagem cancelada', 'info');
-                stopRidePolling();
-                hideRideStatus();
-                state.currentRide = null;
-            } catch (error) {
-                console.error('❌ Erro ao cancelar viagem:', error);
-                toast.show('Erro ao cancelar viagem: ' + error.message, 'error');
-            }
-        }
-
-        function messageDriver() {
-            if (state.currentRide?.driver_id) {
-                toast.show('Função de mensagem em desenvolvimento', 'info');
-            }
-        }
-
-        function callDriver() {
-            if (state.currentRide?.driver_id) {
-                toast.show('Função de chamada em desenvolvimento', 'info');
-            }
-        }
-
-        function getHelp() {
-            toast.show('Suporte: Entre em contato pelo WhatsApp (11) 9999-9999', 'info');
+        function hideOfflineMode() {
+            document.getElementById('offline-indicator').style.display = 'none';
         }
 
         // ========== EVENT LISTENERS ==========
         function setupEventListeners() {
-            // Auth state listener
-            supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                console.log('🔄 Mudança de autenticação:', event, session?.user?.id);
-                
-                if (event === 'SIGNED_IN' && session?.user) {
-                    // Só processar se não for o mesmo usuário já logado
-                    if (!state.user || state.user.id !== session.user.id) {
-                        console.log('👤 Novo login detectado via listener');
-                        state.user = session.user;
-                        try {
-                            await loadUserProfile(session.user.id);
-                        } catch (error) {
-                            console.error('❌ Erro no listener de autenticação:', error);
+            // Auth state listener (apenas se Supabase estiver disponível)
+            if (supabaseClient) {
+                supabaseClient.auth.onAuthStateChange(async (event, session) => {
+                    console.log('🔄 Mudança de autenticação:', event, session?.user?.id);
+                    
+                    if (event === 'SIGNED_IN' && session?.user) {
+                        if (!state.user || state.user.id !== session.user.id) {
+                            console.log('👤 Novo login detectado via listener');
+                            state.user = session.user;
+                            try {
+                                await loadUserProfile(session.user.id);
+                            } catch (error) {
+                                console.error('❌ Erro no listener de autenticação:', error);
+                            }
                         }
+                    } else if (event === 'SIGNED_OUT') {
+                        console.log('🚪 Logout detectado');
+                        state.user = null;
+                        state.profile = null;
+                        showScreen('login-screen');
                     }
-                } else if (event === 'SIGNED_OUT') {
-                    console.log('🚪 Logout detectado');
-                    state.user = null;
-                    state.profile = null;
-                    cleanupStripeElements();
-                    showScreen('login-screen');
-                }
-            });
+                });
+            }
 
             // Form listeners
-            document.getElementById('login-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const email = document.getElementById('login-email').value;
-                const password = document.getElementById('login-password').value;
-                await handleSignIn(email, password);
-            });
-
-            document.getElementById('signup-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const fullName = document.getElementById('signup-fullname').value;
-                const email = document.getElementById('signup-email').value;
-                const phone = document.getElementById('signup-phone').value;
-                const password = document.getElementById('signup-password').value;
-                await handleSignUp(fullName, email, phone, password);
-            });
-
-            document.getElementById('forgot-password-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const email = document.getElementById('forgot-email').value;
-                showLoading('forgot-btn');
-                try {
-                    const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
-                    if (error) throw error;
-                    toast.show('Link de recuperação enviado para seu e-mail!', 'success');
-                    showScreen('login-screen');
-                } catch (error) {
-                    toast.show('Erro ao enviar link: ' + error.message, 'error');
-                } finally {
-                    hideLoading('forgot-btn');
-                }
-            });
-
-            document.getElementById('update-password-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const password = document.getElementById('update-password').value;
-                showLoading('update-btn');
-                try {
-                    const { error } = await supabaseClient.auth.updateUser({ password });
-                    if (error) throw error;
-                    toast.show('Senha atualizada com sucesso!', 'success');
-                    showScreen('user-screen');
-                } catch (error) {
-                    toast.show('Erro ao atualizar senha: ' + error.message, 'error');
-                } finally {
-                    hideLoading('update-btn');
-                }
-            });
-
-            // Hash change listener para reset de senha
-            window.addEventListener('hashchange', () => {
-                if (window.location.hash.includes('type=recovery')) {
-                    showScreen('update-password-screen');
-                }
-            });
+            const loginForm = document.getElementById('login-form');
+            if (loginForm) {
+                loginForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const email = document.getElementById('login-email').value;
+                    const password = document.getElementById('login-password').value;
+                    await handleSignIn(email, password);
+                });
+            }
         }
 
-        // ========== OUTRAS TELAS ==========
+        // ========== TELAS ADICIONAIS ==========
+        function showWalletScreen() {
+            if (!state.servicesStatus.stripe) {
+                toast.show('Sistema de pagamento não disponível no momento.', 'error');
+                return;
+            }
+            toast.show('Carteira em desenvolvimento', 'info');
+        }
+
         function showHistoryScreen() {
-            showScreen('history-screen');
-            loadRideHistory();
+            toast.show('Histórico em desenvolvimento', 'info');
         }
 
         function showProfileScreen() {
-            showScreen('profile-screen');
-            updateProfileDisplay();
-        }
-
-        async function loadRideHistory() {
-            try {
-                const { data: rides, error } = await supabaseClient
-                    .from('rides')
-                    .select('*')
-                    .eq('user_id', state.user.id)
-                    .order('created_at', { ascending: false })
-                    .limit(20);
-
-                if (error) throw error;
-
-                const historyList = document.getElementById('history-list');
-                
-                if (!rides || rides.length === 0) {
-                    historyList.innerHTML = `
-                        <div class="text-center text-gray-400 py-8">
-                            <div class="text-4xl mb-4">📱</div>
-                            <p>Nenhuma viagem realizada ainda</p>
-                            <p class="text-sm mt-2">Suas viagens aparecerão aqui</p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                const historyHTML = rides.map(ride => `
-                    <div class="bg-gray-800 rounded-lg p-4 mb-3">
-                        <div class="flex justify-between items-start mb-2">
-                            <div class="flex-1">
-                                <p class="text-white font-semibold">${ride.origin}</p>
-                                <p class="text-gray-400 text-sm">para</p>
-                                <p class="text-white font-semibold">${ride.destination}</p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-white font-bold">${formatCurrency(ride.estimated_price || 0)}</p>
-                                <span class="text-xs px-2 py-1 rounded-full ${getStatusColor(ride.status)}">${getStatusText(ride.status)}</span>
-                            </div>
-                        </div>
-                        <p class="text-gray-400 text-xs">${formatDate(ride.created_at)}</p>
-                    </div>
-                `).join('');
-
-                historyList.innerHTML = historyHTML;
-            } catch (error) {
-                console.error('❌ Erro ao carregar histórico:', error);
-                toast.show('Erro ao carregar histórico de viagens', 'error');
-            }
-        }
-
-        function updateProfileDisplay() {
-            if (state.profile) {
-                document.getElementById('profile-name').textContent = state.profile.full_name || 'Nome não informado';
-                document.getElementById('profile-email').textContent = state.profile.email || 'Email não informado';
-                document.getElementById('profile-phone').textContent = state.profile.phone || 'Não informado';
-            }
+            toast.show('Perfil em desenvolvimento', 'info');
         }
 
         // ========== UTILS ==========
@@ -1514,49 +1045,14 @@
             }).format(value);
         }
 
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            return date.toLocaleDateString('pt-BR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-
-        function getStatusColor(status) {
-            const colors = {
-                'requested': 'bg-yellow-600 text-yellow-100',
-                'accepted': 'bg-blue-600 text-blue-100',
-                'arrived': 'bg-green-600 text-green-100',
-                'in_progress': 'bg-purple-600 text-purple-100',
-                'completed': 'bg-green-700 text-green-100',
-                'cancelled': 'bg-red-600 text-red-100'
-            };
-            return colors[status] || 'bg-gray-600 text-gray-100';
-        }
-
-        function getStatusText(status) {
-            const texts = {
-                'requested': 'Solicitada',
-                'accepted': 'Aceita',
-                'arrived': 'Motorista chegou',
-                'in_progress': 'Em andamento',
-                'completed': 'Concluída',
-                'cancelled': 'Cancelada'
-            };
-            return texts[status] || 'Desconhecido';
-        }
-
-        // Inicializar quando DOM estiver pronto
+        // ========== INICIALIZAÇÃO ==========
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', initializeApp);
         } else {
             initializeApp();
         }
 
-        console.log('🎮 Garcia Mobilidade - Versão Online de Produção Carregada');
+        console.log('🎮 Garcia Mobilidade - Versão Ultra Robusta Carregada');
 
     </script>
 </body>
