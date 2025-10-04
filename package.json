@@ -1,0 +1,28 @@
+{
+  "name": "garcia-mobilidade-stripe-backend",
+  "version": "1.0.0",
+  "description": "Backend para processar pagamentos Stripe do Garcia Mobilidade",
+  "main": "stripe-backend.js",
+  "scripts": {
+    "start": "node stripe-backend.js",
+    "dev": "nodemon stripe-backend.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "stripe",
+    "payment",
+    "garcia",
+    "mobilidade"
+  ],
+  "author": "Garcia Mobilidade",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "stripe": "^14.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
