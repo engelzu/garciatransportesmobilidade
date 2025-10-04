@@ -668,12 +668,36 @@
         // UI HELPER FUNCTIONS
         // =============================================================================
         function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(screenId).classList.add('active');
+            console.log('📺 Mostrando tela:', screenId);
             
+            // Esconder loading screen primeiro
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen) {
+                loadingScreen.classList.remove('active');
+            }
+            
+            // Remover active de todas as screens
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            
+            // Mostrar a screen solicitada
+            const targetScreen = document.getElementById(screenId);
+            if (targetScreen) {
+                targetScreen.classList.add('active');
+                console.log('✅ Tela ativada:', screenId);
+            } else {
+                console.error('❌ Tela não encontrada:', screenId);
+            }
+            
+            // Lógica específica por tela
             if (screenId === 'homeScreen') {
                 document.getElementById('mainContainer').style.display = 'block';
                 loadWalletBalance();
+            } else if (screenId === 'login-screen' || screenId === 'signup-screen') {
+                // Garantir que o mainContainer está escondido
+                const mainContainer = document.getElementById('mainContainer');
+                if (mainContainer) {
+                    mainContainer.style.display = 'none';
+                }
             } else if (screenId === 'walletScreen') {
                 loadTransactionHistory();
             } else if (screenId === 'rideHistoryScreen') {
@@ -701,13 +725,7 @@
             window.location.reload();
         }
 
-        function setupLoadingTimeout() {
-            setTimeout(() => {
-                if (document.getElementById('loading-screen').classList.contains('active')) {
-                    document.getElementById('loading-error')?.classList.remove('hidden');
-                }
-            }, 10000);
-        }
+
 
         function handleAuthError() {
             toast.show('Erro de autenticação. Redirecionando...', 'error');
@@ -1394,18 +1412,36 @@
         function initializeApp() {
             if (state.isInitializing) return;
             state.isInitializing = true;
-            setupLoadingTimeout();
+            console.log('🚀 Inicializando aplicativo...');
             
-            supabaseClient.auth.getSession().then(({ data: { session } }) => {
+            // Timeout de segurança - se demorar mais de 5 segundos, mostra login
+            const safetyTimeout = setTimeout(() => {
+                console.warn('⏰ Timeout de inicialização - forçando tela de login');
+                showScreen('login-screen');
+                state.isInitializing = false;
+            }, 5000);
+            
+            supabaseClient.auth.getSession().then(({ data: { session }, error }) => {
+                clearTimeout(safetyTimeout);
+                
+                if (error) {
+                    console.error("❌ Erro ao verificar sessão:", error);
+                    showScreen('login-screen');
+                    return;
+                }
+                
                 if (session) {
+                    console.log('✅ Sessão encontrada:', session.user.email);
                     state.user = session.user;
                     loadUserProfile(session.user.id);
                 } else {
+                    console.log('ℹ️ Nenhuma sessão ativa - mostrando login');
                     showScreen('login-screen');
                 }
             }).catch(error => {
-                console.error("❌ Erro ao verificar sessão:", error);
-                handleAuthError();
+                clearTimeout(safetyTimeout);
+                console.error("❌ Erro crítico ao verificar sessão:", error);
+                showScreen('login-screen');
             }).finally(() => { 
                 state.isInitializing = false; 
             });
