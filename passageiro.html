@@ -1025,34 +1025,50 @@
             try {
                 toast.show('Redirecionando para pagamento...', 'info');
                 
-                // OPÇÃO 1: Usar backend (RECOMENDADO PARA PRODUÇÃO)
-                // Detecta automaticamente se está no Vercel ou localhost
-                const isVercel = window.location.hostname.includes('vercel.app');
-                const BACKEND_URL = isVercel ? window.location.origin : 'http://localhost:3000';
+                // CORREÇÃO: Sempre usar o domínio atual para o backend
+                const BACKEND_URL = window.location.origin;
                 
                 console.log('🌐 Backend URL:', BACKEND_URL);
                 console.log('📍 Hostname:', window.location.hostname);
-                console.log('🔍 Is Vercel?', isVercel);
+                console.log('🔍 Full URL:', `${BACKEND_URL}/api/create-checkout-session`);
+                
+                const requestData = {
+                    amount: parseFloat(amount),
+                    userId: state.user.id,
+                    userEmail: state.user.email || state.profile?.email || 'usuario@exemplo.com'
+                };
+                
+                console.log('📤 Enviando dados:', requestData);
                 
                 const response = await fetch(`${BACKEND_URL}/api/create-checkout-session`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
-                    body: JSON.stringify({
-                        amount: parseFloat(amount),
-                        userId: state.user.id,
-                        userEmail: state.user.email
-                    })
+                    body: JSON.stringify(requestData)
                 });
 
+                console.log('📥 Response status:', response.status);
+                console.log('📥 Response headers:', [...response.headers.entries()]);
+
                 if (!response.ok) {
-                    throw new Error('Erro ao criar sessão de pagamento');
+                    const errorText = await response.text();
+                    console.error('❌ Response error:', errorText);
+                    throw new Error(`Erro ${response.status}: ${errorText}`);
                 }
 
-                const { sessionId, url } = await response.json();
+                const responseData = await response.json();
+                console.log('✅ Response data:', responseData);
+
+                const { sessionId, url } = responseData;
+                
+                if (!sessionId) {
+                    throw new Error('Session ID não recebido do servidor');
+                }
                 
                 // Redirecionar para o Stripe Checkout
+                console.log('🔄 Redirecionando para Stripe...');
                 const result = await stripe.redirectToCheckout({ sessionId });
 
                 if (result.error) {
@@ -1060,8 +1076,8 @@
                 }
 
             } catch (error) {
-                console.error('Erro ao processar pagamento:', error);
-                toast.show('Backend não encontrado. Usando modo de teste.', 'warning');
+                console.error('❌ Erro ao processar pagamento:', error);
+                toast.show(`Erro: ${error.message}. Usando modo de teste.`, 'warning');
                 
                 // MÉTODO DE TESTE (usar quando backend não está disponível)
                 if (confirm('Backend não disponível. Deseja adicionar créditos em modo de teste?')) {
