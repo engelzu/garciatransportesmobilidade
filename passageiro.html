@@ -1026,9 +1026,15 @@
                 toast.show('Redirecionando para pagamento...', 'info');
                 
                 // OPÇÃO 1: Usar backend (RECOMENDADO PARA PRODUÇÃO)
-                const BACKEND_URL = 'http://localhost:3000'; // Altere para URL do seu backend
+                // Detecta automaticamente se está no Vercel ou localhost
+                const isVercel = window.location.hostname.includes('vercel.app');
+                const BACKEND_URL = isVercel ? window.location.origin : 'http://localhost:3000';
                 
-                const response = await fetch(`${BACKEND_URL}/create-checkout-session`, {
+                console.log('🌐 Backend URL:', BACKEND_URL);
+                console.log('📍 Hostname:', window.location.hostname);
+                console.log('🔍 Is Vercel?', isVercel);
+                
+                const response = await fetch(`${BACKEND_URL}/api/create-checkout-session`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1175,13 +1181,30 @@
         }
 
         // Verificar pagamento bem-sucedido na URL
-        function checkPaymentStatus() {
+        async function checkPaymentStatus() {
             const urlParams = new URLSearchParams(window.location.search);
             const paymentStatus = urlParams.get('payment');
-            const amount = urlParams.get('amount');
+            const sessionId = urlParams.get('session_id');
 
-            if (paymentStatus === 'success' && amount) {
-                addCreditsTest(parseFloat(amount));
+            if (paymentStatus === 'success' && sessionId) {
+                try {
+                    // Buscar detalhes do pagamento
+                    const isVercel = window.location.hostname.includes('vercel.app');
+                    const BACKEND_URL = isVercel ? window.location.origin : 'http://localhost:3000';
+                    
+                    const response = await fetch(`${BACKEND_URL}/api/check-payment?session_id=${sessionId}`);
+                    const data = await response.json();
+                    
+                    if (data.status === 'paid') {
+                        // Adicionar créditos ao banco
+                        await addCreditsTest(data.amount);
+                        toast.show(`Pagamento confirmado! R$ ${data.amount.toFixed(2)} adicionados.`, 'success');
+                    }
+                } catch (error) {
+                    console.error('Erro ao verificar pagamento:', error);
+                    toast.show('Erro ao confirmar pagamento. Entre em contato com o suporte.', 'error');
+                }
+                
                 // Limpar URL
                 window.history.replaceState({}, document.title, window.location.pathname);
             } else if (paymentStatus === 'cancel') {
