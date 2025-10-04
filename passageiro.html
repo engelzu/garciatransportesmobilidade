@@ -102,586 +102,624 @@
             animation: spin 1s linear infinite;
         }
 
-        .error-recovery {
-            background: linear-gradient(135deg, #991b1b, #dc2626);
-            border-radius: 12px;
-            padding: 16px;
-            margin: 16px 0;
-            text-align: center;
+        /* Stripe Elements Styling */
+        .StripeElement {
+            background-color: #1F2937 !important;
+            color: #ffffff !important;
+            padding: 12px !important;
+            border-radius: 8px !important;
+            border: 1px solid #4B5563 !important;
+        }
+        .StripeElement--focus {
+            border-color: #6d28d9 !important;
+            box-shadow: 0 0 0 2px rgba(109, 40, 217, 0.1) !important;
+        }
+        .StripeElement--invalid {
+            border-color: #ef4444 !important;
         }
 
-        #driver-details-panel {
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        .ride-status-card {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, #000000, #1a1a1a);
+            border-top: 2px solid #6d28d9;
+            padding: 20px;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            z-index: 50;
         }
-        #driver-details-panel.active {
-            opacity: 1;
+        .ride-status-card.show {
             transform: translateY(0);
         }
 
-        .timeline-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            opacity: 0.4;
-            transition: all 0.3s ease;
-            position: relative;
-            padding-left: 20px;
-        }
-        .timeline-item::before {
-            content: '';
-            position: absolute;
-            left: 15px;
-            top: 38px;
-            height: calc(100% - 20px);
-            border-left: 2px dashed #4b5563;
-        }
-        .timeline-item:last-child::before {
-            display: none;
-        }
-
-        .timeline-item.active { opacity: 1; }
-        .timeline-item.completed { opacity: 0.9; }
-        .timeline-item.completed .timeline-icon { 
-            background-color: #16a34a; 
-            border-color: #22c55e; 
-        }
-        .timeline-item.completed::before { 
-            border-left: 2px solid #22c55e; 
-        }
-
-        .timeline-icon {
-            width: 32px; 
-            height: 32px; 
-            border-radius: 50%; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
-            background-color: #374151; 
-            border: 2px solid #4b5563; 
-            flex-shrink: 0; 
-            z-index: 1;
-        }
-        .timeline-item.active .timeline-icon {
-            background-color: #6d28d9; 
-            border-color: #8b5cf6; 
-            animation: pulse 2s infinite;
-        }
-        
-        .timeline-text { font-weight: 500; }
-        
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(139, 92, 246, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
-        }
-
-        .StripeElement {
-            background-color: #1f2937; 
-            padding: 12px; 
-            border-radius: 8px; 
-            border: 1px solid #4b5563; 
-            transition: border-color 0.2s;
-        }
-        .StripeElement--focus { border-color: #6d28d9; }
-        .StripeElement--invalid { border-color: #ef4444; }
-        .StripeElement--complete { border-color: #22c55e; }
-        
-        #card-errors {
-            color: #ef4444; 
-            font-size: 0.875rem; 
-            margin-top: 10px; 
-            text-align: center; 
-            min-height: 1.25rem;
-        }
-        
-        /* Logo placeholder */
-        .logo-placeholder {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            font-weight: bold;
-            color: white;
-            margin: 0 auto 24px;
-            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
-        }
-
-        .user-avatar {
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, #059669, #10b981);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            color: white;
-        }
-        
-        @media (max-width: 480px) {
-            .toast { min-width: 280px; }
+        @media (max-width: 640px) {
+            .container { 
+                padding: 16px; 
+            }
+            .toast { 
+                min-width: auto; 
+                max-width: calc(100vw - 40px); 
+            }
         }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen">
+<body>
 
-    <div id="toast-container" class="toast-container"></div>
+    <!-- Toast Container -->
+    <div class="toast-container"></div>
 
-    <div id="app-container" class="w-full max-w-md mx-auto p-4">
-
-        <!-- Loading Screen -->
-        <div id="loading-screen" class="screen active text-center">
-            <div class="logo-placeholder">GM</div>
-            <div class="loader mx-auto"></div>
-            <p class="mt-4">Carregando aplicativo...</p>
-            <div id="loading-error" class="error-recovery hidden">
-                <p class="text-white mb-2">⚠️ Problema no carregamento</p>
-                <p class="text-sm text-gray-200 mb-4">Tentando resolver automaticamente...</p>
-                <button onclick="forceReload()" class="py-2 px-4 bg-white text-red-600 rounded-lg font-semibold">
-                    🔄 Recarregar App
-                </button>
-            </div>
-        </div>
-
-        <!-- Login Screen -->
-        <div id="login-screen" class="screen space-y-3">
-            <div class="logo-placeholder">GM</div>
-            <h2 class="text-3xl font-bold text-center">Login</h2>
-            
-            <div class="space-y-3 pt-2">
-                <button onclick="handleSignInWithProvider('google')" class="w-full py-3 font-semibold rounded-lg bg-white text-gray-800 hover:bg-gray-200 flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.222,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.988,36.635,44,31.023,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
-                    Entrar com Google
-                </button>
-                <button onclick="handleSignInWithProvider('facebook')" class="w-full py-3 font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#3F51B5" d="M42,37c0,2.762-2.238,5-5,5H11c-2.761,0-5-2.238-5-5V11c0-2.762,2.239-5,5-5h26c2.762,0,5,2.238,5,5V37z"></path><path fill="#FFF" d="M34.368,25H31v13h-5V25h-3v-4h3v-2.41c0-3.408,1.72-5.59,5.592-5.59H35v4h-2.287C31.104,17,31,17.6,31,18.723V21h4L34.368,25z"></path></svg>
-                    Entrar com Facebook
-                </button>
-            </div>
-            <div class="relative flex py-1 items-center">
-                <div class="flex-grow border-t border-gray-600"></div>
-                <span class="flex-shrink mx-4 text-gray-400">OU</span>
-                <div class="flex-grow border-t border-gray-600"></div>
-            </div>
-            <form id="login-form" class="space-y-3">
-                <div>
-                    <label for="login-email" class="block mb-1 text-sm font-medium">E-mail</label>
-                    <input type="email" id="login-email" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <div>
-                    <label for="login-password" class="block mb-1 text-sm font-medium">Senha</label>
-                    <input type="password" id="login-password" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <button type="submit" id="login-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENTRAR</button>
-            </form>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="screen active">
+        <div class="min-h-screen bg-black flex items-center justify-center">
             <div class="text-center">
-                <a href="#" onclick="showScreen('forgot-password-screen')" class="text-sm text-indigo-400">Esqueceu a senha?</a>
+                <div class="w-20 h-20 bg-purple-600 rounded-2xl mx-auto mb-6 flex items-center justify-center">
+                    <span class="text-2xl font-bold text-white">GM</span>
+                </div>
+                <div class="loader mx-auto mb-4"></div>
+                <p class="text-gray-300">Carregando Garcia Mobilidade...</p>
             </div>
-            <p class="text-center text-sm">Não tem uma conta? <a href="#" onclick="showScreen('signup-screen')" class="font-semibold text-indigo-400">Cadastre-se</a></p>
         </div>
-        
-        <!-- Forgot Password Screen -->
-        <div id="forgot-password-screen" class="screen space-y-4">
-            <h2 class="text-3xl font-bold text-center">Recuperar Senha</h2>
-            <p class="text-center text-gray-400">Digite seu e-mail e enviaremos um link.</p>
-            <form id="forgot-password-form" class="space-y-4">
-                <div>
-                    <label for="forgot-email" class="block mb-2 text-sm font-medium">E-mail</label>
-                    <input type="email" id="forgot-email" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <button type="submit" id="forgot-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENVIAR LINK</button>
-            </form>
-            <p class="text-center">
-                <a href="#" onclick="showScreen('login-screen')" class="font-semibold text-indigo-400">Voltar para o Login</a>
-            </p>
-        </div>
-        
-        <!-- Update Password Screen -->
-        <div id="update-password-screen" class="screen space-y-4">
-            <h2 class="text-3xl font-bold text-center">Crie uma Nova Senha</h2>
-            <form id="update-password-form" class="space-y-4">
-                <div>
-                    <label for="update-password" class="block mb-2 text-sm font-medium">Nova Senha</label>
-                    <input type="password" id="update-password" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <button type="submit" id="update-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">SALVAR NOVA SENHA</button>
-            </form>
-        </div>
-        
-        <!-- Complete Profile Screen -->
-        <div id="complete-profile-screen" class="screen space-y-4">
-            <h2 class="text-3xl font-bold text-center">Complete seu Perfil</h2>
-            <p class="text-center text-gray-400">Precisamos de mais uma informação para continuar.</p>
-            <form id="complete-profile-form" class="space-y-4">
-                <div>
-                    <label for="profile-phone" class="block mb-2 text-sm font-medium">Telefone</label>
-                    <input type="tel" id="profile-phone" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="(XX) XXXXX-XXXX" required>
-                </div>
-                <button type="submit" id="profile-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">SALVAR E CONTINUAR</button>
-            </form>
-        </div>
+    </div>
 
-        <!-- Signup Screen -->
-        <div id="signup-screen" class="screen space-y-3">
-            <h2 class="text-3xl font-bold text-center">Cadastro</h2>
-            <form id="signup-form" class="space-y-3">
-                <div>
-                    <label for="signup-fullname" class="block mb-1 text-sm font-medium">Nome Completo</label>
-                    <input type="text" id="signup-fullname" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen">
+        <div class="min-h-screen bg-black flex items-center justify-center px-4">
+            <div class="w-full max-w-md">
+                <div class="text-center mb-8">
+                    <div class="w-20 h-20 bg-purple-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                        <span class="text-2xl font-bold text-white">GM</span>
+                    </div>
+                    <h1 class="text-3xl font-bold text-white">Login</h1>
                 </div>
-                <div>
-                    <label for="signup-email" class="block mb-1 text-sm font-medium">E-mail</label>
-                    <input type="email" id="signup-email" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <div>
-                    <label for="signup-phone" class="block mb-1 text-sm font-medium">Telefone</label>
-                    <input type="tel" id="signup-phone" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="(XX) XXXXX-XXXX" required>
-                </div>
-                <div>
-                    <label for="signup-password" class="block mb-1 text-sm font-medium">Senha</label>
-                    <input type="password" id="signup-password" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
-                </div>
-                <button type="submit" id="signup-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">CADASTRAR</button>
-            </form>
-            <p class="text-center text-sm">Já tem uma conta? <a href="#" onclick="showScreen('login-screen')" class="font-semibold text-indigo-400">Faça o login</a></p>
-        </div>
 
-        <!-- User Screen -->
-        <div id="user-screen" class="screen space-y-6">
-            <div class="flex justify-between items-center">
-                <div class="flex items-center gap-3">
-                    <div class="user-avatar">👤</div>
-                    <h2 class="text-2xl font-bold">Solicitar Viagem</h2>
+                <!-- Social Login -->
+                <div class="space-y-3 mb-6">
+                    <button onclick="handleSignInWithProvider('google')" class="w-full py-3 font-semibold rounded-lg bg-white text-gray-800 hover:bg-gray-200 flex items-center justify-center gap-2">
+                        <span>🔍</span> Entrar com Google
+                    </button>
+                    <button onclick="handleSignInWithProvider('facebook')" class="w-full py-3 font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-center gap-2">
+                        <span>📘</span> Entrar com Facebook
+                    </button>
                 </div>
-                <button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700 transition-colors">Sair</button>
-            </div>
-            <p id="welcome-message" class="text-lg"></p>
-            <div id="wallet-panel" class="p-4 rounded-xl bg-gray-800 flex justify-between items-center">
-                <div>
-                    <p class="text-sm text-gray-400">Meu Saldo</p>
-                    <p id="wallet-balance-display" class="text-2xl font-bold">R$ 0,00</p>
-                </div>
-                <button onclick="showWalletScreen()" class="py-2 px-4 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors">
-                    Adicionar Saldo
-                </button>
-            </div>
-            <div id="ride-request-container">
-                <form id="ride-request-form" class="space-y-4">
+
+                <div class="text-center text-gray-400 mb-6">OU</div>
+
+                <!-- Email Login Form -->
+                <form id="login-form" class="space-y-4">
                     <div>
-                        <label for="origin" class="block mb-2 text-sm font-medium">Origem</label>
-                        <input type="text" id="origin" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="Digite o endereço de partida" required>
-                        <button type="button" onclick="useCurrentLocation()" id="location-button" class="w-full mt-2 py-2 px-4 text-sm font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 transition-colors">
-                            📍 Usar Localização Atual
-                        </button>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">E-mail</label>
+                        <input type="email" id="login-email" value="luciano.emobile.consultoria@gmail.co" class="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent" required>
                     </div>
                     <div>
-                        <label for="destination" class="block mb-2 text-sm font-medium">Destino</label>
-                        <input type="text" id="destination" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="Digite o destino" required>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Senha</label>
+                        <input type="password" id="login-password" value="123456" class="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent" required>
                     </div>
-                    <button type="submit" id="request-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">
-                        🚗 SOLICITAR AGORA
+                    <button type="submit" id="login-btn" class="w-full py-3 font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700">
+                        ENTRAR
+                    </button>
+                </form>
+
+                <div class="text-center mt-6">
+                    <button onclick="showScreen('forgot-password-screen')" class="text-purple-400 hover:text-purple-300 text-sm">Esqueceu a senha?</button>
+                </div>
+                <div class="text-center mt-4">
+                    <span class="text-gray-400 text-sm">Não tem uma conta? </span>
+                    <button onclick="showScreen('signup-screen')" class="text-purple-400 hover:text-purple-300 text-sm font-semibold">Cadastre-se</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Signup Screen -->
+    <div id="signup-screen" class="screen">
+        <div class="min-h-screen bg-black flex items-center justify-center px-4">
+            <div class="w-full max-w-md">
+                <div class="text-center mb-8">
+                    <div class="w-20 h-20 bg-purple-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                        <span class="text-2xl font-bold text-white">GM</span>
+                    </div>
+                    <h1 class="text-3xl font-bold text-white">Cadastro</h1>
+                </div>
+
+                <form id="signup-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Nome Completo</label>
+                        <input type="text" id="signup-fullname" class="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">E-mail</label>
+                        <input type="email" id="signup-email" class="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Telefone</label>
+                        <input type="tel" id="signup-phone" class="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Senha</label>
+                        <input type="password" id="signup-password" class="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent" required>
+                    </div>
+                    <button type="submit" id="signup-btn" class="w-full py-3 font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700">
+                        CRIAR CONTA
+                    </button>
+                </form>
+
+                <div class="text-center mt-6">
+                    <span class="text-gray-400 text-sm">Já tem uma conta? </span>
+                    <button onclick="showScreen('login-screen')" class="text-purple-400 hover:text-purple-300 text-sm font-semibold">Fazer Login</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forgot Password Screen -->
+    <div id="forgot-password-screen" class="screen">
+        <div class="min-h-screen bg-black flex items-center justify-center px-4">
+            <div class="w-full max-w-md">
+                <div class="text-center mb-8">
+                    <div class="w-20 h-20 bg-purple-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                        <span class="text-2xl font-bold text-white">GM</span>
+                    </div>
+                    <h1 class="text-3xl font-bold text-white">Recuperar Senha</h1>
+                    <p class="text-gray-400 mt-2">Digite seu e-mail para receber o link de recuperação</p>
+                </div>
+
+                <form id="forgot-password-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">E-mail</label>
+                        <input type="email" id="forgot-email" class="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent" required>
+                    </div>
+                    <button type="submit" id="forgot-btn" class="w-full py-3 font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700">
+                        ENVIAR LINK
+                    </button>
+                </form>
+
+                <div class="text-center mt-6">
+                    <button onclick="showScreen('login-screen')" class="text-purple-400 hover:text-purple-300 text-sm">Voltar ao Login</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Password Screen -->
+    <div id="update-password-screen" class="screen">
+        <div class="min-h-screen bg-black flex items-center justify-center px-4">
+            <div class="w-full max-w-md">
+                <div class="text-center mb-8">
+                    <div class="w-20 h-20 bg-purple-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                        <span class="text-2xl font-bold text-white">GM</span>
+                    </div>
+                    <h1 class="text-3xl font-bold text-white">Nova Senha</h1>
+                    <p class="text-gray-400 mt-2">Digite sua nova senha</p>
+                </div>
+
+                <form id="update-password-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Nova Senha</label>
+                        <input type="password" id="update-password" class="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent" required>
+                    </div>
+                    <button type="submit" id="update-btn" class="w-full py-3 font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700">
+                        ATUALIZAR SENHA
                     </button>
                 </form>
             </div>
-            <div id="ride-status-container" class="hidden space-y-4">
-                <div id="driver-details-panel" class="bg-gray-800/80 backdrop-blur-sm p-4 rounded-xl space-y-4 transition-all duration-500 transform -translate-y-4 opacity-0">
-                    <div class="flex items-center gap-4">
-                        <div class="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center shrink-0">
-                            👤
+        </div>
+    </div>
+
+    <!-- User Screen -->
+    <div id="user-screen" class="screen">
+        <div class="min-h-screen bg-black">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-purple-600 to-purple-800 p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 id="welcome-message" class="text-xl font-bold text-white">Olá, Usuário!</h1>
+                        <p class="text-purple-200 text-sm">Onde você quer ir hoje?</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm text-purple-200">Saldo</p>
+                        <p id="wallet-balance-display" class="text-lg font-bold text-white">R$ 0,00</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trip Form -->
+            <div class="p-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">De onde você está saindo?</label>
+                    <div class="relative">
+                        <input type="text" id="origin" placeholder="Digite o endereço de origem" class="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                        <button onclick="useCurrentLocation()" class="absolute right-3 top-3 text-purple-400 hover:text-purple-300">
+                            📍
+                        </button>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Para onde você vai?</label>
+                    <input type="text" id="destination" placeholder="Digite o endereço de destino" class="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                </div>
+
+                <button onclick="requestRide()" class="w-full py-4 font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700 text-lg">
+                    SOLICITAR VIAGEM
+                </button>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="p-4">
+                <h3 class="text-lg font-semibold text-white mb-4">Ações Rápidas</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="showWalletScreen()" class="p-4 bg-gray-800 rounded-lg hover:bg-gray-700 text-center">
+                        <div class="text-2xl mb-2">💳</div>
+                        <div class="text-sm text-gray-300">Carteira</div>
+                    </button>
+                    <button onclick="showHistoryScreen()" class="p-4 bg-gray-800 rounded-lg hover:bg-gray-700 text-center">
+                        <div class="text-2xl mb-2">📋</div>
+                        <div class="text-sm text-gray-300">Histórico</div>
+                    </button>
+                    <button onclick="showProfileScreen()" class="p-4 bg-gray-800 rounded-lg hover:bg-gray-700 text-center">
+                        <div class="text-2xl mb-2">👤</div>
+                        <div class="text-sm text-gray-300">Perfil</div>
+                    </button>
+                    <button onclick="handleSignOut()" class="p-4 bg-gray-800 rounded-lg hover:bg-gray-700 text-center">
+                        <div class="text-2xl mb-2">🚪</div>
+                        <div class="text-sm text-gray-300">Sair</div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wallet Screen -->
+    <div id="wallet-screen" class="screen">
+        <div class="min-h-screen bg-black">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-purple-600 to-purple-800 p-4">
+                <div class="flex items-center justify-between">
+                    <button onclick="showScreen('user-screen')" class="text-white text-2xl">←</button>
+                    <h1 class="text-xl font-bold text-white">Carteira</h1>
+                    <div></div>
+                </div>
+            </div>
+
+            <!-- Balance Card -->
+            <div class="p-4">
+                <div class="bg-gradient-to-r from-purple-600 to-purple-800 rounded-xl p-6 text-center">
+                    <p class="text-purple-200 text-sm">Saldo Disponível</p>
+                    <p id="wallet-balance-details" class="text-3xl font-bold text-white mt-2">R$ 0,00</p>
+                </div>
+            </div>
+
+            <!-- Top Up Options -->
+            <div class="p-4">
+                <h3 class="text-lg font-semibold text-white mb-4">Recarregar Carteira</h3>
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <button onclick="startWalletTopUp(10)" class="p-3 bg-gray-800 rounded-lg hover:bg-gray-700 text-center text-white">R$ 10</button>
+                    <button onclick="startWalletTopUp(20)" class="p-3 bg-gray-800 rounded-lg hover:bg-gray-700 text-center text-white">R$ 20</button>
+                    <button onclick="startWalletTopUp(50)" class="p-3 bg-gray-800 rounded-lg hover:bg-gray-700 text-center text-white">R$ 50</button>
+                    <button onclick="startWalletTopUp(100)" class="p-3 bg-gray-800 rounded-lg hover:bg-gray-700 text-center text-white">R$ 100</button>
+                </div>
+                
+                <div class="flex gap-2">
+                    <input type="number" id="custom-amount" placeholder="Valor personalizado" min="5" max="1000" class="flex-1 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500">
+                    <button onclick="startWalletTopUp(document.getElementById('custom-amount').value)" class="px-6 py-3 bg-purple-600 rounded-lg text-white hover:bg-purple-700">
+                        Recarregar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wallet Payment Screen -->
+    <div id="wallet-payment-screen" class="screen">
+        <div class="min-h-screen bg-black">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-purple-600 to-purple-800 p-4">
+                <div class="flex items-center justify-between">
+                    <button onclick="showWalletScreen()" class="text-white text-2xl">←</button>
+                    <h1 class="text-xl font-bold text-white">Pagamento</h1>
+                    <div></div>
+                </div>
+            </div>
+
+            <!-- Payment Details -->
+            <div class="p-4">
+                <div class="bg-gray-800 rounded-xl p-6 mb-6 text-center">
+                    <p class="text-gray-300 text-sm">Valor da Recarga</p>
+                    <p id="top-up-amount" class="text-3xl font-bold text-white mt-2">R$ 0,00</p>
+                </div>
+
+                <!-- Stripe Payment Form -->
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Dados do Cartão</label>
+                        <div id="card-element" class="bg-gray-800 border border-gray-600 rounded-lg">
+                            <!-- Stripe Elements será inserido aqui -->
                         </div>
-                        <div class="flex-1 min-w-0">
-                            <h4 id="driver-name" class="text-lg font-bold truncate">Procurando motorista...</h4>
-                            <p class="text-sm text-gray-300">
-                                <span id="driver-car">Aguarde um momento</span>
-                                <span id="driver-plate" class="font-mono ml-2"></span>
-                            </p>
+                        <div id="card-errors" class="text-red-500 text-sm mt-2"></div>
+                    </div>
+
+                    <button id="payment-submit" class="w-full py-4 font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700 text-lg">
+                        PAGAR AGORA
+                    </button>
+                </div>
+
+                <!-- Security Info -->
+                <div class="mt-6 p-4 bg-gray-800 rounded-lg">
+                    <div class="flex items-center gap-2 text-green-400 text-sm">
+                        <span>🔒</span>
+                        <span>Pagamento seguro processado pela Stripe</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Screen -->
+    <div id="history-screen" class="screen">
+        <div class="min-h-screen bg-black">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-purple-600 to-purple-800 p-4">
+                <div class="flex items-center justify-between">
+                    <button onclick="showScreen('user-screen')" class="text-white text-2xl">←</button>
+                    <h1 class="text-xl font-bold text-white">Histórico de Viagens</h1>
+                    <div></div>
+                </div>
+            </div>
+
+            <!-- History List -->
+            <div id="history-list" class="p-4">
+                <div class="text-center text-gray-400 py-8">
+                    <div class="text-4xl mb-4">📱</div>
+                    <p>Nenhuma viagem realizada ainda</p>
+                    <p class="text-sm mt-2">Suas viagens aparecerão aqui</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Screen -->
+    <div id="profile-screen" class="screen">
+        <div class="min-h-screen bg-black">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-purple-600 to-purple-800 p-4">
+                <div class="flex items-center justify-between">
+                    <button onclick="showScreen('user-screen')" class="text-white text-2xl">←</button>
+                    <h1 class="text-xl font-bold text-white">Meu Perfil</h1>
+                    <div></div>
+                </div>
+            </div>
+
+            <!-- Profile Info -->
+            <div class="p-4 space-y-4">
+                <div class="bg-gray-800 rounded-xl p-6 text-center">
+                    <div class="w-20 h-20 bg-purple-600 rounded-full mx-auto mb-4 flex items-center justify-center">
+                        <span class="text-2xl">👤</span>
+                    </div>
+                    <h2 id="profile-name" class="text-xl font-bold text-white">Nome do Usuário</h2>
+                    <p id="profile-email" class="text-gray-400">email@exemplo.com</p>
+                </div>
+
+                <div class="space-y-3">
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-300">📞 Telefone</span>
+                            <span id="profile-phone" class="text-white">Não informado</span>
                         </div>
-                        <div class="flex gap-2 shrink-0">
-                            <button id="message-driver-btn" onclick="messageDriver()" disabled class="w-10 h-10 bg-blue-600/80 hover:bg-blue-600 disabled:bg-gray-700 disabled:opacity-50 rounded-full flex items-center justify-center transition-all">
-                                💬
-                            </button>
-                            <button id="call-driver-btn" onclick="callDriver()" disabled class="w-10 h-10 bg-green-600/80 hover:bg-green-600 disabled:bg-gray-700 disabled:opacity-50 rounded-full flex items-center justify-center transition-all">
-                                📞
-                            </button>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-300">⭐ Avaliação</span>
+                            <span class="text-white">5.0</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-300">🚗 Viagens Realizadas</span>
+                            <span class="text-white">0</span>
                         </div>
                     </div>
                 </div>
-                <div id="status-timeline" class="p-4 bg-gray-800/80 backdrop-blur-sm rounded-xl space-y-3"></div>
-                <div id="trip-details" class="p-4 bg-gray-800/80 backdrop-blur-sm rounded-xl text-sm space-y-2">
-                    <p class="flex items-start gap-2"><strong class="text-green-400">🟢 Origem:</strong> <span id="trip-origin" class="flex-1">-</span></p>
-                    <p class="flex items-start gap-2"><strong class="text-red-400">🔴 Destino:</strong> <span id="trip-destination" class="flex-1">-</span></p>
-                </div>
-                <div class="flex gap-3 pt-2">
-                    <button id="cancel-ride-btn" onclick="cancelRide()" class="flex-1 py-3 font-semibold rounded-lg bg-red-600/90 hover:bg-red-600 transition-colors">
-                        ❌ CANCELAR VIAGEM
-                    </button>
-                    <button id="help-btn" onclick="getHelp()" class="py-3 px-5 font-semibold rounded-lg bg-gray-600/90 hover:bg-gray-600 transition-colors">
-                        ❓
-                    </button>
-                </div>
-            </div>
-        </div>
 
-        <!-- Wallet Screen -->
-        <div id="wallet-screen" class="screen space-y-6">
-            <div class="flex items-center gap-4">
-                <button onclick="showScreen('user-screen')" class="text-2xl">⬅️</button>
-                <h2 class="text-3xl font-bold text-center">Minha Carteira</h2>
-            </div>
-            <div class="p-6 bg-gradient-to-br from-indigo-700 to-purple-800 rounded-xl text-center">
-                <p class="text-lg text-indigo-200">Saldo Atual</p>
-                <p id="wallet-balance-details" class="font-bold text-5xl">R$ 0,00</p>
-            </div>
-            <div class="space-y-3">
-                <p class="font-semibold">Adicionar Saldo Rápido</p>
-                <div class="grid grid-cols-3 gap-3">
-                    <button onclick="startWalletTopUp(20)" class="p-3 font-semibold rounded-lg bg-gray-700 hover:bg-gray-600">R$ 20</button>
-                    <button onclick="startWalletTopUp(50)" class="p-3 font-semibold rounded-lg bg-gray-700 hover:bg-gray-600">R$ 50</button>
-                    <button onclick="startWalletTopUp(100)" class="p-3 font-semibold rounded-lg bg-gray-700 hover:bg-gray-600">R$ 100</button>
-                </div>
-            </div>
-            <div class="space-y-3">
-                <label for="custom-amount" class="font-semibold">Outro Valor</label>
-                <input type="number" id="custom-amount" min="5" step="0.01" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="Ex: 15,50">
-                <button onclick="startWalletTopUp(document.getElementById('custom-amount').value)" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">
-                    Adicionar Valor
+                <button onclick="handleSignOut()" class="w-full py-3 font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700">
+                    SAIR DA CONTA
                 </button>
             </div>
         </div>
+    </div>
 
-        <!-- Wallet Payment Screen -->
-        <div id="wallet-payment-screen" class="screen space-y-6">
-            <div class="flex items-center gap-4">
-                <button onclick="showWalletScreen()" class="text-2xl">⬅️</button>
-                <h2 class="text-3xl font-bold">Adicionar Saldo</h2>
-            </div>
-            <div class="p-4 bg-gray-800 rounded-lg text-center">
-                <p class="text-gray-400">Valor da Recarga</p>
-                <p id="top-up-amount" class="font-bold text-4xl text-green-400">R$ 0,00</p>
-            </div>
-            <form id="payment-form">
-                <label class="block mb-2 text-sm font-medium">Dados do Cartão</label>
-                <div id="card-element" class="mb-3"></div>
-                <div id="card-errors" role="alert"></div>
-                <button type="submit" id="payment-btn" class="w-full mt-6 py-3 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    💳 Pagar Agora
+    <!-- Ride Status Card (Fixed Bottom) -->
+    <div id="ride-status-card" class="ride-status-card">
+        <div class="max-w-md mx-auto">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 id="ride-status-title" class="text-lg font-bold text-white">Procurando motorista...</h3>
+                    <p id="ride-status-subtitle" class="text-gray-400 text-sm">Aguarde enquanto encontramos um motorista</p>
+                </div>
+                <button onclick="cancelRide()" class="text-red-400 hover:text-red-300 text-sm font-semibold">
+                    Cancelar
                 </button>
-            </form>
-        </div>
+            </div>
+            
+            <div id="driver-info" class="hidden bg-gray-800 rounded-lg p-4 mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
+                        <span class="text-white font-bold">M</span>
+                    </div>
+                    <div class="flex-1">
+                        <h4 id="driver-name" class="text-white font-semibold">Nome do Motorista</h4>
+                        <p id="driver-vehicle" class="text-gray-400 text-sm">Veículo - Placa</p>
+                    </div>
+                    <div class="text-right">
+                        <p id="driver-rating" class="text-yellow-400 text-sm">⭐ 5.0</p>
+                        <p id="estimated-time" class="text-gray-400 text-xs">5 min</p>
+                    </div>
+                </div>
+            </div>
 
+            <div class="flex gap-2">
+                <button onclick="messageDriver()" class="flex-1 py-2 bg-gray-700 rounded-lg text-white hover:bg-gray-600">
+                    💬 Mensagem
+                </button>
+                <button onclick="callDriver()" class="flex-1 py-2 bg-gray-700 rounded-lg text-white hover:bg-gray-600">
+                    📞 Ligar
+                </button>
+                <button onclick="getHelp()" class="flex-1 py-2 bg-gray-700 rounded-lg text-white hover:bg-gray-600">
+                    🆘 Ajuda
+                </button>
+            </div>
+        </div>
     </div>
 
     <script>
-        // ========== CONFIGURAÇÕES DE PRODUÇÃO ==========
-        const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
+        // ========== CONFIGURAÇÕES ==========
+        const SUPABASE_URL = 'https://kcdjbagmffwfpqwgxbqg.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjZGpiYWdtZmZ3ZnBxd2d4YnFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjgwNzk1NDYsImV4cCI6MjA0MzY1NTU0Nn0.bHHlqGXMz0IylZFmL0OLKQe9v7cL-ZPAjhWNqcx85I8';
         const STRIPE_PUBLISHABLE_KEY = 'pk_test_51SEJCBFyO4P04UV0YubwfXu6UD8rmVBuA1AGNlygxvLTTiVCfdnmaAewkyT7H1mfgMBu0JhpvPPbraIC2IIM080G00KH08HO7v';
+
+        // Inicializar Supabase
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
-        let supabaseClient, stripe, cardElement;
+        // Variáveis globais
+        let stripe = null;
+        let elements = null;
+        let cardElement = null;
         
-        const state = { 
-            user: null, 
-            profile: null, 
-            currentRide: null, 
-            rideSubscription: null,
-            ridePollInterval: null,
-            isInitializing: false,
+        // Estado da aplicação
+        const state = {
+            user: null,
+            profile: null,
+            currentRide: null,
             originPlace: null,
             destinationPlace: null,
-            topUpAmount: 0,
+            rideSubscription: null,
+            topUpAmount: 0
         };
 
-        let loadingTimeout = null;
-
-        // ========== FUNÇÕES DE INICIALIZAÇÃO ==========
-        function setupLoadingTimeout() {
-            loadingTimeout = setTimeout(() => {
-                document.getElementById('loading-error')?.classList.remove('hidden');
-            }, 15000);
-        }
-
-        function clearLoadingTimeout() {
-            if (loadingTimeout) clearTimeout(loadingTimeout);
-            loadingTimeout = null;
-        }
-
-        function forceReload() {
-            window.location.reload();
-        }
-
+        // ========== INICIALIZAÇÃO ==========
         async function initializeApp() {
+            console.log('🚀 Inicializando Garcia Mobilidade...');
+            
             try {
-                console.log('🚀 Iniciando Garcia Mobilidade (Versão Online)');
-                setupLoadingTimeout();
-                
-                // Inicializar Supabase
-                try {
-                    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                    console.log('✅ Supabase inicializado');
-                } catch (error) {
-                    console.error('❌ Erro ao inicializar Supabase:', error);
-                    throw new Error('Falha na conexão com o servidor');
-                }
-                
-                // Inicializar Stripe
-                try {
-                    if (typeof Stripe !== 'undefined') {
-                        stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
-                        console.log('✅ Stripe inicializado');
-                    } else {
-                        console.warn('⚠️ Stripe não disponível');
-                    }
-                } catch (error) {
-                    console.error('❌ Erro ao inicializar Stripe:', error);
-                }
-
-                // Inicializar Google Maps Autocomplete
-                initializeAutocomplete();
-                
-                // Configurar event listeners
-                setupEventListeners();
-                
-                // Verificar sessão existente
+                // Verificar se há sessão ativa
                 const { data: { session } } = await supabaseClient.auth.getSession();
+                
                 if (session?.user) {
+                    console.log('👤 Usuário já logado:', session.user.email);
                     state.user = session.user;
-                    await loadUserProfile(session.user.id);
+                    try {
+                        await loadUserProfile(session.user.id);
+                    } catch (error) {
+                        console.error('❌ Erro ao carregar perfil na inicialização:', error);
+                        showScreen('login-screen');
+                    }
                 } else {
+                    console.log('👤 Nenhum usuário logado');
                     showScreen('login-screen');
                 }
+
+                // Configurar listeners
+                setupEventListeners();
                 
-                clearLoadingTimeout();
+                // Inicializar Stripe
+                if (typeof Stripe !== 'undefined') {
+                    stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+                    console.log('💳 Stripe inicializado');
+                } else {
+                    console.warn('⚠️ Stripe não carregado');
+                }
+                
+                // Inicializar Google Maps
+                if (typeof google !== 'undefined' && google.maps) {
+                    initializeGoogleMaps();
+                    console.log('🗺️ Google Maps inicializado');
+                } else {
+                    console.warn('⚠️ Google Maps não carregado');
+                }
+                
             } catch (error) {
                 console.error('❌ Erro na inicialização:', error);
-                clearLoadingTimeout();
                 showScreen('login-screen');
-                toast.show('Erro ao carregar aplicativo: ' + error.message, 'error');
             }
         }
 
-        // ========== SISTEMA DE TOAST ==========
-        class ToastManager {
-            constructor() {
-                this.container = document.getElementById('toast-container');
-            }
-            
-            show(message, type = 'info', duration = 4000) {
-                if (!this.container) return;
-                
-                const toast = document.createElement('div');
-                toast.className = `toast ${type}`;
-                
-                const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
-                const titles = { success: 'Sucesso', error: 'Erro', warning: 'Atenção', info: 'Informação' };
-                
-                toast.innerHTML = `
-                    <div class="flex justify-between items-start">
-                        <div class="flex-1">
-                            <p class="font-medium">${icons[type]} ${titles[type]}</p>
-                            <p class="text-sm opacity-90 mt-1">${message}</p>
-                        </div>
-                        <button onclick="this.parentElement.parentElement.remove()" class="ml-3 text-white/60 hover:text-white">✕</button>
-                    </div>
-                `;
-                
-                this.container.appendChild(toast);
-                
-                setTimeout(() => toast.classList.add('show'), 100);
-                setTimeout(() => {
-                    if (toast.parentElement) {
-                        toast.classList.remove('show');
-                        setTimeout(() => toast.remove(), 300);
-                    }
-                }, duration);
-            }
-        }
-        const toast = new ToastManager();
-
-        // ========== GERENCIAMENTO DE TELAS ==========
+        // ========== NAVEGAÇÃO ENTRE TELAS ==========
         function showScreen(screenId) {
-            if (document.querySelector('.screen.active')?.id === 'wallet-payment-screen' && screenId !== 'wallet-payment-screen') {
-                cleanupStripeElements();
-            }
-            
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(screenId)?.classList.add('active');
-            clearLoadingTimeout();
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+            console.log('🔄 Tela ativa:', screenId);
         }
 
-        function cleanupStripeElements() {
-            if (cardElement) {
-                try {
-                    cardElement.unmount();
-                    cardElement.destroy();
-                    cardElement = null;
-                    console.log('🧹 Elementos Stripe limpos');
-                } catch (e) {
-                    console.warn('⚠️ Erro ao limpar cardElement:', e);
-                    cardElement = null;
-                }
-            }
-            const cardErrors = document.getElementById('card-errors');
-            if (cardErrors) cardErrors.textContent = '';
-        }
-
-        // ========== UTILITÁRIOS ==========
         function showLoading(buttonId) {
-            const btn = document.getElementById(buttonId);
-            if(btn) {
-                btn.classList.add('btn-loading');
-                btn.disabled = true;
+            const button = document.getElementById(buttonId);
+            if (button) {
+                button.classList.add('btn-loading');
+                button.disabled = true;
             }
         }
 
         function hideLoading(buttonId) {
-            const btn = document.getElementById(buttonId);
-            if(btn) {
-                btn.classList.remove('btn-loading');
-                btn.disabled = false;
+            const button = document.getElementById(buttonId);
+            if (button) {
+                button.classList.remove('btn-loading');
+                button.disabled = false;
             }
         }
-        
-        function formatCurrency(value) {
-            const number = Number(value) || 0;
-            return `R$ ${number.toFixed(2).replace('.', ',')}`;
-        }
+
+        // ========== SISTEMA DE TOAST ==========
+        const toast = {
+            show: function(message, type = 'info') {
+                const container = document.querySelector('.toast-container');
+                const toastElement = document.createElement('div');
+                toastElement.className = `toast ${type}`;
+                toastElement.innerHTML = `
+                    <div>${message}</div>
+                `;
+                
+                container.appendChild(toastElement);
+                
+                setTimeout(() => {
+                    toastElement.classList.add('show');
+                }, 100);
+                
+                setTimeout(() => {
+                    toastElement.classList.remove('show');
+                    setTimeout(() => {
+                        container.removeChild(toastElement);
+                    }, 300);
+                }, 4000);
+            }
+        };
 
         // ========== AUTENTICAÇÃO ==========
-        async function handleSignUp(fullName, email, phone, password) {
-            showLoading('signup-btn');
-            try {
-                const { error } = await supabaseClient.auth.signUp({ 
-                    email, 
-                    password, 
-                    options: { 
-                        data: { 
-                            full_name: fullName, 
-                            phone_number: phone,
-                            user_type: 'passenger' 
-                        } 
-                    } 
-                });
-                if (error) throw error;
-                toast.show('Cadastro realizado! Verifique seu e-mail para ativar sua conta.', 'success');
-                showScreen('login-screen');
-            } catch (error) { 
-                toast.show('Erro no cadastro: ' + error.message, 'error');
-            } finally { 
-                hideLoading('signup-btn'); 
-            }
-        }
-
         async function handleSignIn(email, password) {
             showLoading('login-btn');
             try {
-                const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
                 if (error) throw error;
-                toast.show('Login realizado com sucesso!', 'success');
+                
+                // Login bem-sucedido - configurar estado do usuário
+                if (data?.user) {
+                    state.user = data.user;
+                    toast.show('Login realizado com sucesso!', 'success');
+                    
+                    // Carregar perfil e redirecionar
+                    try {
+                        await loadUserProfile(data.user.id);
+                    } catch (profileError) {
+                        console.error('❌ Erro ao carregar perfil:', profileError);
+                        // Se falhar ao carregar perfil, ainda assim ir para user-screen
+                        toast.show('Perfil carregado parcialmente. Alguns dados podem não estar disponíveis.', 'warning');
+                        showScreen('user-screen');
+                    }
+                }
             } catch (error) { 
+                console.error('❌ Erro no login:', error);
                 toast.show('Erro no login: ' + error.message, 'error');
             } finally { 
                 hideLoading('login-btn'); 
@@ -724,78 +762,169 @@
                 showScreen('login-screen');
             }
         }
-        
+
+        async function handleSignUp(fullName, email, phone, password) {
+            showLoading('signup-btn');
+            try {
+                const { data, error } = await supabaseClient.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            full_name: fullName,
+                            phone: phone
+                        }
+                    }
+                });
+                
+                if (error) throw error;
+                
+                if (data.user && !data.user.email_confirmed_at) {
+                    toast.show('Verifique seu e-mail para confirmar o cadastro!', 'info');
+                    showScreen('login-screen');
+                } else if (data.user) {
+                    toast.show('Cadastro realizado com sucesso!', 'success');
+                    await createUserProfile(data.user, fullName, phone);
+                }
+            } catch (error) {
+                toast.show('Erro no cadastro: ' + error.message, 'error');
+            } finally {
+                hideLoading('signup-btn');
+            }
+        }
+
+        async function createUserProfile(user, fullName, phone) {
+            try {
+                const { error } = await supabaseClient
+                    .from('profiles')
+                    .insert([{
+                        id: user.id,
+                        full_name: fullName,
+                        email: user.email,
+                        phone: phone,
+                        wallet_balance: 0,
+                        created_at: new Date().toISOString()
+                    }]);
+                    
+                if (error) throw error;
+                console.log('✅ Perfil criado com sucesso');
+            } catch (error) {
+                console.error('❌ Erro ao criar perfil:', error);
+            }
+        }
+
         async function loadUserProfile(userId) {
             try {
+                console.log('🔄 Carregando perfil do usuário:', userId);
+                
                 const { data, error } = await supabaseClient
                     .from('profiles')
                     .select('*')
                     .eq('id', userId)
                     .single();
                     
-                if (error) throw error;
-                
-                if (!data) {
-                    console.error('Perfil não encontrado:', userId);
-                    toast.show('Não foi possível carregar seu perfil.', 'error');
-                    return handleSignOut();
+                if (error && error.code !== 'PGRST116') { // PGRST116 = No rows found
+                    console.error('❌ Erro na consulta do perfil:', error);
+                    throw error;
                 }
                 
-                state.profile = data;
-                document.getElementById('welcome-message').textContent = `Olá, ${state.profile.full_name}!`;
-                document.getElementById('wallet-balance-display').textContent = formatCurrency(state.profile.wallet_balance || 0);
-                document.getElementById('wallet-balance-details').textContent = formatCurrency(state.profile.wallet_balance || 0);
+                if (!data) {
+                    // Perfil não existe - criar um básico
+                    console.log('📄 Criando perfil básico para o usuário');
+                    const userEmail = state.user?.email || 'Usuário';
+                    state.profile = {
+                        id: userId,
+                        full_name: userEmail.split('@')[0],
+                        email: userEmail,
+                        wallet_balance: 0
+                    };
+                } else {
+                    state.profile = data;
+                }
+                
+                // Atualizar interface
+                const welcomeMsg = document.getElementById('welcome-message');
+                const walletDisplay = document.getElementById('wallet-balance-display');
+                const walletDetails = document.getElementById('wallet-balance-details');
+                
+                if (welcomeMsg) {
+                    welcomeMsg.textContent = `Olá, ${state.profile.full_name}!`;
+                }
+                if (walletDisplay) {
+                    walletDisplay.textContent = formatCurrency(state.profile.wallet_balance || 0);
+                }
+                if (walletDetails) {
+                    walletDetails.textContent = formatCurrency(state.profile.wallet_balance || 0);
+                }
+                
+                console.log('✅ Perfil carregado com sucesso');
+                showScreen('user-screen');
+                
+                // Verificar viagem pendente (não deve bloquear o login)
+                try {
+                    await checkPendingRide();
+                } catch (rideError) {
+                    console.warn('⚠️ Erro ao verificar viagem pendente:', rideError);
+                }
+                
+            } catch (error) { 
+                console.error('❌ Erro crítico ao carregar perfil:', error); 
+                // Não fazer logout automaticamente - dar uma segunda chance
+                toast.show('Erro ao carregar dados do perfil. Redirecionando...', 'warning');
+                
+                // Criar perfil mínimo e continuar
+                const userEmail = state.user?.email || 'Usuário';
+                state.profile = {
+                    id: userId,
+                    full_name: userEmail.split('@')[0],
+                    email: userEmail,
+                    wallet_balance: 0
+                };
                 
                 showScreen('user-screen');
-                await checkPendingRide();
-            } catch (error) { 
-                console.error('❌ Erro ao carregar perfil:', error.message); 
-                toast.show('Erro ao carregar perfil: ' + error.message, 'error');
-                setTimeout(handleSignOut, 2000);
             }
         }
 
         // ========== GOOGLE MAPS AUTOCOMPLETE ==========
-        function initializeAutocomplete() {
+        function initializeGoogleMaps() {
+            if (typeof google === 'undefined' || !google.maps) {
+                console.warn('⚠️ Google Maps não está disponível');
+                return;
+            }
+
             try {
-                if (typeof google !== 'undefined' && google.maps && google.maps.places) {
-                    const options = { 
-                        types: ['address'], 
-                        componentRestrictions: { 'country': 'br' } 
-                    };
-                    
-                    const originInput = document.getElementById('origin');
-                    const destinationInput = document.getElementById('destination');
-                    
-                    if (originInput && destinationInput) {
-                        const originAutocomplete = new google.maps.places.Autocomplete(originInput, options);
-                        originAutocomplete.addListener('place_changed', () => {
-                            state.originPlace = originAutocomplete.getPlace();
-                        });
-                        
-                        const destinationAutocomplete = new google.maps.places.Autocomplete(destinationInput, options);
-                        destinationAutocomplete.addListener('place_changed', () => {
-                            state.destinationPlace = destinationAutocomplete.getPlace();
-                        });
-                        
-                        originInput.addEventListener('input', () => { state.originPlace = null; });
-                        destinationInput.addEventListener('input', () => { state.destinationPlace = null; });
-                        
-                        console.log('✅ Google Maps Autocomplete inicializado');
-                    }
-                } else {
-                    console.warn('⚠️ Google Maps não disponível, tentando novamente...');
-                    setTimeout(initializeAutocomplete, 1000);
+                const originInput = document.getElementById('origin');
+                const destinationInput = document.getElementById('destination');
+
+                if (originInput) {
+                    const originAutocomplete = new google.maps.places.Autocomplete(originInput);
+                    originAutocomplete.addListener('place_changed', () => {
+                        const place = originAutocomplete.getPlace();
+                        if (place.geometry) {
+                            state.originPlace = place;
+                            console.log('📍 Origem selecionada:', place.formatted_address);
+                        }
+                    });
                 }
-            } catch (error) { 
-                console.error('❌ Erro ao inicializar autocomplete:', error); 
+
+                if (destinationInput) {
+                    const destinationAutocomplete = new google.maps.places.Autocomplete(destinationInput);
+                    destinationAutocomplete.addListener('place_changed', () => {
+                        const place = destinationAutocomplete.getPlace();
+                        if (place.geometry) {
+                            state.destinationPlace = place;
+                            console.log('📍 Destino selecionado:', place.formatted_address);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('❌ Erro ao inicializar autocomplete:', error);
             }
         }
 
-        // ========== GEOLOCALIZAÇÃO ==========
         function useCurrentLocation() {
             if (!navigator.geolocation) {
-                toast.show('Geolocalização não suportada pelo navegador.', 'error');
+                toast.show('Geolocalização não é suportada neste navegador.', 'error');
                 return;
             }
 
@@ -898,30 +1027,33 @@
                     throw new Error('Client secret não recebido do servidor');
                 }
 
-                console.log('✅ Client secret recebido, configurando elementos Stripe...');
+                console.log('✅ Payment Intent criado com sucesso');
 
-                const elements = stripe.elements();
-                const style = {
-                    base: { 
-                        color: '#ffffff', 
-                        fontFamily: '"Poppins", sans-serif', 
-                        fontSize: '16px', 
-                        '::placeholder': { color: '#a0aec0' } 
-                    },
-                    invalid: { 
-                        color: '#ef4444', 
-                        iconColor: '#ef4444' 
+                // Criar Elements
+                elements = stripe.elements({
+                    clientSecret,
+                    appearance: {
+                        theme: 'night',
+                        variables: {
+                            colorPrimary: '#6d28d9',
+                            colorBackground: '#1F2937',
+                            colorText: '#ffffff',
+                            colorDanger: '#ef4444',
+                            fontFamily: 'Poppins, sans-serif',
+                            spacingUnit: '4px',
+                            borderRadius: '8px'
+                        }
                     }
-                };
+                });
 
-                cardElement = elements.create('card', { 
-                    style, 
-                    hidePostalCode: true,
-                    hideIcon: false
+                // Criar e montar Card Element
+                cardElement = elements.create('payment', {
+                    layout: 'tabs'
                 });
                 
                 cardElement.mount('#card-element');
 
+                // Listener para erros
                 cardElement.on('change', ({error}) => {
                     const displayError = document.getElementById('card-errors');
                     if (error) {
@@ -931,322 +1063,259 @@
                     }
                 });
 
-                cardElement.on('ready', () => {
-                    console.log('✅ Elemento do cartão pronto');
-                });
+                // Configurar botão de pagamento
+                const submitButton = document.getElementById('payment-submit');
+                submitButton.onclick = async (e) => {
+                    e.preventDefault();
+                    await processPayment(clientSecret);
+                };
 
-                const form = document.getElementById('payment-form');
-                if (form) {
-                    form.onsubmit = null;
-                    const newForm = form.cloneNode(true);
-                    form.parentNode.replaceChild(newForm, form);
-                    
-                    newForm.addEventListener('submit', async (event) => {
-                        event.preventDefault();
-                        await handleWalletPayment(clientSecret);
-                    });
-                }
-
-                toast.show('Formulário de pagamento carregado com sucesso!', 'success');
+                console.log('💳 Stripe Elements inicializado para recarga');
 
             } catch (error) {
-                console.error("❌ Erro ao inicializar Stripe:", error);
-                let errorMessage = "Erro ao iniciar recarga: " + error.message;
-                
-                if (error.message.includes('Edge Function') || error.message.includes('FunctionsHttpError')) {
-                    errorMessage = "Servidor de pagamentos indisponível. Tente novamente em alguns instantes.";
-                } else if (error.message.includes('network')) {
-                    errorMessage = "Erro de conexão. Verifique sua internet e tente novamente.";
-                }
-                
-                toast.show(errorMessage, 'error');
-                showWalletScreen();
+                console.error('❌ Erro ao inicializar Stripe:', error);
+                toast.show('Erro ao carregar sistema de pagamento: ' + error.message, 'error');
             }
         }
 
-        async function handleWalletPayment(clientSecret) {
-            const cardErrors = document.getElementById('card-errors');
-            
-            if (!cardElement) {
-                toast.show("Erro: Elemento do cartão não inicializado", 'error');
+        async function processPayment(clientSecret) {
+            if (!stripe || !elements) {
+                toast.show('Sistema de pagamento não inicializado.', 'error');
                 return;
             }
 
-            if (!clientSecret) {
-                toast.show("Erro: Token de pagamento inválido", 'error');
-                return;
-            }
+            showLoading('payment-submit');
 
-            console.log('🔄 Iniciando processamento do pagamento...');
-
-            showLoading('payment-btn');
-            cardErrors.textContent = '';
-            
             try {
-                const cardData = await stripe.createToken(cardElement);
-                if (cardData.error) {
-                    cardErrors.textContent = cardData.error.message;
-                    throw new Error(cardData.error.message);
-                }
-
-                console.log('✅ Cartão validado, confirmando pagamento...');
-
-                const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-                    payment_method: { 
-                        card: cardElement,
-                        billing_details: {
-                            name: state.profile?.full_name || 'Cliente'
-                        }
-                    }
+                const { error, paymentIntent } = await stripe.confirmPayment({
+                    elements,
+                    confirmParams: {
+                        return_url: window.location.origin + '/payment-success'
+                    },
+                    redirect: 'if_required'
                 });
 
                 if (error) {
-                    cardErrors.textContent = error.message;
-                    console.error('❌ Erro do Stripe:', error);
-                    throw new Error(error.message);
-                }
-
-                console.log('✅ Status do pagamento:', paymentIntent.status);
-
-                if (paymentIntent.status === 'succeeded') {
-                    toast.show('Pagamento processado com sucesso! 🎉', 'success');
+                    console.error('❌ Erro no pagamento:', error);
+                    toast.show('Erro no pagamento: ' + error.message, 'error');
+                } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+                    console.log('✅ Pagamento bem-sucedido:', paymentIntent.id);
+                    toast.show('Pagamento realizado com sucesso!', 'success');
                     
-                    // Aguardar processamento do webhook
-                    setTimeout(async () => {
-                        try {
-                            await loadUserProfile(state.user.id);
-                            showScreen('user-screen');
-                            toast.show(`Saldo de ${formatCurrency(state.topUpAmount)} adicionado com sucesso!`, 'success');
-                        } catch (profileError) {
-                            console.error('❌ Erro ao recarregar perfil:', profileError);
-                            toast.show('Pagamento realizado, atualize a página para ver o saldo', 'info');
-                            showScreen('user-screen');
-                        }
-                    }, 3000);
+                    // Atualizar saldo da carteira
+                    await updateWalletBalance(state.topUpAmount);
                     
-                } else if (paymentIntent.status === 'requires_action') {
-                    toast.show('Ação adicional necessária. Siga as instruções.', 'warning');
-                } else {
-                    throw new Error('Status inesperado do pagamento: ' + paymentIntent.status);
+                    // Voltar para carteira
+                    showWalletScreen();
+                    
+                    // Limpar formulário
+                    document.getElementById('custom-amount').value = '';
                 }
-
             } catch (error) {
-                console.error("❌ Erro no pagamento:", error);
-                
-                let errorMessage = "Falha no pagamento. Tente novamente.";
-                const errorCode = error.code || error.decline_code || '';
-                
-                if (error.message.includes('card_declined') || errorCode.includes('declined')) {
-                    errorMessage = "Cartão recusado. Verifique os dados ou tente outro cartão.";
-                } else if (error.message.includes('insufficient_funds')) {
-                    errorMessage = "Saldo insuficiente no cartão.";
-                } else if (error.message.includes('incorrect_cvc')) {
-                    errorMessage = "Código de segurança (CVC) incorreto.";
-                } else if (error.message.includes('expired_card')) {
-                    errorMessage = "Cartão expirado.";
-                } else if (error.message.includes('invalid_number')) {
-                    errorMessage = "Número do cartão inválido.";
-                }
-                
-                toast.show(errorMessage, 'error');
-                
+                console.error('❌ Erro crítico no pagamento:', error);
+                toast.show('Erro inesperado no pagamento. Tente novamente.', 'error');
             } finally {
-                hideLoading('payment-btn');
+                hideLoading('payment-submit');
             }
         }
 
-        // ========== VIAGENS ==========
-        async function checkPendingRide() {
+        async function updateWalletBalance(amount) {
             try {
-                const { data, error } = await supabaseClient
-                    .from('rides')
-                    .select('*')
-                    .eq('passenger_id', state.user.id)
-                    .in('status', ['requested', 'assigned', 'accepted', 'arrived_pickup', 'in_progress'])
-                    .order('created_at', { ascending: false })
-                    .limit(1);
+                const newBalance = (state.profile.wallet_balance || 0) + amount;
+                
+                const { error } = await supabaseClient
+                    .from('profiles')
+                    .update({ wallet_balance: newBalance })
+                    .eq('id', state.user.id);
 
                 if (error) throw error;
+
+                // Atualizar estado local
+                state.profile.wallet_balance = newBalance;
                 
-                if (data && data.length > 0) {
-                    state.currentRide = data[0];
-                    showRideStatus();
-                    handleRideStateUpdate(state.currentRide);
-                    startRidePolling();
-                }
+                // Atualizar interface
+                document.getElementById('wallet-balance-display').textContent = formatCurrency(newBalance);
+                document.getElementById('wallet-balance-details').textContent = formatCurrency(newBalance);
+                
+                console.log('✅ Saldo atualizado:', formatCurrency(newBalance));
             } catch (error) {
-                console.error('❌ Erro ao verificar viagens pendentes:', error);
+                console.error('❌ Erro ao atualizar saldo:', error);
+                toast.show('Pagamento processado, mas houve erro ao atualizar saldo. Recarregue a página.', 'warning');
+            }
+        }
+
+        function cleanupStripeElements() {
+            if (cardElement) {
+                cardElement.destroy();
+                cardElement = null;
+            }
+            if (elements) {
+                elements = null;
+            }
+            console.log('🧹 Stripe Elements limpos');
+        }
+
+        // ========== VIAGENS ==========
+        async function requestRide() {
+            const originInput = document.getElementById('origin');
+            const destinationInput = document.getElementById('destination');
+            
+            if (!originInput.value || !destinationInput.value) {
+                toast.show('Por favor, preencha origem e destino.', 'warning');
+                return;
+            }
+
+            // Verificar saldo
+            const minBalance = 10; // Saldo mínimo para solicitar viagem
+            if ((state.profile?.wallet_balance || 0) < minBalance) {
+                toast.show(`Saldo insuficiente. Mínimo: ${formatCurrency(minBalance)}`, 'warning');
+                showWalletScreen();
+                return;
+            }
+
+            try {
+                // Criar solicitação de viagem
+                const { data: ride, error } = await supabaseClient
+                    .from('rides')
+                    .insert([{
+                        user_id: state.user.id,
+                        origin: originInput.value,
+                        destination: destinationInput.value,
+                        status: 'requested',
+                        estimated_price: 15.00, // Preço estimado fixo por enquanto
+                        created_at: new Date().toISOString()
+                    }])
+                    .select()
+                    .single();
+
+                if (error) throw error;
+
+                state.currentRide = ride;
+                showRideStatus();
+                startRidePolling();
+                
+                toast.show('Viagem solicitada! Procurando motorista...', 'success');
+                
+            } catch (error) {
+                console.error('❌ Erro ao solicitar viagem:', error);
+                toast.show('Erro ao solicitar viagem: ' + error.message, 'error');
             }
         }
 
         function showRideStatus() {
-            document.getElementById('ride-request-container').classList.add('hidden');
-            document.getElementById('ride-status-container').classList.remove('hidden');
+            const card = document.getElementById('ride-status-card');
+            card.classList.add('show');
         }
 
         function hideRideStatus() {
-            document.getElementById('ride-request-container').classList.remove('hidden');
-            document.getElementById('ride-status-container').classList.add('hidden');
-            resetRideStatusUI();
+            const card = document.getElementById('ride-status-card');
+            card.classList.remove('show');
         }
 
-        function resetRideStatusUI() {
-            const driverPanel = document.getElementById('driver-details-panel');
-            if (driverPanel) {
-                driverPanel.classList.remove('active');
-                driverPanel.style.opacity = '0';
-                driverPanel.style.transform = 'translateY(-1rem)';
-                document.getElementById('driver-name').textContent = 'Procurando motorista...';
-                document.getElementById('driver-car').textContent = 'Aguarde um momento';
-                document.getElementById('driver-plate').textContent = '';
-                document.getElementById('call-driver-btn').disabled = true;
-                document.getElementById('message-driver-btn').disabled = true;
-            }
-            document.getElementById('status-timeline').innerHTML = '';
-        }
-
-        function handleRideStateUpdate(ride) {
-            if (!ride || !ride.status) return;
-            
-            const status = ride.status;
-            renderTimeline(status);
-            const destination = (ride.destinations && ride.destinations[0]) || 'N/A';
-            updateTripDetails(ride.origin_address, destination);
-            
-            const cancelBtn = document.getElementById('cancel-ride-btn');
-            if (['in_progress', 'completed', 'cancelled'].includes(status)) {
-                cancelBtn.classList.add('hidden');
-            } else {
-                cancelBtn.classList.remove('hidden');
-            }
-            
-            if (ride.driver_id) {
-                loadDriverInfo(ride.driver_id);
-            } else {
-                updateDriverPanel(null, null);
-                document.getElementById('driver-details-panel').classList.add('active');
-            }
-        }
-
-        function renderTimeline(currentStatus) {
-            const timelineContainer = document.getElementById('status-timeline');
-            if (!timelineContainer) return;
-            
-            timelineContainer.innerHTML = '';
-            const statusOrder = ['requested', 'assigned', 'accepted', 'arrived_pickup', 'in_progress', 'completed'];
-            const currentIndex = statusOrder.indexOf(currentStatus);
-
-            const timelineSteps = [
-                { status: 'requested', icon: '🔍', text: 'Procurando motorista' },
-                { status: 'assigned', icon: '✅', text: 'Motorista encontrado' },
-                { status: 'accepted', icon: '🚗', text: 'Motorista no local' },
-                { status: 'arrived_pickup', icon: '📍', text: 'Viagem em andamento' },
-                { status: 'in_progress', icon: '🛣️', text: 'Viagem em progresso' },
-                { status: 'completed', icon: '🏁', text: 'Viagem concluída' }
-            ];
-
-            timelineSteps.forEach((step, index) => {
-                const item = document.createElement('div');
-                let className = 'timeline-item';
-                
-                if (index < currentIndex) {
-                    className += ' completed';
-                } else if (index === currentIndex) {
-                    className += ' active';
-                }
-                
-                item.className = className;
-                item.innerHTML = `<div class="timeline-icon">${step.icon}</div><p class="timeline-text">${step.text}</p>`;
-                timelineContainer.appendChild(item);
-            });
-        }
-
-        function updateTripDetails(origin, destination) {
-            document.getElementById('trip-origin').textContent = origin || '-';
-            document.getElementById('trip-destination').textContent = destination || '-';
-        }
-
-        function updateDriverPanel(driver, details) {
-            const driverPanel = document.getElementById('driver-details-panel');
-            if (!driverPanel) return;
-            
-            document.getElementById('driver-name').textContent = driver?.full_name || 'Motorista';
-            const carInfo = `${details?.car_model || ''} ${details?.car_color || ''}`.trim();
-            document.getElementById('driver-car').textContent = carInfo || 'Veículo';
-            document.getElementById('driver-plate').textContent = details?.license_plate || '';
-            
-            const callBtn = document.getElementById('call-driver-btn');
-            const msgBtn = document.getElementById('message-driver-btn');
-            callBtn.disabled = !driver?.phone_number;
-            msgBtn.disabled = !driver?.phone_number;
-            
-            driverPanel.classList.add('active');
-        }
-
-        async function loadDriverInfo(driverId) {
-            try {
-                const { data: driver, error: driverError } = await supabaseClient
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', driverId)
-                    .single();
-
-                if (driverError) throw driverError;
-
-                const { data: driverDetails, error: detailsError } = await supabaseClient
-                    .from('driver_details')
-                    .select('*')
-                    .eq('driver_id', driverId)
-                    .single();
-
-                if (detailsError) console.warn('Detalhes do motorista não encontrados:', detailsError);
-
-                updateDriverPanel(driver, driverDetails);
-            } catch (error) {
-                console.error('❌ Erro ao carregar informações do motorista:', error);
-            }
-        }
+        let ridePollingInterval = null;
 
         function startRidePolling() {
-            if (state.ridePollInterval) return;
+            if (ridePollingInterval) {
+                clearInterval(ridePollingInterval);
+            }
             
-            state.ridePollInterval = setInterval(async () => {
-                if (!state.currentRide) return;
+            ridePollingInterval = setInterval(async () => {
+                if (!state.currentRide) {
+                    stopRidePolling();
+                    return;
+                }
                 
                 try {
-                    const { data, error } = await supabaseClient
+                    const { data: ride, error } = await supabaseClient
                         .from('rides')
                         .select('*')
                         .eq('id', state.currentRide.id)
                         .single();
-
+                        
                     if (error) throw error;
                     
-                    if (data) {
-                        state.currentRide = data;
-                        handleRideStateUpdate(data);
-                        
-                        if (['completed', 'cancelled'].includes(data.status)) {
-                            stopRidePolling();
-                            if (data.status === 'completed') {
-                                toast.show('Viagem concluída com sucesso!', 'success');
-                            }
-                            setTimeout(() => {
-                                hideRideStatus();
-                                state.currentRide = null;
-                            }, 3000);
-                        }
-                    }
+                    state.currentRide = ride;
+                    updateRideStatusDisplay(ride);
+                    
                 } catch (error) {
-                    console.error('❌ Erro no polling da viagem:', error);
+                    console.error('❌ Erro ao verificar status da viagem:', error);
                 }
-            }, 5000);
+            }, 5000); // Verificar a cada 5 segundos
         }
 
         function stopRidePolling() {
-            if (state.ridePollInterval) {
-                clearInterval(state.ridePollInterval);
-                state.ridePollInterval = null;
+            if (ridePollingInterval) {
+                clearInterval(ridePollingInterval);
+                ridePollingInterval = null;
+            }
+        }
+
+        function updateRideStatusDisplay(ride) {
+            const titleElement = document.getElementById('ride-status-title');
+            const subtitleElement = document.getElementById('ride-status-subtitle');
+            const driverInfoElement = document.getElementById('driver-info');
+            
+            switch (ride.status) {
+                case 'requested':
+                    titleElement.textContent = 'Procurando motorista...';
+                    subtitleElement.textContent = 'Aguarde enquanto encontramos um motorista';
+                    driverInfoElement.classList.add('hidden');
+                    break;
+                case 'accepted':
+                    titleElement.textContent = 'Motorista a caminho';
+                    subtitleElement.textContent = 'Motorista encontrado e se dirigindo até você';
+                    driverInfoElement.classList.remove('hidden');
+                    break;
+                case 'arrived':
+                    titleElement.textContent = 'Motorista chegou!';
+                    subtitleElement.textContent = 'Seu motorista está no local de embarque';
+                    break;
+                case 'in_progress':
+                    titleElement.textContent = 'Viagem em andamento';
+                    subtitleElement.textContent = 'Você está a caminho do destino';
+                    break;
+                case 'completed':
+                    titleElement.textContent = 'Viagem concluída';
+                    subtitleElement.textContent = 'Obrigado por usar Garcia Mobilidade!';
+                    setTimeout(() => {
+                        hideRideStatus();
+                        state.currentRide = null;
+                        stopRidePolling();
+                    }, 3000);
+                    break;
+                case 'cancelled':
+                    titleElement.textContent = 'Viagem cancelada';
+                    subtitleElement.textContent = 'A viagem foi cancelada';
+                    setTimeout(() => {
+                        hideRideStatus();
+                        state.currentRide = null;
+                        stopRidePolling();
+                    }, 2000);
+                    break;
+            }
+        }
+
+        async function checkPendingRide() {
+            try {
+                const { data: rides, error } = await supabaseClient
+                    .from('rides')
+                    .select('*')
+                    .eq('user_id', state.user.id)
+                    .in('status', ['requested', 'accepted', 'arrived', 'in_progress'])
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+
+                if (error) throw error;
+
+                if (rides && rides.length > 0) {
+                    state.currentRide = rides[0];
+                    showRideStatus();
+                    updateRideStatusDisplay(rides[0]);
+                    startRidePolling();
+                    console.log('🚗 Viagem pendente encontrada:', rides[0].id);
+                }
+            } catch (error) {
+                console.error('❌ Erro ao verificar viagem pendente:', error);
             }
         }
 
@@ -1291,12 +1360,21 @@
         function setupEventListeners() {
             // Auth state listener
             supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                console.log('🔄 Mudança de autenticação:', event);
+                console.log('🔄 Mudança de autenticação:', event, session?.user?.id);
                 
                 if (event === 'SIGNED_IN' && session?.user) {
-                    state.user = session.user;
-                    await loadUserProfile(session.user.id);
+                    // Só processar se não for o mesmo usuário já logado
+                    if (!state.user || state.user.id !== session.user.id) {
+                        console.log('👤 Novo login detectado via listener');
+                        state.user = session.user;
+                        try {
+                            await loadUserProfile(session.user.id);
+                        } catch (error) {
+                            console.error('❌ Erro no listener de autenticação:', error);
+                        }
+                    }
                 } else if (event === 'SIGNED_OUT') {
+                    console.log('🚪 Logout detectado');
                     state.user = null;
                     state.profile = null;
                     cleanupStripeElements();
@@ -1353,70 +1431,123 @@
                 }
             });
 
-            document.getElementById('complete-profile-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const phone = document.getElementById('profile-phone').value;
-                showLoading('profile-btn');
-                try {
-                    const { error } = await supabaseClient
-                        .from('profiles')
-                        .update({ phone_number: phone })
-                        .eq('id', state.user.id);
-                    if (error) throw error;
-                    toast.show('Perfil completado!', 'success');
-                    await loadUserProfile(state.user.id);
-                } catch (error) {
-                    toast.show('Erro ao atualizar perfil: ' + error.message, 'error');
-                } finally {
-                    hideLoading('profile-btn');
-                }
-            });
-
-            document.getElementById('ride-request-form')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const origin = document.getElementById('origin').value;
-                const destination = document.getElementById('destination').value;
-                
-                if (!origin || !destination) {
-                    toast.show('Preencha origem e destino', 'warning');
-                    return;
-                }
-
-                showLoading('request-btn');
-                try {
-                    const { data, error } = await supabaseClient
-                        .from('rides')
-                        .insert({
-                            passenger_id: state.user.id,
-                            origin_address: origin,
-                            destinations: [destination],
-                            status: 'requested'
-                        })
-                        .select()
-                        .single();
-
-                    if (error) throw error;
-                    
-                    state.currentRide = data;
-                    showRideStatus();
-                    handleRideStateUpdate(data);
-                    startRidePolling();
-                    toast.show('Viagem solicitada! Procurando motorista...', 'success');
-                } catch (error) {
-                    toast.show('Erro ao solicitar viagem: ' + error.message, 'error');
-                } finally {
-                    hideLoading('request-btn');
+            // Hash change listener para reset de senha
+            window.addEventListener('hashchange', () => {
+                if (window.location.hash.includes('type=recovery')) {
+                    showScreen('update-password-screen');
                 }
             });
         }
 
-        // ========== INICIALIZAÇÃO ==========
-        window.addEventListener('unhandledrejection', (event) => {
-            console.error('❌ Promise rejection não tratada:', event.reason);
-            if (event.reason?.message?.includes('Auth')) {
-                handleSignOut();
+        // ========== OUTRAS TELAS ==========
+        function showHistoryScreen() {
+            showScreen('history-screen');
+            loadRideHistory();
+        }
+
+        function showProfileScreen() {
+            showScreen('profile-screen');
+            updateProfileDisplay();
+        }
+
+        async function loadRideHistory() {
+            try {
+                const { data: rides, error } = await supabaseClient
+                    .from('rides')
+                    .select('*')
+                    .eq('user_id', state.user.id)
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+
+                if (error) throw error;
+
+                const historyList = document.getElementById('history-list');
+                
+                if (!rides || rides.length === 0) {
+                    historyList.innerHTML = `
+                        <div class="text-center text-gray-400 py-8">
+                            <div class="text-4xl mb-4">📱</div>
+                            <p>Nenhuma viagem realizada ainda</p>
+                            <p class="text-sm mt-2">Suas viagens aparecerão aqui</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const historyHTML = rides.map(ride => `
+                    <div class="bg-gray-800 rounded-lg p-4 mb-3">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex-1">
+                                <p class="text-white font-semibold">${ride.origin}</p>
+                                <p class="text-gray-400 text-sm">para</p>
+                                <p class="text-white font-semibold">${ride.destination}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-white font-bold">${formatCurrency(ride.estimated_price || 0)}</p>
+                                <span class="text-xs px-2 py-1 rounded-full ${getStatusColor(ride.status)}">${getStatusText(ride.status)}</span>
+                            </div>
+                        </div>
+                        <p class="text-gray-400 text-xs">${formatDate(ride.created_at)}</p>
+                    </div>
+                `).join('');
+
+                historyList.innerHTML = historyHTML;
+            } catch (error) {
+                console.error('❌ Erro ao carregar histórico:', error);
+                toast.show('Erro ao carregar histórico de viagens', 'error');
             }
-        });
+        }
+
+        function updateProfileDisplay() {
+            if (state.profile) {
+                document.getElementById('profile-name').textContent = state.profile.full_name || 'Nome não informado';
+                document.getElementById('profile-email').textContent = state.profile.email || 'Email não informado';
+                document.getElementById('profile-phone').textContent = state.profile.phone || 'Não informado';
+            }
+        }
+
+        // ========== UTILS ==========
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            }).format(value);
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                'requested': 'bg-yellow-600 text-yellow-100',
+                'accepted': 'bg-blue-600 text-blue-100',
+                'arrived': 'bg-green-600 text-green-100',
+                'in_progress': 'bg-purple-600 text-purple-100',
+                'completed': 'bg-green-700 text-green-100',
+                'cancelled': 'bg-red-600 text-red-100'
+            };
+            return colors[status] || 'bg-gray-600 text-gray-100';
+        }
+
+        function getStatusText(status) {
+            const texts = {
+                'requested': 'Solicitada',
+                'accepted': 'Aceita',
+                'arrived': 'Motorista chegou',
+                'in_progress': 'Em andamento',
+                'completed': 'Concluída',
+                'cancelled': 'Cancelada'
+            };
+            return texts[status] || 'Desconhecido';
+        }
 
         // Inicializar quando DOM estiver pronto
         if (document.readyState === 'loading') {
