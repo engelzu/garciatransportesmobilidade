@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GARCIA MOBILIDADE - Passageiro</title>
+    
+    <!-- CDNs Externos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g&libraries=places"></script>
+    <script src="https://js.stripe.com/v3/"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { 
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background-color: #000000; 
+            color: #ffffff; 
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .screen { display: none; }
+        .screen.active { display: block; }
+        
+        .loader { 
+            border: 4px solid #f3f3f3; 
+            border-radius: 50%; 
+            border-top: 4px solid #6d28d9; 
+            width: 40px; 
+            height: 40px; 
+            animation: spin 1s linear infinite; 
+        }
+        
+        @keyframes spin { 
+            0% { transform: rotate(0deg); } 
+            100% { transform: rotate(360deg); } 
+        }
+        
+        .pac-container { 
+            background-color: #1F2937; 
+            border-radius: 8px; 
+            border: 1px solid #4B5563; 
+            z-index: 9999;
+        }
+        .pac-item { 
+            padding: 10px; 
+            font-size: 14px; 
+            color: #D1D5DB; 
+            cursor: pointer; 
+            border-top: 1px solid #374151;
+        }
+        .pac-item:first-child { border-top: none; }
+        .pac-item:hover { background-color: #374151; }
+        .pac-item-query { font-weight: 600; color: #F3F4F6; }
+
+        .toast-container { 
+            position: fixed; 
+            top: 20px; 
+            right: 20px; 
+            z-index: 1000; 
+        }
+        .toast { 
+            background: #1f2937; 
+            border-left: 4px solid; 
+            color: white; 
+            padding: 16px; 
+            border-radius: 8px; 
+            margin-bottom: 10px; 
+            min-width: 300px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transform: translateX(400px); 
+            transition: all 0.3s ease;
+        }
+        .toast.show { transform: translateX(0); }
+        .toast.success { border-left-color: #22c55e; }
+        .toast.error { border-left-color: #ef4444; }
+        .toast.info { border-left-color: #3b82f6; }
+        .toast.warning { border-left-color: #f59e0b; }
+
+        .btn-loading { 
+            position: relative; 
+            color: transparent !important; 
+        }
+        .btn-loading::after {
+            content: ''; 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            width: 20px; 
+            height: 20px;
+            margin: -10px 0 0 -10px; 
+            border: 2px solid #ffffff; 
+            border-top: 2px solid transparent;
+            border-radius: 50%; 
+            animation: spin 1s linear infinite;
+        }
+
+        .error-recovery {
+            background: linear-gradient(135deg, #991b1b, #dc2626);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 16px 0;
+            text-align: center;
+        }
+
+        #driver-details-panel {
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #driver-details-panel.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            opacity: 0.4;
+            transition: all 0.3s ease;
+            position: relative;
+            padding-left: 20px;
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 38px;
+            height: calc(100% - 20px);
+            border-left: 2px dashed #4b5563;
+        }
+        .timeline-item:last-child::before {
+            display: none;
+        }
+
+        .timeline-item.active { opacity: 1; }
+        .timeline-item.completed { opacity: 0.9; }
+        .timeline-item.completed .timeline-icon { 
+            background-color: #16a34a; 
+            border-color: #22c55e; 
+        }
+        .timeline-item.completed::before { 
+            border-left: 2px solid #22c55e; 
+        }
+
+        .timeline-icon {
+            width: 32px; 
+            height: 32px; 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            background-color: #374151; 
+            border: 2px solid #4b5563; 
+            flex-shrink: 0; 
+            z-index: 1;
+        }
+        .timeline-item.active .timeline-icon {
+            background-color: #6d28d9; 
+            border-color: #8b5cf6; 
+            animation: pulse 2s infinite;
+        }
+        
+        .timeline-text { font-weight: 500; }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(139, 92, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
+        }
+
+        .StripeElement {
+            background-color: #1f2937; 
+            padding: 12px; 
+            border-radius: 8px; 
+            border: 1px solid #4b5563; 
+            transition: border-color 0.2s;
+        }
+        .StripeElement--focus { border-color: #6d28d9; }
+        .StripeElement--invalid { border-color: #ef4444; }
+        .StripeElement--complete { border-color: #22c55e; }
+        
+        #card-errors {
+            color: #ef4444; 
+            font-size: 0.875rem; 
+            margin-top: 10px; 
+            text-align: center; 
+            min-height: 1.25rem;
+        }
+        
+        /* Logo placeholder */
+        .logo-placeholder {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: bold;
+            color: white;
+            margin: 0 auto 24px;
+            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #059669, #10b981);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: white;
+        }
+        
+        @media (max-width: 480px) {
+            .toast { min-width: 280px; }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <div id="app-container" class="w-full max-w-md mx-auto p-4">
+
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="screen active text-center">
+            <div class="logo-placeholder">GM</div>
+            <div class="loader mx-auto"></div>
+            <p class="mt-4">Carregando aplicativo...</p>
+            <div id="loading-error" class="error-recovery hidden">
+                <p class="text-white mb-2">⚠️ Problema no carregamento</p>
+                <p class="text-sm text-gray-200 mb-4">Tentando resolver automaticamente...</p>
+                <button onclick="forceReload()" class="py-2 px-4 bg-white text-red-600 rounded-lg font-semibold">
+                    🔄 Recarregar App
+                </button>
+            </div>
+        </div>
+
+        <!-- Login Screen -->
+        <div id="login-screen" class="screen space-y-3">
+            <div class="logo-placeholder">GM</div>
+            <h2 class="text-3xl font-bold text-center">Login</h2>
+            
+            <div class="space-y-3 pt-2">
+                <button onclick="handleSignInWithProvider('google')" class="w-full py-3 font-semibold rounded-lg bg-white text-gray-800 hover:bg-gray-200 flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.222,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.988,36.635,44,31.023,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
+                    Entrar com Google
+                </button>
+                <button onclick="handleSignInWithProvider('facebook')" class="w-full py-3 font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#3F51B5" d="M42,37c0,2.762-2.238,5-5,5H11c-2.761,0-5-2.238-5-5V11c0-2.762,2.239-5,5-5h26c2.762,0,5,2.238,5,5V37z"></path><path fill="#FFF" d="M34.368,25H31v13h-5V25h-3v-4h3v-2.41c0-3.408,1.72-5.59,5.592-5.59H35v4h-2.287C31.104,17,31,17.6,31,18.723V21h4L34.368,25z"></path></svg>
+                    Entrar com Facebook
+                </button>
+            </div>
+            <div class="relative flex py-1 items-center">
+                <div class="flex-grow border-t border-gray-600"></div>
+                <span class="flex-shrink mx-4 text-gray-400">OU</span>
+                <div class="flex-grow border-t border-gray-600"></div>
+            </div>
+            <form id="login-form" class="space-y-3">
+                <div>
+                    <label for="login-email" class="block mb-1 text-sm font-medium">E-mail</label>
+                    <input type="email" id="login-email" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                </div>
+                <div>
+                    <label for="login-password" class="block mb-1 text-sm font-medium">Senha</label>
+                    <input type="password" id="login-password" class="w-full p-2.5 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
+                </div>
+                <button type="submit" id="login-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENTRAR</button>
+            </form>
+            <div class="text-center">
+                <a href="#" onclick="showScreen('forgot-password-screen')" class="text-sm text-indigo-400">Esqueceu a senha?</a>
+            </div>
+            <p class="text-center text-sm">Não tem uma conta? <a href="#" onclick="showScreen('signup-screen')" class="font-semibold text-indigo-400">Cadastre-se</a></p>
+        </div>
+
+        <!-- Wallet Screen -->
+        <div id="wallet-screen" class="screen space-y-6">
+            <div class="flex items-center gap-4">
+                <button onclick="showScreen('user-screen')" class="text-2xl">⬅️</button>
+                <h2 class="text-3xl font-bold text-center">Minha Carteira</h2>
+            </div>
+            <div class="p-6 bg-gradient-to-br from-indigo-700 to-purple-800 rounded-xl text-center">
+                <p class="text-lg text-indigo-200">Saldo Atual</p>
+                <p id="wallet-balance-details" class="font-bold text-5xl">R$ 0,00</p>
+            </div>
+            <div class="space-y-3">
+                <p class="font-semibold">Adicionar Saldo Rápido</p>
+                <div class="grid grid-cols-3 gap-3">
+                    <button onclick="startWalletTopUp(20)" class="p-3 font-semibold rounded-lg bg-gray-700 hover:bg-gray-600">R$ 20</button>
+                    <button onclick="startWalletTopUp(50)" class="p-3 font-semibold rounded-lg bg-gray-700 hover:bg-gray-600">R$ 50</button>
+                    <button onclick="startWalletTopUp(100)" class="p-3 font-semibold rounded-lg bg-gray-700 hover:bg-gray-600">R$ 100</button>
+                </div>
+            </div>
+            <div class="space-y-3">
+                <label for="custom-amount" class="font-semibold">Outro Valor</label>
+                <input type="number" id="custom-amount" min="5" step="0.01" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="Ex: 15,50">
+                <button onclick="startWalletTopUp(document.getElementById('custom-amount').value)" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">
+                    Adicionar Valor
+                </button>
+            </div>
+        </div>
+
+        <!-- Wallet Payment Screen -->
+        <div id="wallet-payment-screen" class="screen space-y-6">
+            <div class="flex items-center gap-4">
+                <button onclick="showWalletScreen()" class="text-2xl">⬅️</button>
+                <h2 class="text-3xl font-bold">Adicionar Saldo</h2>
+            </div>
+            <div class="p-4 bg-gray-800 rounded-lg text-center">
+                <p class="text-gray-400">Valor da Recarga</p>
+                <p id="top-up-amount" class="font-bold text-4xl text-green-400">R$ 0,00</p>
+            </div>
+            <form id="payment-form">
+                <label class="block mb-2 text-sm font-medium">Dados do Cartão</label>
+                <div id="card-element" class="mb-3"></div>
+                <div id="card-errors" role="alert"></div>
+                <button type="submit" id="payment-btn" class="w-full mt-6 py-3 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    💳 Pagar Agora
+                </button>
+            </form>
+        </div>
+
+        <!-- User Screen -->
+        <div id="user-screen" class="screen space-y-6">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="user-avatar">👤</div>
+                    <h2 class="text-2xl font-bold">Solicitar Viagem</h2>
+                </div>
+                <button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700 transition-colors">Sair</button>
+            </div>
+            <p id="welcome-message" class="text-lg"></p>
+            <div id="wallet-panel" class="p-4 rounded-xl bg-gray-800 flex justify-between items-center">
+                <div>
+                    <p class="text-sm text-gray-400">Meu Saldo</p>
+                    <p id="wallet-balance-display" class="text-2xl font-bold">R$ 0,00</p>
+                </div>
+                <button onclick="showWalletScreen()" class="py-2 px-4 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors">
+                    Adicionar Saldo
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ========== CONFIGURAÇÕES CORRETAS (BASEADAS NAS IMAGENS) ==========
+        const SUPABASE_URL = 'https://emhxlsmukcwgukcxshrr.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjg5NzY0MDYsImV4cCI6MjA0NDU1MjQwNn0.3oHhlTW8YqJOYWP4pbrfYZrlSDg6GJhRRhL8nw8g1Xs';
+        const STRIPE_PUBLISHABLE_KEY = 'pk_test_51SEJCBFyO4P04UV0YubwfXu6UD8rmVBuA1AGNlygxvLTTiVCfdnmaAewkyT7H1mfgMBu0JhpvPPbraIC2IIM080G00KH08HO7v';
+
+        let supabaseClient, stripe, cardElement;
+        
+        const state = { 
+            user: null, 
+            profile: null, 
+            topUpAmount: 0,
+        };
+
+        let loadingTimeout = null;
+
+        // ========== FUNÇÕES DE INICIALIZAÇÃO ==========
+        function setupLoadingTimeout() {
+            loadingTimeout = setTimeout(() => {
+                document.getElementById('loading-error')?.classList.remove('hidden');
+            }, 15000);
+        }
+
+        function clearLoadingTimeout() {
+            if (loadingTimeout) clearTimeout(loadingTimeout);
+            loadingTimeout = null;
+        }
+
+        function forceReload() {
+            window.location.reload();
+        }
+
+        async function initializeApp() {
+            try {
+                console.log('🚀 Iniciando Garcia Mobilidade (Versão Corrigida)');
+                setupLoadingTimeout();
+                
+                // Inicializar Supabase
+                try {
+                    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    console.log('✅ Supabase inicializado com projeto:', SUPABASE_URL);
+                } catch (error) {
+                    console.error('❌ Erro ao inicializar Supabase:', error);
+                    throw new Error('Falha na conexão com o servidor');
+                }
+                
+                // Inicializar Stripe
+                try {
+                    if (typeof Stripe !== 'undefined') {
+                        stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+                        console.log('✅ Stripe inicializado');
+                    } else {
+                        console.warn('⚠️ Stripe não disponível');
+                    }
+                } catch (error) {
+                    console.error('❌ Erro ao inicializar Stripe:', error);
+                }
+
+                // Configurar event listeners
+                setupEventListeners();
+                
+                // Verificar sessão existente
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (session?.user) {
+                    state.user = session.user;
+                    await loadUserProfile(session.user.id);
+                } else {
+                    showScreen('login-screen');
+                }
+                
+                clearLoadingTimeout();
+            } catch (error) {
+                console.error('❌ Erro na inicialização:', error);
+                clearLoadingTimeout();
+                showScreen('login-screen');
+                toast.show('Erro ao carregar aplicativo: ' + error.message, 'error');
+            }
+        }
+
+        // ========== SISTEMA DE TOAST ==========
+        class ToastManager {
+            constructor() {
+                this.container = document.getElementById('toast-container');
+            }
+            
+            show(message, type = 'info', duration = 4000) {
+                if (!this.container) return;
+                
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                
+                const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+                const titles = { success: 'Sucesso', error: 'Erro', warning: 'Atenção', info: 'Informação' };
+                
+                toast.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <p class="font-medium">${icons[type]} ${titles[type]}</p>
+                            <p class="text-sm opacity-90 mt-1">${message}</p>
+                        </div>
+                        <button onclick="this.parentElement.parentElement.remove()" class="ml-3 text-white/60 hover:text-white">✕</button>
+                    </div>
+                `;
+                
+                this.container.appendChild(toast);
+                
+                setTimeout(() => toast.classList.add('show'), 100);
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.classList.remove('show');
+                        setTimeout(() => toast.remove(), 300);
+                    }
+                }, duration);
+            }
+        }
+        const toast = new ToastManager();
+
+        // ========== GERENCIAMENTO DE TELAS ==========
+        function showScreen(screenId) {
+            if (document.querySelector('.screen.active')?.id === 'wallet-payment-screen' && screenId !== 'wallet-payment-screen') {
+                cleanupStripeElements();
+            }
+            
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId)?.classList.add('active');
+            clearLoadingTimeout();
+        }
+
+        function cleanupStripeElements() {
+            if (cardElement) {
+                try {
+                    cardElement.unmount();
+                    cardElement.destroy();
+                    cardElement = null;
+                    console.log('🧹 Elementos Stripe limpos');
+                } catch (e) {
+                    console.warn('⚠️ Erro ao limpar cardElement:', e);
+                    cardElement = null;
+                }
+            }
+            const cardErrors = document.getElementById('card-errors');
+            if (cardErrors) cardErrors.textContent = '';
+        }
+
+        // ========== UTILITÁRIOS ==========
+        function showLoading(buttonId) {
+            const btn = document.getElementById(buttonId);
+            if(btn) {
+                btn.classList.add('btn-loading');
+                btn.disabled = true;
+            }
+        }
+
+        function hideLoading(buttonId) {
+            const btn = document.getElementById(buttonId);
+            if(btn) {
+                btn.classList.remove('btn-loading');
+                btn.disabled = false;
+            }
+        }
+        
+        function formatCurrency(value) {
+            const number = Number(value) || 0;
+            return `R$ ${number.toFixed(2).replace('.', ',')}`;
+        }
+
+        // ========== AUTENTICAÇÃO ==========
+        async function handleSignInWithProvider(provider) {
+            try {
+                const { error } = await supabaseClient.auth.signInWithOAuth({ 
+                    provider,
+                    options: {
+                        redirectTo: window.location.origin
+                    }
+                });
+                if (error) throw error;
+            } catch (error) { 
+                toast.show(`Erro ao tentar login com ${provider}: ` + error.message, 'error'); 
+            }
+        }
+
+        async function handleSignOut() {
+            try {
+                cleanupStripeElements();
+                await supabaseClient.auth.signOut();
+                
+                state.user = null;
+                state.profile = null;
+                
+                toast.show('Logout realizado com sucesso', 'success');
+                showScreen('login-screen');
+            } catch (error) {
+                toast.show('Erro ao fazer logout: ' + error.message, 'error');
+                showScreen('login-screen');
+            }
+        }
+        
+        async function loadUserProfile(userId) {
+            try {
+                console.log('🔄 Carregando perfil do usuário:', userId);
+                
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', userId)
+                    .single();
+                    
+                if (error && error.code !== 'PGRST116') {
+                    console.error('❌ Erro na consulta do perfil:', error);
+                    throw error;
+                }
+                
+                if (!data) {
+                    const userEmail = state.user?.email || 'Usuário';
+                    state.profile = {
+                        id: userId,
+                        full_name: userEmail.split('@')[0],
+                        email: userEmail,
+                        wallet_balance: 0
+                    };
+                } else {
+                    state.profile = data;
+                }
+                
+                // Atualizar interface
+                const welcomeMsg = document.getElementById('welcome-message');
+                const walletDisplay = document.getElementById('wallet-balance-display');
+                const walletDetails = document.getElementById('wallet-balance-details');
+                
+                if (welcomeMsg) {
+                    welcomeMsg.textContent = `Olá, ${state.profile.full_name}!`;
+                }
+                if (walletDisplay) {
+                    walletDisplay.textContent = formatCurrency(state.profile.wallet_balance || 0);
+                }
+                if (walletDetails) {
+                    walletDetails.textContent = formatCurrency(state.profile.wallet_balance || 0);
+                }
+                
+                console.log('✅ Perfil carregado com sucesso');
+                showScreen('user-screen');
+                
+            } catch (error) { 
+                console.error('❌ Erro crítico ao carregar perfil:', error); 
+                toast.show('Erro ao carregar dados do perfil. Redirecionando...', 'warning');
+                
+                const userEmail = state.user?.email || 'Usuário';
+                state.profile = {
+                    id: userId,
+                    full_name: userEmail.split('@')[0],
+                    email: userEmail,
+                    wallet_balance: 0
+                };
+                
+                showScreen('user-screen');
+            }
+        }
+
+        // ========== CARTEIRA E PAGAMENTOS STRIPE ==========
+        function showWalletScreen() {
+            cleanupStripeElements();
+            showScreen('wallet-screen');
+        }
+
+        function startWalletTopUp(amount) {
+            if (!stripe) {
+                toast.show('Sistema de pagamento não disponível no momento.', 'error');
+                return;
+            }
+
+            const parsedAmount = parseFloat(amount);
+            if (isNaN(parsedAmount) || parsedAmount < 5) {
+                toast.show('Por favor, insira um valor de recarga de no mínimo R$ 5,00.', 'warning');
+                return;
+            }
+            if (parsedAmount > 1000) {
+                toast.show('Valor máximo para recarga é R$ 1.000,00.', 'warning');
+                return;
+            }
+            
+            state.topUpAmount = parsedAmount;
+            document.getElementById('top-up-amount').textContent = formatCurrency(parsedAmount);
+            showScreen('wallet-payment-screen');
+            initializeStripeForTopUp(parsedAmount);
+        }
+
+        async function initializeStripeForTopUp(amount) {
+            try {
+                cleanupStripeElements();
+
+                if (!stripe) {
+                    stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+                }
+
+                console.log('🔄 Criando Payment Intent para:', formatCurrency(amount));
+
+                const { data, error: invokeError } = await supabaseClient.functions.invoke('create-payment-intent', {
+                    body: { 
+                        amount: Math.round(amount * 100),
+                        user_id: state.user?.id
+                    },
+                });
+
+                if (invokeError) {
+                    console.error('❌ Erro na Edge Function:', invokeError);
+                    throw invokeError;
+                }
+                if (data.error) {
+                    console.error('❌ Erro retornado pela API:', data.error);
+                    throw new Error(data.error);
+                }
+                
+                const { clientSecret } = data;
+                
+                if (!clientSecret) {
+                    throw new Error('Client secret não recebido do servidor');
+                }
+
+                console.log('✅ Client secret recebido, configurando elementos Stripe...');
+
+                const elements = stripe.elements();
+                const style = {
+                    base: { 
+                        color: '#ffffff', 
+                        fontFamily: '"Poppins", sans-serif', 
+                        fontSize: '16px', 
+                        '::placeholder': { color: '#a0aec0' } 
+                    },
+                    invalid: { 
+                        color: '#ef4444', 
+                        iconColor: '#ef4444' 
+                    }
+                };
+
+                cardElement = elements.create('card', { 
+                    style, 
+                    hidePostalCode: true,
+                    hideIcon: false
+                });
+                
+                cardElement.mount('#card-element');
+
+                cardElement.on('change', ({error}) => {
+                    const displayError = document.getElementById('card-errors');
+                    if (error) {
+                        displayError.textContent = error.message;
+                    } else {
+                        displayError.textContent = '';
+                    }
+                });
+
+                cardElement.on('ready', () => {
+                    console.log('✅ Elemento do cartão pronto');
+                });
+
+                const form = document.getElementById('payment-form');
+                if (form) {
+                    form.onsubmit = null;
+                    const newForm = form.cloneNode(true);
+                    form.parentNode.replaceChild(newForm, form);
+                    
+                    newForm.addEventListener('submit', async (event) => {
+                        event.preventDefault();
+                        await handleWalletPayment(clientSecret);
+                    });
+                }
+
+                toast.show('Formulário de pagamento carregado com sucesso!', 'success');
+
+            } catch (error) {
+                console.error("❌ Erro ao inicializar Stripe:", error);
+                let errorMessage = "Erro ao iniciar recarga: " + error.message;
+                
+                if (error.message.includes('Edge Function') || error.message.includes('FunctionsHttpError')) {
+                    errorMessage = "Servidor de pagamentos indisponível. Tente novamente em alguns instantes.";
+                } else if (error.message.includes('network')) {
+                    errorMessage = "Erro de conexão. Verifique sua internet e tente novamente.";
+                }
+                
+                toast.show(errorMessage, 'error');
+                showWalletScreen();
+            }
+        }
+
+        async function handleWalletPayment(clientSecret) {
+            const cardErrors = document.getElementById('card-errors');
+            
+            if (!cardElement) {
+                toast.show("Erro: Elemento do cartão não inicializado", 'error');
+                return;
+            }
+
+            if (!clientSecret) {
+                toast.show("Erro: Token de pagamento inválido", 'error');
+                return;
+            }
+
+            console.log('🔄 Iniciando processamento do pagamento...');
+
+            showLoading('payment-btn');
+            cardErrors.textContent = '';
+            
+            try {
+                const cardData = await stripe.createToken(cardElement);
+                if (cardData.error) {
+                    cardErrors.textContent = cardData.error.message;
+                    throw new Error(cardData.error.message);
+                }
+
+                console.log('✅ Cartão validado, confirmando pagamento...');
+
+                const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+                    payment_method: { 
+                        card: cardElement,
+                        billing_details: {
+                            name: state.profile?.full_name || 'Cliente'
+                        }
+                    }
+                });
+
+                if (error) {
+                    cardErrors.textContent = error.message;
+                    console.error('❌ Erro do Stripe:', error);
+                    throw new Error(error.message);
+                }
+
+                console.log('✅ Status do pagamento:', paymentIntent.status);
+
+                if (paymentIntent.status === 'succeeded') {
+                    toast.show('Pagamento processado com sucesso! 🎉', 'success');
+                    
+                    setTimeout(async () => {
+                        try {
+                            await loadUserProfile(state.user.id);
+                            showScreen('user-screen');
+                            toast.show(`Saldo de ${formatCurrency(state.topUpAmount)} adicionado com sucesso!`, 'success');
+                        } catch (profileError) {
+                            console.error('❌ Erro ao recarregar perfil:', profileError);
+                            toast.show('Pagamento realizado, atualize a página para ver o saldo', 'info');
+                            showScreen('user-screen');
+                        }
+                    }, 3000);
+                    
+                } else if (paymentIntent.status === 'requires_action') {
+                    toast.show('Ação adicional necessária. Siga as instruções.', 'warning');
+                } else {
+                    throw new Error('Status inesperado do pagamento: ' + paymentIntent.status);
+                }
+
+            } catch (error) {
+                console.error("❌ Erro no pagamento:", error);
+                
+                let errorMessage = "Falha no pagamento. Tente novamente.";
+                const errorCode = error.code || error.decline_code || '';
+                
+                if (error.message.includes('card_declined') || errorCode.includes('declined')) {
+                    errorMessage = "Cartão recusado. Verifique os dados ou tente outro cartão.";
+                } else if (error.message.includes('insufficient_funds')) {
+                    errorMessage = "Saldo insuficiente no cartão.";
+                } else if (error.message.includes('incorrect_cvc')) {
+                    errorMessage = "Código de segurança (CVC) incorreto.";
+                } else if (error.message.includes('expired_card')) {
+                    errorMessage = "Cartão expirado.";
+                } else if (error.message.includes('invalid_number')) {
+                    errorMessage = "Número do cartão inválido.";
+                }
+                
+                toast.show(errorMessage, 'error');
+                
+            } finally {
+                hideLoading('payment-btn');
+            }
+        }
+
+        // ========== EVENT LISTENERS ==========
+        function setupEventListeners() {
+            // Auth state listener
+            supabaseClient.auth.onAuthStateChange(async (event, session) => {
+                console.log('🔄 Mudança de autenticação:', event, session?.user?.id);
+                
+                if (event === 'SIGNED_IN' && session?.user) {
+                    if (!state.user || state.user.id !== session.user.id) {
+                        console.log('👤 Novo login detectado via listener');
+                        state.user = session.user;
+                        try {
+                            await loadUserProfile(session.user.id);
+                        } catch (error) {
+                            console.error('❌ Erro no listener de autenticação:', error);
+                        }
+                    }
+                } else if (event === 'SIGNED_OUT') {
+                    console.log('🚪 Logout detectado');
+                    state.user = null;
+                    state.profile = null;
+                    cleanupStripeElements();
+                    showScreen('login-screen');
+                }
+            });
+
+            // Form listeners
+            document.getElementById('login-form')?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+
+                showLoading('login-btn');
+                try {
+                    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                    if (error) throw error;
+                    
+                    if (data?.user) {
+                        state.user = data.user;
+                        toast.show('Login realizado com sucesso!', 'success');
+                        await loadUserProfile(data.user.id);
+                    }
+                } catch (error) { 
+                    console.error('❌ Erro no login:', error);
+                    toast.show('Erro no login: ' + error.message, 'error');
+                } finally { 
+                    hideLoading('login-btn'); 
+                }
+            });
+        }
+
+        // ========== INICIALIZAÇÃO ==========
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('❌ Promise rejection não tratada:', event.reason);
+            if (event.reason?.message?.includes('Auth')) {
+                handleSignOut();
+            }
+        });
+
+        // Inicializar quando DOM estiver pronto
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeApp);
+        } else {
+            initializeApp();
+        }
+
+        console.log('🎮 Garcia Mobilidade - Versão FINAL CORRIGIDA Carregada');
+
+    </script>
+</body>
+</html>
