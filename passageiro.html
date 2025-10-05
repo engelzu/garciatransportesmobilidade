@@ -1040,7 +1040,7 @@
                 
                 console.log('📤 Enviando dados:', requestData);
                 
-                const response = await fetch(`${BACKEND_URL}/api/create-checkout-session`, {
+                const response = await fetch(`${BACKEND_URL}/api/stripe-payment`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
