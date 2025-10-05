@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Stripe - Garcia Mobilidade</title>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #6772e5;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background: #5469d4;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .logs {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste Stripe - Garcia Mobilidade</h1>
+        
+        <div class="form-group">
+            <label for="amount">Valor (R$):</label>
+            <input type="number" id="amount" value="25.00" step="0.01" min="1">
+        </div>
+        
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" value="teste@garcia.com">
+        </div>
+        
+        <button onclick="testarStripe()" id="payButton">💳 Testar Pagamento Stripe</button>
+        <button onclick="testarAPI()" id="apiButton">🔧 Testar API Direta</button>
+        <button onclick="limparLogs()">🗑️ Limpar Logs</button>
+        
+        <div id="status"></div>
+        <div id="logs" class="logs"></div>
+    </div>
+
+    <script>
+        // Configuração do Stripe
+        const STRIPE_PUBLIC_KEY = 'pk_test_51SEJCBFyO4P04Uv0YubWfXu6UD8rmVBuA1AGUlygxvLTTivCfdnmaAewkyT7HlmfgMBuOJhpvPPbraIC2IIMO8OG00KHQ8HO7v';
+        const stripe = Stripe(STRIPE_PUBLIC_KEY);
+        
+        // URL da API
+        const API_URL = window.location.origin + '/api/teste-stripe';
+        
+        // Função para adicionar logs
+        function addLog(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            logs.textContent += logEntry;
+            logs.scrollTop = logs.scrollHeight;
+            console.log(logEntry);
+        }
+        
+        // Função para mostrar status
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.className = `status ${type}`;
+            status.textContent = message;
+            addLog(message, type);
+        }
+        
+        // Função para limpar logs
+        function limparLogs() {
+            document.getElementById('logs').textContent = '';
+            document.getElementById('status').textContent = '';
+        }
+        
+        // Testar API diretamente
+        async function testarAPI() {
+            try {
+                addLog('Testando API diretamente...');
+                
+                const response = await fetch(API_URL, {
+                    method: 'GET'
+                });
+                
+                addLog(`Response status: ${response.status}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addLog(`Response data: ${JSON.stringify(data, null, 2)}`);
+                    showStatus('✅ API funcionando!', 'success');
+                } else {
+                    const errorText = await response.text();
+                    addLog(`Error response: ${errorText}`);
+                    showStatus(`❌ API erro: ${response.status}`, 'error');
+                }
+                
+            } catch (error) {
+                addLog(`Erro na requisição: ${error.message}`);
+                showStatus(`❌ Erro: ${error.message}`, 'error');
+            }
+        }
+        
+        // Testar pagamento Stripe
+        async function testarStripe() {
+            try {
+                const amount = parseFloat(document.getElementById('amount').value);
+                const email = document.getElementById('email').value;
+                
+                if (!amount || amount <= 0) {
+                    showStatus('❌ Valor inválido', 'error');
+                    return;
+                }
+                
+                if (!email) {
+                    showStatus('❌ Email obrigatório', 'error');
+                    return;
+                }
+                
+                // Desabilitar botão
+                const button = document.getElementById('payButton');
+                button.disabled = true;
+                button.textContent = '⏳ Processando...';
+                
+                addLog(`Iniciando pagamento: R$ ${amount.toFixed(2)} para ${email}`);
+                showStatus('⏳ Criando sessão de pagamento...', 'info');
+                
+                // Chamar API
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        amount: amount,
+                        email: email,
+                        userId: 'teste-123'
+                    })
+                });
+                
+                addLog(`Response status: ${response.status}`);
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    addLog(`Error response: ${JSON.stringify(errorData, null, 2)}`);
+                    throw new Error(`Erro ${response.status}: ${errorData.message || 'Erro desconhecido'}`);
+                }
+                
+                const data = await response.json();
+                addLog(`Success response: ${JSON.stringify(data, null, 2)}`);
+                
+                if (data.url) {
+                    showStatus('✅ Redirecionando para Stripe...', 'success');
+                    addLog(`Redirecionando para: ${data.url}`);
+                    
+                    // Redirecionar para Stripe Checkout
+                    window.location.href = data.url;
+                } else {
+                    throw new Error('URL de pagamento não retornada');
+                }
+                
+            } catch (error) {
+                addLog(`Erro no pagamento: ${error.message}`);
+                showStatus(`❌ Erro: ${error.message}`, 'error');
+            } finally {
+                // Reabilitar botão
+                const button = document.getElementById('payButton');
+                button.disabled = false;
+                button.textContent = '💳 Testar Pagamento Stripe';
+            }
+        }
+        
+        // Log inicial
+        addLog('Página carregada');
+        addLog(`Stripe Public Key: ${STRIPE_PUBLIC_KEY.substring(0, 20)}...`);
+        addLog(`API URL: ${API_URL}`);
+    </script>
+</body>
+</html>
