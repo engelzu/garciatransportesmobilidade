@@ -1,4 +1,5 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = require('stripe')('sk_test_51SEJCBFyO4P04Uv0iSN9Jn46XLbJ5dkLeE55hTlD9TILyyxlpKPbfIPfazGjwJQGhzlHyiuLekkVMxiJPCglVqEg00x8xiB14d');
+
 
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
