@@ -6,7 +6,9 @@
     "stripe",
     "payment",
     "garcia",
-    "mobilidade"
+    "mobilidade",
+    "vercel",
+    "serverless"
   ],
   "author": "Garcia Mobilidade",
   "license": "MIT",
