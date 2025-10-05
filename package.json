@@ -13,6 +13,12 @@
   "author": "Garcia Mobilidade",
   "license": "MIT",
   "dependencies": {
-    "stripe": "^14.0.0"
+    "stripe": "^14.0.0",
+    "@supabase/supabase-js": "^2.38.5"
+  },
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "vercel build",
+    "deploy": "vercel --prod"
   }
 }
