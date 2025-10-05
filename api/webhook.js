@@ -1,199 +1,88 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { createClient } = require('@supabase/supabase-js');
 
-// Inicializar cliente Supabase
+// Inicializar cliente Supabase com as variáveis de ambiente
 const supabase = createClient(
     process.env.SUPABASE_URL,
-    process.env.SUPABASE_ANON_KEY
+    process.env.SUPABASE_ANON_KEY // Usar a chave ANON, pois este é um processo de backend seguro
 );
 
 module.exports = async (req, res) => {
-    // Apenas POST permitido
+    // Apenas o método POST é permitido
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        res.setHeader('Allow', 'POST');
+        return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
     const sig = req.headers['stripe-signature'];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
-        console.error('❌ STRIPE_WEBHOOK_SECRET não configurado');
-        return res.status(500).json({ error: 'Webhook secret não configurado' });
+        console.error('❌ Erro Crítico: A variável de ambiente STRIPE_WEBHOOK_SECRET não está configurada.');
+        return res.status(500).json({ error: 'Webhook secret não configurado no servidor.' });
     }
 
     let event;
 
     try {
-        // Verificar assinatura do webhook
+        // A Vercel já faz o parse do body, então usamos req.body diretamente
         event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-        console.log('✅ Webhook signature verified:', event.type);
+        console.log(`✅ Assinatura do Webhook verificada com sucesso. Evento: ${event.type}`);
     } catch (err) {
-        console.error('❌ Webhook signature verification failed:', err.message);
-        return res.status(400).json({ error: 'Webhook signature verification failed' });
+        console.error(`❌ Falha na verificação da assinatura do webhook: ${err.message}`);
+        return res.status(400).json({ error: `Webhook Error: ${err.message}` });
     }
 
-    try {
-        // Processar diferentes tipos de eventos
-        switch (event.type) {
-            case 'checkout.session.completed':
-                await handleCheckoutSessionCompleted(event.data.object);
-                break;
-            
-            case 'payment_intent.succeeded':
-                await handlePaymentIntentSucceeded(event.data.object);
-                break;
-            
-            case 'payment_intent.payment_failed':
-                await handlePaymentIntentFailed(event.data.object);
-                break;
-            
-            default:
-                console.log(`🔔 Unhandled event type: ${event.type}`);
+    // Processar o evento 'checkout.session.completed'
+    if (event.type === 'checkout.session.completed') {
+        const session = event.data.object;
+        console.log('💰 Processando evento checkout.session.completed para a sessão:', session.id);
+
+        try {
+            // Extrair metadados importantes da sessão do Stripe
+            const userId = session.client_reference_id; // ID do usuário do Supabase
+            const amount = parseFloat(session.metadata.amount); // Valor do crédito
+            const paymentStatus = session.payment_status;
+
+            // Validação dos dados recebidos
+            if (paymentStatus !== 'paid') {
+                console.log(`🔔 Sessão ${session.id} não foi paga ainda (${paymentStatus}). Ignorando.`);
+                return res.json({ received: true, message: 'Sessão não paga, nada a fazer.' });
+            }
+
+            if (!userId || !amount || amount <= 0) {
+                console.error('❌ Dados ausentes ou inválidos na sessão do Stripe:', { userId, amount });
+                return res.status(400).json({ error: 'Metadados da sessão do Stripe ausentes ou inválidos.' });
+            }
+
+            // **AÇÃO PRINCIPAL: Inserir o crédito na tabela `wallet_transactions`**
+            const { data, error } = await supabase
+                .from('wallet_transactions')
+                .insert({
+                    profile_id: userId,
+                    amount: amount,
+                    transaction_type: 'credit',
+                    description: `Crédito de R$ ${amount.toFixed(2)} via Stripe`,
+                    // O Stripe já garante que este evento só é enviado uma vez.
+                });
+
+            if (error) {
+                console.error('❌ Erro ao inserir a transação no Supabase:', error);
+                // Lançar o erro para que a resposta seja 500 e o Stripe possa tentar novamente.
+                throw new Error(`Erro no Supabase: ${error.message}`);
+            }
+
+            console.log(`✅ Sucesso! Crédito de R$ ${amount.toFixed(2)} adicionado para o usuário ${userId}. Transação ID: ${data ? data[0].id : 'N/A'}`);
+
+        } catch (error) {
+            console.error('❌ Erro ao processar o webhook:', error);
+            // Retorna um erro 500 para que o Stripe tente reenviar o webhook mais tarde.
+            return res.status(500).json({ error: 'Erro interno ao processar o webhook.' });
         }
-
-        res.json({ received: true });
-    } catch (error) {
-        console.error('❌ Error processing webhook:', error);
-        res.status(500).json({ error: 'Webhook processing failed' });
+    } else {
+        console.log(`🔔 Evento não tratado recebido: ${event.type}`);
     }
+
+    // Responda ao Stripe para confirmar o recebimento do evento
+    res.json({ received: true });
 };
-
-async function handleCheckoutSessionCompleted(session) {
-    console.log('💰 Processing checkout session completed:', session.id);
-    
-    try {
-        const userId = session.client_reference_id;
-        const amount = parseFloat(session.metadata.amount);
-        const sessionId = session.id;
-        const paymentIntentId = session.payment_intent;
-
-        if (!userId || !amount) {
-            console.error('❌ Missing required data in session metadata');
-            return;
-        }
-
-        // 1. Registrar transação na tabela transactions
-        const { data: transaction, error: transactionError } = await supabase
-            .from('transactions')
-            .insert({
-                user_id: userId,
-                amount: amount,
-                type: 'credit',
-                status: 'completed',
-                stripe_session_id: sessionId,
-                stripe_payment_intent_id: paymentIntentId,
-                description: `Crédito adicionado via Stripe - R$ ${amount.toFixed(2)}`,
-                created_at: new Date().toISOString()
-            })
-            .select()
-            .single();
-
-        if (transactionError) {
-            console.error('❌ Error creating transaction:', transactionError);
-            throw transactionError;
-        }
-
-        console.log('✅ Transaction created:', transaction.id);
-
-        // 2. Atualizar saldo do usuário
-        const { data: currentUser, error: getUserError } = await supabase
-            .from('users')
-            .select('wallet_balance')
-            .eq('id', userId)
-            .single();
-
-        if (getUserError) {
-            console.error('❌ Error getting user:', getUserError);
-            throw getUserError;
-        }
-
-        const currentBalance = currentUser.wallet_balance || 0;
-        const newBalance = currentBalance + amount;
-
-        const { error: updateBalanceError } = await supabase
-            .from('users')
-            .update({ 
-                wallet_balance: newBalance,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', userId);
-
-        if (updateBalanceError) {
-            console.error('❌ Error updating wallet balance:', updateBalanceError);
-            throw updateBalanceError;
-        }
-
-        console.log(`✅ Wallet updated: ${currentBalance} + ${amount} = ${newBalance}`);
-
-        // 3. Criar notificação para o usuário
-        const { error: notificationError } = await supabase
-            .from('notifications')
-            .insert({
-                user_id: userId,
-                title: 'Crédito Adicionado',
-                message: `R$ ${amount.toFixed(2)} foram adicionados à sua carteira`,
-                type: 'payment_success',
-                read: false,
-                created_at: new Date().toISOString()
-            });
-
-        if (notificationError) {
-            console.error('❌ Error creating notification:', notificationError);
-            // Não falhar por causa da notificação
-        } else {
-            console.log('✅ Notification created');
-        }
-
-    } catch (error) {
-        console.error('❌ Error in handleCheckoutSessionCompleted:', error);
-        throw error;
-    }
-}
-
-async function handlePaymentIntentSucceeded(paymentIntent) {
-    console.log('💳 Payment intent succeeded:', paymentIntent.id);
-    
-    // Atualizar status da transação se necessário
-    try {
-        const { error } = await supabase
-            .from('transactions')
-            .update({ 
-                status: 'completed',
-                stripe_payment_intent_id: paymentIntent.id,
-                updated_at: new Date().toISOString()
-            })
-            .eq('stripe_payment_intent_id', paymentIntent.id);
-
-        if (error) {
-            console.error('❌ Error updating transaction status:', error);
-        } else {
-            console.log('✅ Transaction status updated to completed');
-        }
-    } catch (error) {
-        console.error('❌ Error in handlePaymentIntentSucceeded:', error);
-    }
-}
-
-async function handlePaymentIntentFailed(paymentIntent) {
-    console.log('❌ Payment intent failed:', paymentIntent.id);
-    
-    // Atualizar status da transação para falha
-    try {
-        const { error } = await supabase
-            .from('transactions')
-            .update({ 
-                status: 'failed',
-                stripe_payment_intent_id: paymentIntent.id,
-                updated_at: new Date().toISOString()
-            })
-            .eq('stripe_payment_intent_id', paymentIntent.id);
-
-        if (error) {
-            console.error('❌ Error updating failed transaction:', error);
-        } else {
-            console.log('✅ Transaction status updated to failed');
-        }
-    } catch (error) {
-        console.error('❌ Error in handlePaymentIntentFailed:', error);
-    }
-}
