@@ -2,17 +2,11 @@
   "name": "garcia-mobilidade-stripe-backend",
   "version": "1.0.0",
   "description": "Backend para processar pagamentos Stripe do Garcia Mobilidade - Vercel Serverless",
-  "type": "module",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "keywords": [
     "stripe",
     "payment",
     "garcia",
-    "mobilidade",
-    "vercel",
-    "serverless"
+    "mobilidade"
   ],
   "author": "Garcia Mobilidade",
   "license": "MIT",
