@@ -1,4 +1,5 @@
 {
+  "trailingSlash": false,
   "functions": {
     "api/stripe-payment.js": {
       "maxDuration": 30
