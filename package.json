@@ -1,6 +1,15 @@
 {
+  "name": "garcia-transportes-backend",
+  "version": "1.0.0",
+  "description": "Backend functions for Garcia Mobilidade",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "stripe": "^14.0.0",
-    "@supabase/supabase-js": "^2.38.5"
+    "@supabase/supabase-js": "^2.44.4",
+    "stripe": "^16.2.0"
   }
 }
