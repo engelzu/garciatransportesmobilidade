@@ -34,7 +34,7 @@ exports.handler = async (event, context) => {
                     amount: amount,
                     transaction_type: 'credit',
                     description: `Crédito de R$ ${amount.toFixed(2)} via Stripe`,
-                    stripe_session_id: session.id
+                
                 });
 
             if (error) {
