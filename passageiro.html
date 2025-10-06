@@ -1040,7 +1040,11 @@
                 
                 console.log('📤 Enviando dados:', requestData);
                 
-                const response = await fetch(/.netlify/functions/stripe-payment, {
+                const response = await fetch('/.netlify/functions/stripe-payment', {
+
+
+
+
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
