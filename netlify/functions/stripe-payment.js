@@ -1,41 +1,20 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-module.exports = async (req, res) => {
-    // CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+// A Netlify espera que a função seja exportada como 'handler'
+exports.handler = async (event, context) => {
+    // A Netlify passa os dados do POST no 'body', que é uma string.
+    // Precisamos converter essa string para um objeto JSON.
+    const { amount, userId, userEmail } = JSON.parse(event.body);
 
-    // Handle preflight
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+    // Validações
+    if (!amount || amount <= 0) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'Valor inválido' }) };
     }
-
-    // Apenas POST permitido
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+    if (!userId) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'ID do usuário não fornecido' }) };
     }
 
     try {
-        const { amount, userId, userEmail } = req.body;
-
-        // Validações
-        if (!amount || amount <= 0) {
-            return res.status(400).json({ error: 'Valor inválido' });
-        }
-
-        if (!userId) {
-            return res.status(400).json({ error: 'ID do usuário não fornecido' });
-        }
-
-        // Verificar chave Stripe
-        if (!process.env.STRIPE_SECRET_KEY) {
-            return res.status(500).json({ error: 'Chave Stripe não configurada' });
-        }
-
-        console.log('💰 Creating session for:', { amount, userId, userEmail });
-
-        // Criar sessão Stripe
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [{
@@ -45,13 +24,14 @@ module.exports = async (req, res) => {
                         name: 'Créditos Garcia Mobilidade',
                         description: `Adicionar R$ ${amount.toFixed(2)} à carteira`,
                     },
-                    unit_amount: Math.round(amount * 100), // centavos
+                    unit_amount: Math.round(amount * 100),
                 },
                 quantity: 1,
             }],
             mode: 'payment',
-            success_url: `${req.headers.origin}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${req.headers.origin}?payment=cancel`,
+            // O 'origin' vem dos headers do evento da Netlify
+            success_url: `${event.headers.origin}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${event.headers.origin}?payment=cancel`,
             client_reference_id: userId,
             customer_email: userEmail,
             metadata: {
@@ -61,19 +41,16 @@ module.exports = async (req, res) => {
             }
         });
 
-        console.log('✅ Session created:', session.id);
-
-        return res.json({
-            sessionId: session.id,
-            url: session.url
-        });
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ sessionId: session.id, url: session.url })
+        };
 
     } catch (error) {
         console.error('❌ Stripe Error:', error);
-        
-        return res.status(500).json({
-            error: 'Erro ao processar pagamento',
-            message: error.message
-        });
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: 'Erro ao processar pagamento', message: error.message })
+        };
     }
 };
