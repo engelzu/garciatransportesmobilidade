@@ -1,0 +1,18 @@
+# Este é o arquivo de configuração da Netlify.
+# Ele diz à Netlify como construir e fazer o deploy do seu site.
+
+[build]
+  # Comando para construir o site (não precisamos de um, então deixamos em branco)
+  command = ""
+
+  # Diretório onde estão as funções serverless
+  functions = "netlify/functions"
+
+  # Diretório que será publicado como o site principal (a raiz do projeto)
+  publish = "."
+
+# Regra de redirecionamento para garantir que as funções sejam encontradas
+[[redirects]]
+  from = "/.netlify/functions/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
