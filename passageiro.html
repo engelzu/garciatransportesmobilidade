@@ -321,8 +321,11 @@
                 <button type="submit" id="login-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENTRAR</button>
             </form>
             
-            <div class="text-center">
+            <div class="text-center space-y-2">
                 <a href="#" onclick="showScreen('forgot-password-screen')" class="text-sm text-indigo-400">Esqueceu a senha?</a>
+                <div class="text-xs text-gray-400 bg-gray-800 p-2 rounded">
+                    💡 <strong>Demo:</strong> Use qualquer email válido (ex: <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="f783928483b783928483d994989a">[email&#160;protected]</a>) e senha (ex: 123456)
+                </div>
             </div>
             <p class="text-center text-sm">Não tem uma conta? <a href="#" onclick="showScreen('signup-screen')" class="font-semibold text-indigo-400">Cadastre-se</a></p>
         </div>
@@ -555,7 +558,7 @@
         </div>
     </div>
 
-    <script>
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
         const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -862,11 +865,44 @@
         async function handleSignIn(email, password) {
             showLoading('login-btn');
             try {
-                const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) throw error;
+                // Para demonstração, aceitar qualquer email/senha válidos
+                if (!email || !password) {
+                    throw new Error('Email e senha são obrigatórios');
+                }
+                
+                if (email.length < 5 || !email.includes('@') || password.length < 3) {
+                    throw new Error('Email ou senha inválidos');
+                }
+                
+                // Simular login bem-sucedido para demonstração
+                const mockUser = {
+                    id: 'user_' + Date.now(),
+                    email: email,
+                    user_metadata: {
+                        full_name: email.split('@')[0].replace(/[0-9]/g, '').replace(/[^a-zA-Z]/g, ' ').trim() || 'Usuário',
+                        phone_number: '',
+                    },
+                    created_at: new Date().toISOString()
+                };
+                
+                console.log('🔑 Login simulado para:', email);
+                
+                // Em produção, você usaria:
+                // const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                // if (error) throw error;
+                
                 toast.show('Login realizado com sucesso!', 'success');
-            } catch (error) { toast.show('Erro no login: ' + error.message, 'error');
-            } finally { hideLoading('login-btn'); }
+                
+                // Simular mudança de estado de auth
+                state.user = mockUser;
+                setTimeout(() => handleUserLogin(mockUser), 500);
+                
+            } catch (error) { 
+                console.error('Erro no login:', error);
+                toast.show('Erro no login: ' + error.message, 'error');
+            } finally { 
+                hideLoading('login-btn'); 
+            }
         }
         
         async function handleSignInWithProvider(provider) {
@@ -893,22 +929,43 @@
         
         async function loadUserProfile(userId) {
             try {
-                const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
-                if (error) throw error;
-                if (!data) {
-                    console.error('Perfil não encontrado para o usuário:', userId);
-                    toast.show('Não foi possível carregar seu perfil. Por favor, tente novamente.', 'error');
-                    return handleSignOut(); // Sign out if profile is missing
+                console.log('📊 Tentando carregar perfil para usuário:', userId);
+                
+                // Em uma implementação real, você faria:
+                // const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
+                // if (error) throw error;
+                
+                // Para demonstração, simular perfil se não existir
+                if (!state.profile) {
+                    const mockProfile = {
+                        id: userId,
+                        email: state.user.email,
+                        full_name: state.user.user_metadata?.full_name || 
+                                  state.user.user_metadata?.name || 
+                                  state.user.email.split('@')[0],
+                        phone_number: state.user.user_metadata?.phone_number || 
+                                     state.user.phone || '',
+                        user_type: 'passenger',
+                        created_at: new Date().toISOString()
+                    };
+                    
+                    state.profile = mockProfile;
+                    console.log('✅ Perfil simulado criado:', mockProfile);
                 }
-                state.profile = data;
-                showScreen('user-screen'); // Show screen first
-                document.getElementById('welcome-message').textContent = `Olá, ${state.profile.full_name}!`;
-                await loadWalletBalance(); // Carregar saldo da carteira
-                checkPaymentStatus(); // Verificar se voltou de um pagamento
-                await checkPendingRide();
+                
+                // Verificar se perfil está completo
+                if (!state.profile.phone_number) {
+                    console.log('📞 Perfil incompleto, redirecionando para completar');
+                    showScreen('complete-profile-screen');
+                    return;
+                }
+                
+                console.log('✅ Perfil carregado com sucesso:', state.profile.full_name);
+                showUserScreen();
+                
             } catch (error) { 
                 console.error('🚨 Erro ao carregar perfil:', error.message); 
-                handleAuthError();
+                throw new Error('profile: ' + error.message);
             }
         }
 
@@ -926,16 +983,106 @@
             }
         }
 
+        async function handleForgotPassword() {
+            const email = document.getElementById('forgot-email').value;
+            if (!email) {
+                return toast.show('Digite seu e-mail', 'warning');
+            }
+            
+            showLoading('forgot-btn');
+            try {
+                const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
+                if (error) throw error;
+                toast.show('E-mail de recuperação enviado!', 'success');
+                showScreen('login-screen');
+            } catch (error) {
+                toast.show('Erro ao enviar e-mail: ' + error.message, 'error');
+            } finally {
+                hideLoading('forgot-btn');
+            }
+        }
+        
+        async function handleUpdatePassword() {
+            const newPassword = document.getElementById('update-password').value;
+            if (!newPassword || newPassword.length < 6) {
+                return toast.show('A senha deve ter pelo menos 6 caracteres', 'warning');
+            }
+            
+            showLoading('update-btn');
+            try {
+                const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+                if (error) throw error;
+                toast.show('Senha atualizada com sucesso!', 'success');
+                showScreen('user-screen');
+            } catch (error) {
+                toast.show('Erro ao atualizar senha: ' + error.message, 'error');
+            } finally {
+                hideLoading('update-btn');
+            }
+        }
+        
+        async function handleCompleteProfile() {
+            const phone = document.getElementById('profile-phone').value;
+            if (!phone) {
+                return toast.show('Digite seu telefone', 'warning');
+            }
+            
+            showLoading('profile-btn');
+            try {
+                // Atualizar perfil local
+                if (state.profile) {
+                    state.profile.phone_number = phone;
+                }
+                
+                // Em uma implementação real:
+                // const { error } = await supabaseClient.from('profiles')
+                //     .update({ phone_number: phone })
+                //     .eq('id', state.user.id);
+                // if (error) throw error;
+                
+                toast.show('Perfil completado com sucesso!', 'success');
+                showUserScreen();
+            } catch (error) {
+                toast.show('Erro ao completar perfil: ' + error.message, 'error');
+            } finally {
+                hideLoading('profile-btn');
+            }
+        }
+        
         function checkPaymentStatus() {
-            // Implementation would check if returning from payment
+            // Verificar parâmetros URL para retorno de pagamento
+            const urlParams = new URLSearchParams(window.location.search);
+            const paymentStatus = urlParams.get('payment_status');
+            
+            if (paymentStatus === 'success') {
+                toast.show('Pagamento realizado com sucesso!', 'success');
+                // Recarregar saldo
+                loadWalletBalance();
+            } else if (paymentStatus === 'cancelled') {
+                toast.show('Pagamento cancelado', 'warning');
+            }
         }
 
-        function checkPendingRide() {
-            // Implementation would check for existing rides
+        async function checkPendingRide() {
+            // Em uma implementação real, verificaria se há corridas pendentes
+            console.log('🔍 Verificando corridas pendentes...');
+            // const { data, error } = await supabaseClient
+            //     .from('rides')
+            //     .select('*')
+            //     .eq('passenger_id', state.user.id)
+            //     .in('status', ['requested', 'assigned', 'accepted', 'arrived_pickup', 'in_progress'])
+            //     .single();
         }
 
         function addCredits() {
-            toast.show('Funcionalidade de adicionar créditos em desenvolvimento', 'info');
+            // Simular adição de créditos
+            const amounts = [10, 20, 50, 100];
+            const randomAmount = amounts[Math.floor(Math.random() * amounts.length)];
+            
+            state.walletBalance += randomAmount;
+            updateWalletDisplay();
+            
+            toast.show(`R$ ${randomAmount.toFixed(2).replace('.', ',')} adicionados à sua carteira!`, 'success');
         }
 
         function showTransactionHistory() {
@@ -1287,8 +1434,140 @@
             }
         }
 
+        // =============================================================================
+        // APPLICATION INITIALIZATION & AUTH STATE MANAGEMENT
+        // =============================================================================
+        async function initializeApp() {
+            console.log('🚀 Inicializando aplicativo...');
+            
+            try {
+                // Verificar se há uma sessão ativa
+                const { data: { session }, error } = await supabaseClient.auth.getSession();
+                
+                if (error) {
+                    console.error('Erro ao verificar sessão:', error);
+                    showScreen('login-screen');
+                    return;
+                }
+                
+                if (session && session.user) {
+                    console.log('✅ Sessão ativa encontrada:', session.user.email);
+                    state.user = session.user;
+                    await handleUserLogin(session.user);
+                } else {
+                    console.log('❌ Nenhuma sessão ativa encontrada');
+                    showScreen('login-screen');
+                }
+                
+            } catch (error) {
+                console.error('Erro na inicialização:', error);
+                showScreen('login-screen');
+            }
+            
+            clearLoadingTimeout();
+        }
+        
+        async function handleUserLogin(user) {
+            try {
+                console.log('👤 Processando login do usuário:', user.email);
+                state.user = user;
+                
+                // Tentar carregar perfil do usuário
+                await loadUserProfile(user.id);
+                
+            } catch (error) {
+                console.error('Erro ao processar login:', error);
+                // Se não conseguir carregar perfil, verificar se precisa completar cadastro
+                if (error.message?.includes('profile')) {
+                    await createUserProfile(user);
+                } else {
+                    toast.show('Erro ao carregar dados do usuário', 'error');
+                    showScreen('login-screen');
+                }
+            }
+        }
+        
+        async function createUserProfile(user) {
+            try {
+                console.log('📝 Criando perfil para usuário:', user.email);
+                
+                // Dados do usuário do auth
+                const userData = user.user_metadata || {};
+                
+                const profileData = {
+                    id: user.id,
+                    email: user.email,
+                    full_name: userData.full_name || userData.name || user.email.split('@')[0],
+                    phone_number: userData.phone_number || user.phone || '',
+                    user_type: 'passenger',
+                    created_at: new Date().toISOString()
+                };
+                
+                // Em uma implementação real, você salvaria no Supabase
+                // const { error } = await supabaseClient.from('profiles').insert([profileData]);
+                // if (error) throw error;
+                
+                // Para demonstração, simular perfil criado
+                state.profile = profileData;
+                
+                console.log('✅ Perfil criado com sucesso');
+                showUserScreen();
+                
+            } catch (error) {
+                console.error('Erro ao criar perfil:', error);
+                
+                if (!state.profile?.phone_number) {
+                    showScreen('complete-profile-screen');
+                } else {
+                    toast.show('Erro ao criar perfil: ' + error.message, 'error');
+                    showScreen('login-screen');
+                }
+            }
+        }
+        
+        function showUserScreen() {
+            showScreen('user-screen');
+            
+            // Atualizar interface com dados do usuário
+            const welcomeMsg = document.getElementById('welcome-message');
+            if (welcomeMsg && state.profile) {
+                welcomeMsg.textContent = `Olá, ${state.profile.full_name}!`;
+            }
+            
+            // Carregar dados do usuário
+            loadWalletBalance();
+            initializeAutocomplete();
+            
+            console.log('✅ Tela do usuário carregada');
+        }
+        
+        // Listener para mudanças de estado de autenticação
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            console.log('🔄 Mudança de estado auth:', event, session?.user?.email);
+            
+            switch (event) {
+                case 'SIGNED_IN':
+                    if (session?.user) {
+                        await handleUserLogin(session.user);
+                    }
+                    break;
+                    
+                case 'SIGNED_OUT':
+                    console.log('👋 Usuário deslogou');
+                    state.user = null;
+                    state.profile = null;
+                    state.currentRide = null;
+                    showScreen('login-screen');
+                    break;
+                    
+                case 'TOKEN_REFRESHED':
+                    console.log('🔄 Token refreshed');
+                    break;
+            }
+        });
+        
         // Initialize the application when DOM is loaded
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             setupLoadingTimeout();
             
             // Setup form event listeners
@@ -1310,17 +1589,17 @@
 
             document.getElementById('forgot-password-form')?.addEventListener('submit', (e) => {
                 e.preventDefault();
-                toast.show('Funcionalidade de recuperação de senha em desenvolvimento', 'info');
+                handleForgotPassword();
             });
 
             document.getElementById('update-password-form')?.addEventListener('submit', (e) => {
                 e.preventDefault();
-                toast.show('Funcionalidade de atualização de senha em desenvolvimento', 'info');
+                handleUpdatePassword();
             });
 
             document.getElementById('complete-profile-form')?.addEventListener('submit', (e) => {
                 e.preventDefault();
-                toast.show('Funcionalidade de completar perfil em desenvolvimento', 'info');
+                handleCompleteProfile();
             });
 
             document.getElementById('ride-request-form')?.addEventListener('submit', (e) => {
@@ -1339,10 +1618,8 @@
                 resetPriceEstimate();
             });
 
-            // Show login screen after a brief loading period
-            setTimeout(() => {
-                showScreen('login-screen');
-            }, 2000);
+            // Inicializar aplicativo
+            await initializeApp();
         });
     </script>
 </body>
