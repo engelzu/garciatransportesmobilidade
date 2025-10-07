@@ -640,7 +640,7 @@
 
             // Manage cancel button visibility
             const cancelBtn = document.getElementById('cancel-ride-btn');
-            if (['in_progress', 'completed', 'cancelled'].includes(status)) {
+            if (['in_progress', 'completed', 'canceled'].includes(status)) {
                 cancelBtn.classList.add('hidden');
             } else {
                 cancelBtn.classList.remove('hidden');
@@ -1072,7 +1072,7 @@
                 console.log(`🔄 Polling detectou mudança! [Status: ${state.currentRide.status} -> ${data.status}]`);
                 await checkPendingRide();
             }
-             if (!data || ['completed', 'cancelled'].includes(data.status)) {
+             if (!data || ['completed', 'canceled'].includes(data.status)) {
                 await checkPendingRide();
             }
         }
@@ -1100,7 +1100,7 @@
                         state.currentRide = { ...state.currentRide, ...updatedRide };
                         handleRideStateUpdate(state.currentRide);
                         
-                        if (['completed', 'cancelled'].includes(updatedRide.status)) {
+                        if (['completed', 'canceled'].includes(updatedRide.status)) {
                             stopRidePolling();
                             if(state.rideSubscription) supabaseClient.removeChannel(state.rideSubscription);
                             state.rideSubscription = null;
@@ -1152,7 +1152,7 @@
         async function cancelRide() {
             if (!state.currentRide || !confirm('Deseja cancelar esta viagem?')) return;
             try {
-                const { error } = await supabaseClient.from('rides').update({ status: 'cancelled' }).eq('id', state.currentRide.id);
+                const { error } = await supabaseClient.from('rides').update({ status: 'canceled' }).eq('id', state.currentRide.id);
                 if (error) throw error;
                 toast.show('Viagem cancelada.', 'success');
             } catch (error) { toast.show('Erro ao cancelar: ' + error.message, 'error'); }
