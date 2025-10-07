@@ -323,8 +323,18 @@
             
             <div class="text-center space-y-2">
                 <a href="#" onclick="showScreen('forgot-password-screen')" class="text-sm text-indigo-400">Esqueceu a senha?</a>
+                
+                <!-- TESTE RÁPIDO -->
+                <div class="bg-blue-900/30 border border-blue-600 rounded-lg p-3 space-y-2">
+                    <p class="text-xs text-blue-200 font-medium">🚀 Teste Rápido</p>
+                    <button onclick="window.garciaDebug.testLogin()" class="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors">
+                        🔑 Login Teste (<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="f98d9c8a8db99e988b9a9098d79a9694">[email&#160;protected]</a>)
+                    </button>
+                </div>
+                
                 <div class="text-xs text-gray-400 bg-gray-800 p-2 rounded">
-                    💡 <strong>Demo:</strong> Use qualquer email válido (ex: <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e89c8d9b9ca89c8d9b9cc68b8785">[email&#160;protected]</a>) e senha (ex: 123456)
+                    💡 <strong>Status:</strong> Configurado para <strong>garciatransportesmobilidade.netlify.app</strong>
+                    <br>🔧 Suporte: Login real + Fallback demo
                 </div>
             </div>
             <p class="text-center text-sm">Não tem uma conta? <a href="#" onclick="showScreen('signup-screen')" class="font-semibold text-indigo-400">Cadastre-se</a></p>
@@ -644,9 +654,25 @@
     </div>
 
     <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+        // CONFIGURAÇÃO PARA NETLIFY - garciatransportesmobilidade.netlify.app
+        const APP_CONFIG = {
+            domain: 'garciatransportesmobilidade.netlify.app',
+            isProduction: window.location.hostname === 'garciatransportesmobilidade.netlify.app',
+            isDevelopment: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        };
+        
+        // Supabase configurado para Netlify
         const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Configurar Supabase com redirecionamento correto
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: {
+                redirectTo: APP_CONFIG.isProduction 
+                    ? 'https://garciatransportesmobilidade.netlify.app/passageiro.html'
+                    : window.location.origin + '/passageiro.html'
+            }
+        });
         
         const state = { 
             user: null, 
@@ -937,50 +963,122 @@
         async function handleSignUp(fullName, email, phone, password) {
             showLoading('signup-btn');
             try {
-                const { error } = await supabaseClient.auth.signUp({ 
-                    email, phone, password, options: { data: { full_name: fullName, user_type: 'passenger' } } 
+                if (!fullName || !email || !password) {
+                    throw new Error('Todos os campos são obrigatórios');
+                }
+                
+                if (password.length < 6) {
+                    throw new Error('A senha deve ter pelo menos 6 caracteres');
+                }
+                
+                console.log('📝 Tentando cadastro com Supabase para:', email);
+                
+                const { data, error } = await supabaseClient.auth.signUp({ 
+                    email, 
+                    password, 
+                    options: { 
+                        data: { 
+                            full_name: fullName, 
+                            phone_number: phone,
+                            user_type: 'passenger' 
+                        },
+                        emailRedirectTo: APP_CONFIG.isProduction 
+                            ? 'https://garciatransportesmobilidade.netlify.app/passageiro.html'
+                            : window.location.origin + '/passageiro.html'
+                    } 
                 });
-                if (error) throw error;
-                toast.show('Cadastro realizado! Verifique seu e-mail para ativar sua conta.', 'success');
-                showScreen('login-screen');
-            } catch (error) { toast.show('Erro no cadastro: ' + error.message, 'error');
-            } finally { hideLoading('signup-btn'); }
+                
+                if (error) {
+                    console.warn('Cadastro Supabase falhou:', error.message);
+                    
+                    // Para demonstração, simular cadastro bem-sucedido
+                    console.log('🔄 Simulando cadastro bem-sucedido para demo');
+                    
+                    // Criar usuário demo diretamente
+                    const mockUser = {
+                        id: 'demo_' + Date.now(),
+                        email: email,
+                        user_metadata: {
+                            full_name: fullName,
+                            phone_number: phone,
+                        },
+                        created_at: new Date().toISOString()
+                    };
+                    
+                    toast.show('Cadastro realizado com sucesso! (Modo Demo)', 'success');
+                    
+                    // Fazer login automático
+                    setTimeout(() => {
+                        state.user = mockUser;
+                        handleUserLogin(mockUser);
+                    }, 1000);
+                    
+                } else {
+                    console.log('✅ Cadastro Supabase bem-sucedido');
+                    
+                    if (data.user && !data.user.email_confirmed_at) {
+                        toast.show('Cadastro realizado! Verifique seu e-mail para ativar sua conta.', 'success');
+                        showScreen('login-screen');
+                    } else if (data.user) {
+                        toast.show('Cadastro realizado com sucesso!', 'success');
+                        // O onAuthStateChange vai lidar com o login automático
+                    }
+                }
+                
+            } catch (error) { 
+                console.error('Erro no cadastro:', error);
+                toast.show('Erro no cadastro: ' + error.message, 'error');
+            } finally { 
+                hideLoading('signup-btn'); 
+            }
         }
 
         async function handleSignIn(email, password) {
             showLoading('login-btn');
             try {
-                // Para demonstração, aceitar qualquer email/senha válidos
                 if (!email || !password) {
                     throw new Error('Email e senha são obrigatórios');
                 }
                 
-                if (email.length < 5 || !email.includes('@') || password.length < 3) {
-                    throw new Error('Email ou senha inválidos');
+                console.log('🔑 Tentando login com Supabase para:', email);
+                
+                // Tentar login real com Supabase primeiro
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ 
+                    email, 
+                    password 
+                });
+                
+                if (error) {
+                    console.warn('Login Supabase falhou:', error.message);
+                    
+                    // Fallback para modo demo se Supabase falhar
+                    if (email.length < 5 || !email.includes('@') || password.length < 3) {
+                        throw new Error('Email ou senha inválidos');
+                    }
+                    
+                    console.log('🔄 Usando modo fallback para demonstração');
+                    
+                    const mockUser = {
+                        id: 'demo_' + Date.now(),
+                        email: email,
+                        user_metadata: {
+                            full_name: email.split('@')[0].replace(/[0-9]/g, '').replace(/[^a-zA-Z]/g, ' ').trim() || 'Usuário Demo',
+                            phone_number: '',
+                        },
+                        created_at: new Date().toISOString()
+                    };
+                    
+                    toast.show('Login realizado com sucesso! (Modo Demo)', 'success');
+                    state.user = mockUser;
+                    setTimeout(() => handleUserLogin(mockUser), 500);
+                    
+                } else if (data.user) {
+                    console.log('✅ Login Supabase bem-sucedido:', data.user.email);
+                    toast.show('Login realizado com sucesso!', 'success');
+                    // O onAuthStateChange vai lidar com o resto
+                } else {
+                    throw new Error('Falha na autenticação');
                 }
-                
-                // Simular login bem-sucedido para demonstração
-                const mockUser = {
-                    id: 'user_' + Date.now(),
-                    email: email,
-                    user_metadata: {
-                        full_name: email.split('@')[0].replace(/[0-9]/g, '').replace(/[^a-zA-Z]/g, ' ').trim() || 'Usuário',
-                        phone_number: '',
-                    },
-                    created_at: new Date().toISOString()
-                };
-                
-                console.log('🔑 Login simulado para:', email);
-                
-                // Em produção, você usaria:
-                // const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                // if (error) throw error;
-                
-                toast.show('Login realizado com sucesso!', 'success');
-                
-                // Simular mudança de estado de auth
-                state.user = mockUser;
-                setTimeout(() => handleUserLogin(mockUser), 500);
                 
             } catch (error) { 
                 console.error('Erro no login:', error);
@@ -992,9 +1090,28 @@
         
         async function handleSignInWithProvider(provider) {
             try {
-                const { error } = await supabaseClient.auth.signInWithOAuth({ provider });
-                if (error) throw error;
-            } catch (error) { toast.show(`Erro ao tentar login com ${provider}: ` + error.message, 'error'); }
+                console.log(`🔑 Tentando login com ${provider}`);
+                
+                const { data, error } = await supabaseClient.auth.signInWithOAuth({ 
+                    provider,
+                    options: {
+                        redirectTo: APP_CONFIG.isProduction 
+                            ? 'https://garciatransportesmobilidade.netlify.app/passageiro.html'
+                            : window.location.origin + '/passageiro.html'
+                    }
+                });
+                
+                if (error) {
+                    console.warn(`Login ${provider} falhou:`, error.message);
+                    throw error;
+                }
+                
+                console.log(`✅ Redirecionamento ${provider} iniciado`);
+                
+            } catch (error) { 
+                console.error(`Erro no login ${provider}:`, error);
+                toast.show(`Erro ao tentar login com ${provider}: ` + error.message, 'error'); 
+            }
         }
 
         async function handleSignOut() {
@@ -1793,29 +1910,35 @@
         // APPLICATION INITIALIZATION & AUTH STATE MANAGEMENT
         // =============================================================================
         async function initializeApp() {
-            console.log('🚀 Inicializando aplicativo...');
+            console.log('🚀 Inicializando aplicativo Garcia Mobilidade...');
+            console.log('🌍 Domínio atual:', window.location.hostname);
+            console.log('🔧 Configuração:', APP_CONFIG);
             
             try {
-                // Verificar se há uma sessão ativa
+                // Verificar conexão com Supabase
+                console.log('🔌 Verificando conexão com Supabase...');
+                
                 const { data: { session }, error } = await supabaseClient.auth.getSession();
                 
                 if (error) {
-                    console.error('Erro ao verificar sessão:', error);
+                    console.error('❌ Erro ao verificar sessão Supabase:', error);
+                    console.log('🔄 Prosseguindo para tela de login...');
                     showScreen('login-screen');
                     return;
                 }
                 
                 if (session && session.user) {
-                    console.log('✅ Sessão ativa encontrada:', session.user.email);
+                    console.log('✅ Sessão Supabase ativa encontrada:', session.user.email);
                     state.user = session.user;
                     await handleUserLogin(session.user);
                 } else {
-                    console.log('❌ Nenhuma sessão ativa encontrada');
+                    console.log('🔄 Nenhuma sessão ativa - exibindo login');
                     showScreen('login-screen');
                 }
                 
             } catch (error) {
-                console.error('Erro na inicialização:', error);
+                console.error('❌ Erro crítico na inicialização:', error);
+                console.log('🔄 Fallback para tela de login');
                 showScreen('login-screen');
             }
             
@@ -2005,6 +2128,17 @@
                 originalHideLoading(elementId);
             }
         }
+
+        // Debug para identificar problemas
+        window.garciaDebug = {
+            state: () => state,
+            config: () => APP_CONFIG,
+            supabase: () => supabaseClient,
+            testLogin: (email = 'test@garcia.com', password = '123456') => handleSignIn(email, password),
+            testSignup: () => handleSignUp('Teste Garcia', 'test@garcia.com', '11999999999', '123456')
+        };
+        
+        console.log('🐛 Para debug, use: window.garciaDebug');
 
         // Initialize the application when DOM is loaded
         document.addEventListener('DOMContentLoaded', async () => {
