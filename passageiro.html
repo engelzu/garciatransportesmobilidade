@@ -324,7 +324,7 @@
             <div class="text-center space-y-2">
                 <a href="#" onclick="showScreen('forgot-password-screen')" class="text-sm text-indigo-400">Esqueceu a senha?</a>
                 <div class="text-xs text-gray-400 bg-gray-800 p-2 rounded">
-                    💡 <strong>Demo:</strong> Use qualquer email válido (ex: <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="f783928483b783928483d994989a">[email&#160;protected]</a>) e senha (ex: 123456)
+                    💡 <strong>Demo:</strong> Use qualquer email válido (ex: <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e89c8d9b9ca89c8d9b9cc68b8785">[email&#160;protected]</a>) e senha (ex: 123456)
                 </div>
             </div>
             <p class="text-center text-sm">Não tem uma conta? <a href="#" onclick="showScreen('signup-screen')" class="font-semibold text-indigo-400">Cadastre-se</a></p>
@@ -555,6 +555,91 @@
                 <p id="summary-price" class="text-4xl font-bold text-white mt-1">R$ 0,00</p>
             </div>
             <button onclick="closeRideSummary()" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">OK</button>
+        </div>
+    </div>
+    
+    <!-- MODAL DE OPÇÕES DE CRÉDITO -->
+    <div id="credit-options-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl transform transition-all scale-95 opacity-0" id="credit-options-content">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    💳
+                </div>
+                <h2 class="text-2xl font-bold text-white mb-2">Adicionar Créditos</h2>
+                <p class="text-gray-400">Escolha o valor para adicionar à sua carteira</p>
+            </div>
+            
+            <div class="space-y-3 mb-6">
+                <button onclick="selectCreditAmount(10)" class="w-full py-3 px-4 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors flex justify-between items-center">
+                    <span>R$ 10,00</span>
+                    <span class="text-sm text-gray-400">Rápido</span>
+                </button>
+                <button onclick="selectCreditAmount(25)" class="w-full py-3 px-4 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors flex justify-between items-center">
+                    <span>R$ 25,00</span>
+                    <span class="text-sm text-gray-400">Popular</span>
+                </button>
+                <button onclick="selectCreditAmount(50)" class="w-full py-3 px-4 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors flex justify-between items-center">
+                    <span>R$ 50,00</span>
+                    <span class="text-sm text-gray-400">Recomendado</span>
+                </button>
+                <button onclick="selectCreditAmount(100)" class="w-full py-3 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-colors flex justify-between items-center">
+                    <span>R$ 100,00</span>
+                    <span class="text-sm text-indigo-200">Bônus +5%</span>
+                </button>
+            </div>
+            
+            <div class="bg-gray-700/50 rounded-lg p-3 mb-4">
+                <div class="flex items-center gap-2 text-sm text-gray-300 mb-2">
+                    <span>🔒</span>
+                    <span>Pagamento seguro via Stripe</span>
+                </div>
+                <div class="text-xs text-gray-400">
+                    💡 <strong>Modo Demo:</strong> Os pagamentos são simulados para demonstração
+                </div>
+            </div>
+            
+            <div class="flex gap-3">
+                <button onclick="closeCreditOptionsModal()" class="flex-1 py-3 font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 text-white transition-colors">
+                    Cancelar
+                </button>
+                <button onclick="showCustomAmount()" class="flex-1 py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+                    Outro Valor
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- MODAL DE VALOR PERSONALIZADO -->
+    <div id="custom-amount-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl transform transition-all scale-95 opacity-0" id="custom-amount-content">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-white mb-2">Valor Personalizado</h2>
+                <p class="text-gray-400">Digite o valor desejado (mínimo R$ 5,00)</p>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-300 mb-2">Valor (R$)</label>
+                <input type="number" id="custom-amount-input" min="5" max="500" step="0.01" placeholder="0,00" 
+                       class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-white text-center text-2xl font-bold focus:outline-none focus:border-indigo-500">
+            </div>
+            
+            <div class="flex gap-3">
+                <button onclick="closeCustomAmountModal()" class="flex-1 py-3 font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 text-white transition-colors">
+                    Cancelar
+                </button>
+                <button onclick="processCustomAmount()" id="custom-amount-btn" class="flex-1 py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+                    Adicionar
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- MODAL DE PROCESSAMENTO -->
+    <div id="processing-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-gray-800 rounded-2xl p-8 w-full max-w-sm text-center shadow-2xl">
+            <div class="loader mx-auto mb-4"></div>
+            <h3 class="text-xl font-bold text-white mb-2">Processando Pagamento</h3>
+            <p class="text-gray-400">Por favor, aguarde...</p>
         </div>
     </div>
 
@@ -1074,15 +1159,204 @@
             //     .single();
         }
 
-        function addCredits() {
-            // Simular adição de créditos
-            const amounts = [10, 20, 50, 100];
-            const randomAmount = amounts[Math.floor(Math.random() * amounts.length)];
+        // =============================================================================
+        // STRIPE PAYMENT INTEGRATION
+        // =============================================================================
+        let stripe = null;
+        
+        function initializeStripe() {
+            try {
+                // Inicializar Stripe com sua chave pública
+                stripe = Stripe('pk_test_51234567890abcdef'); // Substitua pela sua chave pública real
+                console.log('💳 Stripe inicializado com sucesso');
+            } catch (error) {
+                console.error('Erro ao inicializar Stripe:', error);
+            }
+        }
+        
+        async function addCredits() {
+            showCreditOptionsModal();
+        }
+        
+        function showCreditOptionsModal() {
+            const modal = document.getElementById('credit-options-modal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    const content = document.getElementById('credit-options-content');
+                    if (content) {
+                        content.classList.remove('scale-95', 'opacity-0');
+                    }
+                }, 50);
+            }
+        }
+        
+        function closeCreditOptionsModal() {
+            const modal = document.getElementById('credit-options-modal');
+            const content = document.getElementById('credit-options-content');
+            if (modal && content) {
+                content.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 200);
+            }
+        }
+        
+        async function selectCreditAmount(amount) {
+            closeCreditOptionsModal();
             
-            state.walletBalance += randomAmount;
-            updateWalletDisplay();
+            if (!stripe) {
+                initializeStripe();
+                if (!stripe) {
+                    toast.show('Erro ao inicializar sistema de pagamento', 'error');
+                    return;
+                }
+            }
             
-            toast.show(`R$ ${randomAmount.toFixed(2).replace('.', ',')} adicionados à sua carteira!`, 'success');
+            await processStripePayment(amount);
+        }
+        
+        async function processStripePayment(amount) {
+            showLoading('processing-payment');
+            
+            try {
+                // Em produção, você faria uma chamada para seu backend para criar o PaymentIntent
+                const paymentIntent = await createPaymentIntent(amount);
+                
+                if (!paymentIntent) {
+                    throw new Error('Falha ao criar intent de pagamento');
+                }
+                
+                // Confirmar pagamento com Stripe
+                const { error, paymentIntent: confirmedPayment } = await stripe.confirmCardPayment(
+                    paymentIntent.client_secret,
+                    {
+                        payment_method: {
+                            card: {
+                                // Em produção, você usaria Stripe Elements para coletar dados do cartão
+                                number: '4242424242424242', // Cartão de teste
+                                exp_month: 12,
+                                exp_year: 2025,
+                                cvc: '123'
+                            },
+                            billing_details: {
+                                name: state.profile?.full_name || 'Cliente',
+                                email: state.user?.email
+                            }
+                        }
+                    }
+                );
+                
+                if (error) {
+                    throw error;
+                }
+                
+                if (confirmedPayment.status === 'succeeded') {
+                    // Pagamento bem-sucedido
+                    state.walletBalance += amount;
+                    updateWalletDisplay();
+                    
+                    // Salvar transação no banco (em produção)
+                    await saveTransaction({
+                        user_id: state.user.id,
+                        amount: amount,
+                        type: 'credit',
+                        payment_method: 'stripe',
+                        stripe_payment_intent_id: confirmedPayment.id,
+                        status: 'completed',
+                        created_at: new Date().toISOString()
+                    });
+                    
+                    toast.show(`R$ ${amount.toFixed(2).replace('.', ',')} adicionados à sua carteira!`, 'success');
+                    
+                } else {
+                    throw new Error('Pagamento não foi processado corretamente');
+                }
+                
+            } catch (error) {
+                console.error('Erro no pagamento:', error);
+                toast.show(`Erro no pagamento: ${error.message}`, 'error');
+            } finally {
+                hideLoading('processing-payment');
+            }
+        }
+        
+        async function createPaymentIntent(amount) {
+            try {
+                // Em produção, esta seria uma chamada para seu backend:
+                // const response = await fetch('/create-payment-intent', {
+                //     method: 'POST',
+                //     headers: { 'Content-Type': 'application/json' },
+                //     body: JSON.stringify({ 
+                //         amount: amount * 100, // Stripe usa centavos
+                //         currency: 'brl',
+                //         customer_id: state.user.id
+                //     })
+                // });
+                // return await response.json();
+                
+                // Para demonstração, simular PaymentIntent
+                return {
+                    id: 'pi_' + Date.now(),
+                    client_secret: 'pi_' + Date.now() + '_secret_demo',
+                    amount: amount * 100,
+                    currency: 'brl',
+                    status: 'requires_payment_method'
+                };
+                
+            } catch (error) {
+                console.error('Erro ao criar PaymentIntent:', error);
+                return null;
+            }
+        }
+        
+        async function saveTransaction(transaction) {
+            try {
+                // Em produção, salvar no Supabase:
+                // const { error } = await supabaseClient
+                //     .from('transactions')
+                //     .insert([transaction]);
+                // if (error) throw error;
+                
+                console.log('💾 Transação salva:', transaction);
+                
+            } catch (error) {
+                console.error('Erro ao salvar transação:', error);
+            }
+        }
+        
+        // Simular pagamento para demonstração (remover em produção)
+        async function simulatePayment(amount) {
+            showLoading('processing-payment');
+            
+            try {
+                // Simular delay de processamento
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Simular sucesso (90% das vezes)
+                if (Math.random() > 0.1) {
+                    state.walletBalance += amount;
+                    updateWalletDisplay();
+                    
+                    await saveTransaction({
+                        user_id: state.user.id,
+                        amount: amount,
+                        type: 'credit',
+                        payment_method: 'demo',
+                        status: 'completed',
+                        created_at: new Date().toISOString()
+                    });
+                    
+                    toast.show(`R$ ${amount.toFixed(2).replace('.', ',')} adicionados à sua carteira!`, 'success');
+                } else {
+                    throw new Error('Pagamento recusado pelo banco');
+                }
+                
+            } catch (error) {
+                toast.show(`Erro no pagamento: ${error.message}`, 'error');
+            } finally {
+                hideLoading('processing-payment');
+            }
         }
 
         function showTransactionHistory() {
@@ -1091,28 +1365,109 @@
 
         function useCurrentLocation() {
             if (!navigator.geolocation) return toast.show('Geolocalização não suportada.', 'error');
+            
             const originInput = document.getElementById('origin');
+            const locationButton = document.getElementById('location-button');
+            
+            // Mostrar loading no botão
+            if (locationButton) {
+                locationButton.disabled = true;
+                locationButton.innerHTML = '⏳ Obtendo localização...';
+            }
             originInput.value = 'Obtendo localização...';
             state.originPlace = null;
+            
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     const { latitude: lat, longitude: lng } = position.coords;
-                    originInput.value = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
-                    state.originPlace = { 
-                        formatted_address: originInput.value, 
-                        geometry: { 
-                            location: { 
-                                lat: () => lat, 
-                                lng: () => lng 
-                            } 
+                    
+                    if (typeof google !== 'undefined' && google.maps) {
+                        const latLng = new google.maps.LatLng(lat, lng);
+                        const geocoder = new google.maps.Geocoder();
+                        
+                        geocoder.geocode({ 'location': latLng }, (results, status) => {
+                            if (status === 'OK' && results[0]) {
+                                const address = results[0].formatted_address;
+                                originInput.value = address;
+                                
+                                state.originPlace = {
+                                    formatted_address: address,
+                                    geometry: { 
+                                        location: latLng 
+                                    },
+                                    place_id: results[0].place_id
+                                };
+                                
+                                console.log('📍 Localização atual obtida:', address);
+                                toast.show('Localização atual obtida!', 'success');
+                                
+                                // Limpar estimativa quando origem muda
+                                resetPriceEstimate();
+                            } else {
+                                // Fallback para coordenadas
+                                const coordsText = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
+                                originInput.value = coordsText;
+                                
+                                state.originPlace = {
+                                    formatted_address: coordsText,
+                                    geometry: { 
+                                        location: { 
+                                            lat: () => lat, 
+                                            lng: () => lng 
+                                        } 
+                                    }
+                                };
+                                
+                                toast.show('Localização obtida por coordenadas', 'info');
+                                resetPriceEstimate();
+                            }
+                            
+                            // Restaurar botão
+                            if (locationButton) {
+                                locationButton.disabled = false;
+                                locationButton.innerHTML = '📍 Usar Localização Atual';
+                            }
+                        });
+                    } else {
+                        // Google Maps não disponível, usar coordenadas
+                        const coordsText = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
+                        originInput.value = coordsText;
+                        
+                        state.originPlace = {
+                            formatted_address: coordsText,
+                            geometry: { 
+                                location: { 
+                                    lat: () => lat, 
+                                    lng: () => lng 
+                                } 
+                            }
+                        };
+                        
+                        toast.show('Localização obtida!', 'success');
+                        resetPriceEstimate();
+                        
+                        // Restaurar botão
+                        if (locationButton) {
+                            locationButton.disabled = false;
+                            locationButton.innerHTML = '📍 Usar Localização Atual';
                         }
-                    };
-                    // Limpar estimativa quando origem muda
-                    resetPriceEstimate();
+                    }
                 },
-                () => {
+                (error) => {
+                    console.error('Erro ao obter localização:', error);
                     toast.show('Não foi possível obter sua localização.', 'error');
                     originInput.value = '';
+                    
+                    // Restaurar botão
+                    if (locationButton) {
+                        locationButton.disabled = false;
+                        locationButton.innerHTML = '📍 Usar Localização Atual';
+                    }
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 300000 // 5 minutos
                 }
             );
         }
@@ -1566,9 +1921,97 @@
             }
         });
         
+        // Funções auxiliares dos modais
+        function showCustomAmount() {
+            closeCreditOptionsModal();
+            setTimeout(() => {
+                const modal = document.getElementById('custom-amount-modal');
+                if (modal) {
+                    modal.classList.remove('hidden');
+                    setTimeout(() => {
+                        const content = document.getElementById('custom-amount-content');
+                        if (content) {
+                            content.classList.remove('scale-95', 'opacity-0');
+                        }
+                        // Focar no input
+                        const input = document.getElementById('custom-amount-input');
+                        if (input) input.focus();
+                    }, 50);
+                }
+            }, 200);
+        }
+        
+        function closeCustomAmountModal() {
+            const modal = document.getElementById('custom-amount-modal');
+            const content = document.getElementById('custom-amount-content');
+            if (modal && content) {
+                content.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    // Limpar input
+                    const input = document.getElementById('custom-amount-input');
+                    if (input) input.value = '';
+                }, 200);
+            }
+        }
+        
+        async function processCustomAmount() {
+            const input = document.getElementById('custom-amount-input');
+            const amount = parseFloat(input.value);
+            
+            if (!amount || amount < 5) {
+                toast.show('Valor mínimo é R$ 5,00', 'warning');
+                return;
+            }
+            
+            if (amount > 500) {
+                toast.show('Valor máximo é R$ 500,00', 'warning');
+                return;
+            }
+            
+            closeCustomAmountModal();
+            await selectCreditAmount(amount);
+        }
+        
+        function showProcessingModal() {
+            const modal = document.getElementById('processing-modal');
+            if (modal) {
+                modal.classList.remove('hidden');
+            }
+        }
+        
+        function hideProcessingModal() {
+            const modal = document.getElementById('processing-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        }
+        
+        // Override da função showLoading para processamento de pagamento
+        const originalShowLoading = showLoading;
+        function showLoading(elementId) {
+            if (elementId === 'processing-payment') {
+                showProcessingModal();
+            } else {
+                originalShowLoading(elementId);
+            }
+        }
+        
+        const originalHideLoading = hideLoading;
+        function hideLoading(elementId) {
+            if (elementId === 'processing-payment') {
+                hideProcessingModal();
+            } else {
+                originalHideLoading(elementId);
+            }
+        }
+
         // Initialize the application when DOM is loaded
         document.addEventListener('DOMContentLoaded', async () => {
             setupLoadingTimeout();
+            
+            // Inicializar Stripe
+            initializeStripe();
             
             // Setup form event listeners
             document.getElementById('login-form')?.addEventListener('submit', (e) => {
@@ -1607,16 +2050,15 @@
                 requestRide();
             });
             
-            // Event listeners para inputs de endereço para resetar estimativa
-            document.getElementById('origin')?.addEventListener('input', () => {
-                state.originPlace = null;
-                resetPriceEstimate();
+            // Event listener para valor personalizado (Enter)
+            document.getElementById('custom-amount-input')?.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    processCustomAmount();
+                }
             });
             
-            document.getElementById('destination')?.addEventListener('input', () => {
-                state.destinationPlace = null;
-                resetPriceEstimate();
-            });
+            // Event listeners dos inputs são configurados automaticamente no initializeAutocomplete()
+            // quando o Google Maps carrega
 
             // Inicializar aplicativo
             await initializeApp();
