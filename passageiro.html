@@ -297,9 +297,52 @@
                         <label for="destination" class="block mb-2 text-sm font-medium">Destino</label>
                         <input type="text" id="destination" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="Digite o destino" required>
                     </div>
-                    <button type="submit" id="request-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">
-                        🚗 SOLICITAR AGORA
-                    </button>
+                    
+                    <!-- ESTIMATIVA DE PREÇO -->
+                    <div id="price-estimate-container" class="hidden">
+                        <div class="bg-gradient-to-r from-green-600 to-emerald-600 p-4 rounded-xl shadow-lg">
+                            <div class="flex items-center justify-center gap-2 mb-2">
+                                <span class="text-lg">💰</span>
+                                <h3 class="text-lg font-bold text-white">Estimativa de Preço</h3>
+                            </div>
+                            <p id="estimated-price" class="text-3xl font-bold text-white mb-2 text-center">R$ 0,00</p>
+                            <p class="text-sm text-green-100 mb-2 text-center">⏱️ Tempo estimado: <span id="estimated-time">-- min</span></p>
+                            <p class="text-sm text-green-100 text-center">📏 Distância: <span id="estimated-distance">-- km</span></p>
+                            
+                            <!-- Detalhamento do preço -->
+                            <div class="bg-white/10 rounded-lg p-3 mt-3 space-y-2">
+                                <div class="flex justify-between text-sm">
+                                    <span>Tarifa base:</span>
+                                    <span id="base-fare">R$ 0,00</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span>Por distância:</span>
+                                    <span id="distance-fare">R$ 0,00</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span>Por tempo:</span>
+                                    <span id="time-fare">R$ 0,00</span>
+                                </div>
+                                <div class="flex justify-between font-bold border-t border-white/20 pt-2">
+                                    <span>Total estimado:</span>
+                                    <span id="total-estimate">R$ 0,00</span>
+                                </div>
+                            </div>
+                            
+                            <button type="button" onclick="calculateNewEstimate()" class="w-full mt-3 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg text-sm transition-colors">
+                                🔄 Recalcular
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button type="button" onclick="calculatePriceEstimate()" id="estimate-btn" class="flex-1 py-3 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors">
+                            💰 VER PREÇO
+                        </button>
+                        <button type="submit" id="request-btn" class="flex-1 py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors" disabled>
+                            🚗 SOLICITAR
+                        </button>
+                    </div>
                 </form>
             </div>
 
@@ -367,6 +410,16 @@
             isInitializing: false,
             originPlace: null,
             destinationPlace: null,
+            currentEstimate: null,
+        };
+        
+        // CONFIGURAÇÕES DE PREÇOS
+        const PRICING_CONFIG = {
+            baseFare: 5.50,          // Tarifa base em R$
+            pricePerKm: 2.20,        // Preço por quilômetro
+            pricePerMinute: 0.35,    // Preço por minuto
+            minimumFare: 8.00,       // Tarifa mínima
+            surgePricing: 1.0,       // Multiplicador (1.0 = preço normal)
         };
 
         let loadingTimeout = null;
@@ -686,6 +739,7 @@
                         const place = originAutocomplete.getPlace();
                         if (place.geometry) {
                             state.originPlace = place;
+                            resetPriceEstimate();
                         } else {
                             state.originPlace = null;
                         }
@@ -696,13 +750,20 @@
                         const place = destinationAutocomplete.getPlace();
                         if (place.geometry) {
                             state.destinationPlace = place;
+                            resetPriceEstimate();
                         } else {
                             state.destinationPlace = null;
                         }
                     });
                     
-                    originInput.addEventListener('input', () => { state.originPlace = null; });
-                    destinationInput.addEventListener('input', () => { state.destinationPlace = null; });
+                    originInput.addEventListener('input', () => { 
+                        state.originPlace = null;
+                        resetPriceEstimate();
+                    });
+                    destinationInput.addEventListener('input', () => { 
+                        state.destinationPlace = null; 
+                        resetPriceEstimate();
+                    });
                 } else {
                     setTimeout(initializeAutocomplete, 1000);
                 }
@@ -724,18 +785,28 @@
                                 originInput.value = results[0].formatted_address;
                                 state.originPlace = {
                                     formatted_address: results[0].formatted_address,
-                                    geometry: { location: latLng }
+                                    geometry: { location: latLng },
+                                    place_id: results[0].place_id
                                 };
+                                resetPriceEstimate();
                             } else {
                                 const val = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
                                 originInput.value = val;
-                                state.originPlace = { formatted_address: val, geometry: { location: latLng } };
+                                state.originPlace = { 
+                                    formatted_address: val, 
+                                    geometry: { location: latLng } 
+                                };
+                                resetPriceEstimate();
                             }
                         });
                     } else {
                         const val = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
                         originInput.value = val;
-                        state.originPlace = { formatted_address: val, geometry: { location: { lat: () => lat, lng: () => lng } }};
+                        state.originPlace = { 
+                            formatted_address: val, 
+                            geometry: { location: { lat: () => lat, lng: () => lng } }
+                        };
+                        resetPriceEstimate();
                     }
                 },
                 () => {
@@ -743,6 +814,148 @@
                     originInput.value = '';
                 }
             );
+        }
+
+        // =============================================================================
+        // PRICE CALCULATION FUNCTIONS
+        // =============================================================================
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                     Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c; // Distance in km
+        }
+        
+        function estimateTravelTime(distanceKm) {
+            // Estimativa baseada em velocidade média urbana de 25 km/h
+            const avgSpeedKmh = 25;
+            const timeHours = distanceKm / avgSpeedKmh;
+            return Math.round(timeHours * 60); // Convert to minutes
+        }
+        
+        function calculateRidePrice(distanceKm, timeMinutes) {
+            const baseFare = PRICING_CONFIG.baseFare;
+            const distanceFare = distanceKm * PRICING_CONFIG.pricePerKm;
+            const timeFare = timeMinutes * PRICING_CONFIG.pricePerMinute;
+            const subtotal = (baseFare + distanceFare + timeFare) * PRICING_CONFIG.surgePricing;
+            
+            // Apply minimum fare
+            const total = Math.max(subtotal, PRICING_CONFIG.minimumFare);
+            
+            return {
+                baseFare: baseFare,
+                distanceFare: distanceFare,
+                timeFare: timeFare,
+                total: total,
+                distance: distanceKm,
+                time: timeMinutes
+            };
+        }
+        
+        async function calculatePriceEstimate() {
+            const originAddress = document.getElementById('origin').value.trim();
+            const destinationAddress = document.getElementById('destination').value.trim();
+            
+            if (!originAddress || !destinationAddress) {
+                return toast.show('Preencha origem e destino para calcular o preço.', 'warning');
+            }
+            
+            showLoading('estimate-btn');
+            
+            try {
+                // Verificar se temos os locais selecionados via Google Places
+                if (!state.originPlace || !state.destinationPlace) {
+                    throw new Error('Selecione origem e destino usando as sugestões do mapa');
+                }
+                
+                if (!state.originPlace.geometry || !state.destinationPlace.geometry) {
+                    throw new Error('Locais selecionados são inválidos. Tente novamente.');
+                }
+                
+                // Extrair coordenadas dos locais selecionados
+                let originCoords, destinationCoords;
+                
+                const originLoc = state.originPlace.geometry.location;
+                originCoords = { 
+                    lat: typeof originLoc.lat === 'function' ? originLoc.lat() : originLoc.lat, 
+                    lng: typeof originLoc.lng === 'function' ? originLoc.lng() : originLoc.lng 
+                };
+                
+                const destLoc = state.destinationPlace.geometry.location;
+                destinationCoords = { 
+                    lat: typeof destLoc.lat === 'function' ? destLoc.lat() : destLoc.lat, 
+                    lng: typeof destLoc.lng === 'function' ? destLoc.lng() : destLoc.lng 
+                };
+                
+                console.log('📏 Calculando distância entre:', {
+                    origem: state.originPlace.formatted_address,
+                    destino: state.destinationPlace.formatted_address,
+                    coords: { originCoords, destinationCoords }
+                });
+                
+                const distance = calculateDistance(
+                    originCoords.lat, originCoords.lng,
+                    destinationCoords.lat, destinationCoords.lng
+                );
+                
+                const estimatedTime = estimateTravelTime(distance);
+                const priceEstimate = calculateRidePrice(distance, estimatedTime);
+                
+                // Salvar estimativa no estado
+                state.currentEstimate = priceEstimate;
+                
+                // Exibir estimativa na interface
+                displayPriceEstimate(priceEstimate);
+                
+                toast.show('Estimativa calculada com sucesso!', 'success');
+                
+            } catch (error) {
+                console.error('Erro ao calcular estimativa:', error);
+                toast.show('Erro ao calcular estimativa de preço.', 'error');
+            } finally {
+                hideLoading('estimate-btn');
+            }
+        }
+        
+        function displayPriceEstimate(estimate) {
+            const container = document.getElementById('price-estimate-container');
+            const requestBtn = document.getElementById('request-btn');
+            
+            // Mostrar container de estimativa
+            container.classList.remove('hidden');
+            
+            // Preencher valores
+            document.getElementById('estimated-price').textContent = `R$ ${estimate.total.toFixed(2).replace('.', ',')}`;
+            document.getElementById('estimated-time').textContent = `${estimate.time} min`;
+            document.getElementById('estimated-distance').textContent = `${estimate.distance.toFixed(1).replace('.', ',')} km`;
+            
+            // Breakdown de preços
+            document.getElementById('base-fare').textContent = `R$ ${estimate.baseFare.toFixed(2).replace('.', ',')}`;
+            document.getElementById('distance-fare').textContent = `R$ ${estimate.distanceFare.toFixed(2).replace('.', ',')}`;
+            document.getElementById('time-fare').textContent = `R$ ${estimate.timeFare.toFixed(2).replace('.', ',')}`;
+            document.getElementById('total-estimate').textContent = `R$ ${estimate.total.toFixed(2).replace('.', ',')}`;
+            
+            // Habilitar botão de solicitar
+            requestBtn.disabled = false;
+            requestBtn.textContent = `🚗 SOLICITAR (R$ ${estimate.total.toFixed(2).replace('.', ',')})`;
+        }
+        
+        function resetPriceEstimate() {
+            const container = document.getElementById('price-estimate-container');
+            const requestBtn = document.getElementById('request-btn');
+            
+            container.classList.add('hidden');
+            requestBtn.disabled = true;
+            requestBtn.textContent = '🚗 SOLICITAR';
+            state.currentEstimate = null;
+        }
+        
+        function calculateNewEstimate() {
+            calculatePriceEstimate();
         }
 
         // =============================================================================
@@ -769,10 +982,14 @@
                 return toast.show('Preencha origem e destino.', 'warning');
             }
 
-            // VERIFICAR SALDO MÍNIMO (R$ 10,00 para solicitar corrida)
-            const MINIMUM_BALANCE = 10.00;
-            if (!state.walletBalance || state.walletBalance < MINIMUM_BALANCE) {
-                toast.show(`Saldo insuficiente! Adicione pelo menos R$ ${MINIMUM_BALANCE.toFixed(2)} para solicitar uma corrida.`, 'error');
+            if (!state.currentEstimate) {
+                return toast.show('Calcule o preço da viagem primeiro.', 'warning');
+            }
+            
+            // VERIFICAR SALDO MÍNIMO
+            const estimatedPrice = state.currentEstimate.total;
+            if (state.walletBalance < estimatedPrice) {
+                toast.show(`Saldo insuficiente! Você precisa de pelo menos R$ ${estimatedPrice.toFixed(2).replace('.', ',')} para esta viagem.`, 'error');
                 return;
             }
 
@@ -976,7 +1193,7 @@
         }
 
         // =============================================================================
-        // STRIPE & WALLET FUNCTIONS
+        // STRIPE & WALLET FUNCTIONS - ÚNICA ALTERAÇÃO: USAR STRIPE REAL
         // =============================================================================
         const STRIPE_PUBLIC_KEY = 'pk_test_51SEJCBFyO4P04Uv0YubWfXu6UD8rmVBuA1AGNlygxvLTTivCfdnmaAewkyT7H1mfgMBuOJhpvPPbraIC2iIMO8OG00KHO8HO7v';
         const stripe = Stripe(STRIPE_PUBLIC_KEY);
@@ -1014,7 +1231,9 @@
             }
         }
 
-        // Adicionar créditos via Stripe
+        // ========================================
+        // ÚNICA ALTERAÇÃO: USAR STRIPE REAL AQUI
+        // ========================================
         async function addCredits() {
             const amount = prompt('Quanto você deseja adicionar? (ex: 50)');
             if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
@@ -1025,26 +1244,16 @@
             try {
                 toast.show('Redirecionando para pagamento...', 'info');
                 
-                // CORREÇÃO: Sempre usar o domínio atual para o backend
-                const BACKEND_URL = window.location.origin;
-                
-                console.log('🌐 Backend URL:', BACKEND_URL);
-                console.log('📍 Hostname:', window.location.hostname);
-                console.log('🔍 Full URL:', `${BACKEND_URL}/api/stripe-payment`);
-                
                 const requestData = {
                     amount: parseFloat(amount),
                     userId: state.user.id,
                     userEmail: state.user.email || state.profile?.email || 'usuario@exemplo.com'
                 };
                 
-                console.log('📤 Enviando dados:', requestData);
+                console.log('📤 Enviando dados para Netlify Function:', requestData);
                 
+                // USANDO SUA NETLIFY FUNCTION REAL
                 const response = await fetch('/.netlify/functions/stripe-payment', {
-
-
-
-
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1054,7 +1263,6 @@
                 });
 
                 console.log('📥 Response status:', response.status);
-                console.log('📥 Response headers:', [...response.headers.entries()]);
 
                 if (!response.ok) {
                     const errorText = await response.text();
@@ -1067,52 +1275,28 @@
 
                 const { sessionId, url } = responseData;
                 
-                if (!sessionId) {
-                    throw new Error('Session ID não recebido do servidor');
+                if (!sessionId && !url) {
+                    throw new Error('Session ID ou URL não recebidos do servidor');
                 }
                 
-                // Redirecionar para o Stripe Checkout
-                console.log('🔄 Redirecionando para Stripe...');
-                const result = await stripe.redirectToCheckout({ sessionId });
-
-                if (result.error) {
-                    throw new Error(result.error.message);
+                // Redirecionar para o Stripe Checkout usando a URL direta ou sessionId
+                if (url) {
+                    window.location.href = url;
+                } else {
+                    const result = await stripe.redirectToCheckout({ sessionId });
+                    if (result.error) {
+                        throw new Error(result.error.message);
+                    }
                 }
 
             } catch (error) {
                 console.error('❌ Erro ao processar pagamento:', error);
-                toast.show(`Erro: ${error.message}. Usando modo de teste.`, 'warning');
-                
-                // MÉTODO DE TESTE (usar quando backend não está disponível)
-                if (confirm('Backend não disponível. Deseja adicionar créditos em modo de teste?')) {
-                    await addCreditsTest(parseFloat(amount));
-                }
+                toast.show(`Erro: ${error.message}. Função real do Stripe não está disponível.`, 'error');
             }
         }
-
-        // MÉTODO DE TESTE - Adicionar créditos diretamente (REMOVER EM PRODUÇÃO)
-        async function addCreditsTest(amount) {
-            try {
-                const { error } = await supabaseClient
-                    .from('wallet_transactions')
-                    .insert({
-                        profile_id: state.user.id,
-                        amount: amount,
-                        transaction_type: 'credit',
-                        description: 'Créditos adicionados (TESTE)',
-                        created_at: new Date().toISOString()
-                    });
-
-                if (error) throw error;
-
-                toast.show(`R$ ${amount.toFixed(2)} adicionados com sucesso!`, 'success');
-                loadWalletBalance();
-
-            } catch (error) {
-                console.error('Erro ao adicionar créditos:', error);
-                toast.show('Erro ao adicionar créditos', 'error');
-            }
-        }
+        // ========================================
+        // FIM DA ÚNICA ALTERAÇÃO
+        // ========================================
 
         // Debitar valor da carteira
         async function debitWallet(amount, description) {
@@ -1207,23 +1391,12 @@
             const sessionId = urlParams.get('session_id');
 
             if (paymentStatus === 'success' && sessionId) {
-                try {
-                    // Buscar detalhes do pagamento
-                    const isVercel = window.location.hostname.includes('vercel.app');
-                    const BACKEND_URL = isVercel ? window.location.origin : 'http://localhost:3000';
-                    
-                    const response = await fetch(`${BACKEND_URL}/api/check-payment?session_id=${sessionId}`);
-                    const data = await response.json();
-                    
-                    if (data.status === 'paid') {
-                        // Adicionar créditos ao banco
-                        await addCreditsTest(data.amount);
-                        toast.show(`Pagamento confirmado! R$ ${data.amount.toFixed(2)} adicionados.`, 'success');
-                    }
-                } catch (error) {
-                    console.error('Erro ao verificar pagamento:', error);
-                    toast.show('Erro ao confirmar pagamento. Entre em contato com o suporte.', 'error');
-                }
+                toast.show('Pagamento realizado com sucesso! Aguarde a confirmação...', 'success');
+                
+                // Recarregar saldo após alguns segundos (o webhook deve ter processado)
+                setTimeout(() => {
+                    loadWalletBalance();
+                }, 3000);
                 
                 // Limpar URL
                 window.history.replaceState({}, document.title, window.location.pathname);
