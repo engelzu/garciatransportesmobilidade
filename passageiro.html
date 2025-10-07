@@ -591,7 +591,7 @@
                     <span>Pagamento seguro via Stripe</span>
                 </div>
                 <div class="text-xs text-gray-400">
-                    💡 <strong>Modo Demo:</strong> Os pagamentos são simulados para demonstração
+                    ✅ <strong>Pagamento Real:</strong> Processado com segurança via Stripe
                 </div>
             </div>
             
@@ -641,10 +641,13 @@
     </div>
 
     <script>
-        // CONFIGURAÇÃO SIMPLIFICADA - SEM SUPABASE COMPLEXO
+        // CONFIGURAÇÃO REAL - SUPABASE E STRIPE
         const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Inicializar Stripe
+        const stripe = Stripe('pk_test_51Q2g3YRqwT2a4OOUU4WN8RGNKhOcQBcvXYFVOPNwL0kj7VD8dONTZGD1Ol1Y3RyOqGLtPHzNiNc8g2M7gOCDAHD100xRfvNyFa'); // Sua chave pública do Stripe
         
         const state = { 
             user: null, 
@@ -882,28 +885,47 @@
 
         async function selectCreditAmount(amount) {
             closeCreditOptionsModal();
-            await simulatePayment(amount);
+            await processRealPayment(amount);
         }
 
-        async function simulatePayment(amount) {
+        async function processRealPayment(amount) {
             showProcessingModal();
             
             try {
-                // Simular delay de processamento
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                if (!state.user || !state.profile) {
+                    throw new Error('Usuário não logado');
+                }
                 
-                // Simular sucesso (90% das vezes)
-                if (Math.random() > 0.1) {
-                    state.walletBalance += amount;
-                    updateWalletDisplay();
-                    toast.show(`R$ ${amount.toFixed(2).replace('.', ',')} adicionados à sua carteira!`, 'success');
+                // Fazer requisição para sua Netlify Function
+                const response = await fetch('/.netlify/functions/stripe-payment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        amount: amount,
+                        userId: state.user.id,
+                        userEmail: state.profile.email
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro ao processar pagamento');
+                }
+                
+                // Redirecionar para o Stripe Checkout
+                if (data.url) {
+                    hideProcessingModal();
+                    window.location.href = data.url;
                 } else {
-                    throw new Error('Pagamento recusado pelo banco');
+                    throw new Error('URL de pagamento não recebida');
                 }
                 
             } catch (error) {
+                console.error('Erro no pagamento:', error);
                 toast.show(`Erro no pagamento: ${error.message}`, 'error');
-            } finally {
                 hideProcessingModal();
             }
         }
@@ -1644,10 +1666,59 @@
         }
 
         // =============================================================================
+        // PAYMENT SUCCESS/CANCEL HANDLING
+        // =============================================================================
+        function checkPaymentStatus() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const paymentStatus = urlParams.get('payment');
+            const sessionId = urlParams.get('session_id');
+            
+            if (paymentStatus === 'success' && sessionId) {
+                toast.show('Pagamento processado com sucesso! Créditos serão adicionados em instantes.', 'success');
+                // Limpar URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+                
+                // Verificar status do pagamento no Supabase (se necessário)
+                setTimeout(() => {
+                    loadWalletBalance();
+                }, 2000);
+                
+            } else if (paymentStatus === 'cancel') {
+                toast.show('Pagamento cancelado pelo usuário.', 'warning');
+                // Limpar URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
+        
+        async function loadWalletBalance() {
+            try {
+                if (!state.user?.id) return;
+                
+                // Buscar saldo atualizado do Supabase
+                const { data, error } = await supabaseClient
+                    .from('wallet_transactions')
+                    .select('amount')
+                    .eq('profile_id', state.user.id)
+                    .eq('transaction_type', 'credit');
+                    
+                if (!error && data) {
+                    const totalCredits = data.reduce((sum, transaction) => sum + transaction.amount, 0);
+                    state.walletBalance = totalCredits;
+                    updateWalletDisplay();
+                }
+            } catch (error) {
+                console.error('Erro ao carregar saldo da carteira:', error);
+            }
+        }
+
+        // =============================================================================
         // APPLICATION INITIALIZATION
         // =============================================================================
         document.addEventListener('DOMContentLoaded', async () => {
             setupLoadingTimeout();
+            
+            // Verificar status de pagamento na URL
+            checkPaymentStatus();
             
             // Setup form event listeners
             document.getElementById('login-form')?.addEventListener('submit', (e) => {
