@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g&libraries=places"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g&libraries=places,directions"></script>
     
     <style>
         body { font-family: 'Poppins', sans-serif; background-color: black; color: white; }
@@ -20,7 +20,7 @@
         .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #6d28d9; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* Autocomplete Google Maps Styling */
+        /* Autocomplete Google Maps aStyling */
         .pac-container { background-color: #1F2937; border-radius: 8px; border: 1px solid #4B5563; }
         .pac-item { padding: 10px; font-size: 14px; color: #D1D5DB; cursor: pointer; border-top: 1px solid #374151;}
         .pac-item:first-child { border-top: none; }
@@ -372,6 +372,11 @@
                     </div>
                 </div>
                 
+                <!-- MAP CONTAINER -->
+                <div id="map-container" class="w-full h-64 rounded-xl bg-gray-700 my-4 overflow-hidden hidden relative">
+                    <div id="map" class="w-full h-full"></div>
+                </div>
+
                 <!-- Timeline de Status -->
                 <div id="status-timeline" class="p-4 bg-gray-800/80 backdrop-blur-sm rounded-xl space-y-3">
                     <!-- Status items will be populated by JS -->
@@ -384,12 +389,29 @@
                 </div>
 
                 <!-- Botões de Ação -->
-                <div class="flex gap-3 pt-2">
+                <div id="ride-action-buttons" class="flex gap-3 pt-2">
                     <button id="cancel-ride-btn" onclick="cancelRide()" class="flex-1 py-3 font-semibold rounded-lg bg-red-600/90 hover:bg-red-600 transition-colors">
                         ❌ CANCELAR VIAGEM
                     </button>
                     <button id="help-btn" onclick="getHelp()" class="py-3 px-5 font-semibold rounded-lg bg-gray-600/90 hover:bg-gray-600 transition-colors">
                         🆘
+                    </button>
+                </div>
+
+                <!-- RIDE SUMMARY PANEL -->
+                <div id="ride-summary-panel" class="hidden text-center p-6 bg-gray-800 rounded-xl space-y-4 border border-green-500">
+                    <h3 class="text-2xl font-bold text-green-400">✅ Viagem Concluída!</h3>
+                    <p class="text-gray-300">Obrigado por viajar conosco.</p>
+                    <div>
+                        <p class="text-sm text-gray-400">Valor Final</p>
+                        <p id="summary-price" class="text-4xl font-bold text-white">R$ 0,00</p>
+                    </div>
+                    <div id="summary-details" class="text-left text-sm space-y-2 bg-gray-900/50 p-4 rounded-lg">
+                        <p class="flex items-start gap-2"><strong class="text-green-400">🟢 Origem:</strong> <span id="summary-origin" class="flex-1">-</span></p>
+                        <p class="flex items-start gap-2"><strong class="text-red-400">🔴 Destino:</strong> <span id="summary-destination" class="flex-1">-</span></p>
+                    </div>
+                    <button onclick="finishRideSummary()" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">
+                        NOVA VIAGEM
                     </button>
                 </div>
             </div>
@@ -406,11 +428,16 @@
             profile: null, 
             currentRide: null, 
             rideSubscription: null,
-            ridePollInterval: null,
             isInitializing: false,
             originPlace: null,
             destinationPlace: null,
             currentEstimate: null,
+            map: null,
+            driverMarker: null,
+            pickupMarker: null,
+            driverLocationSubscription: null,
+            directionsRenderer: null,
+            directionsService: null,
         };
         
         // CONFIGURAÇÕES DE PREÇOS
@@ -423,6 +450,9 @@
         };
 
         let loadingTimeout = null;
+        
+        // Estilo escuro para o mapa
+        const mapStyle = [ { "elementType": "geometry", "stylers": [ { "color": "#242f3e" } ] }, { "elementType": "labels.text.fill", "stylers": [ { "color": "#746855" } ] }, { "elementType": "labels.text.stroke", "stylers": [ { "color": "#242f3e" } ] }, { "featureType": "administrative.locality", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] }, { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] }, { "featureType": "poi.park", "elementType": "geometry", "stylers": [ { "color": "#263c3f" } ] }, { "featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [ { "color": "#6b9a76" } ] }, { "featureType": "road", "elementType": "geometry", "stylers": [ { "color": "#38414e" } ] }, { "featureType": "road", "elementType": "geometry.stroke", "stylers": [ { "color": "#212a37" } ] }, { "featureType": "road", "elementType": "labels.text.fill", "stylers": [ { "color": "#9ca5b3" } ] }, { "featureType": "road.highway", "elementType": "geometry", "stylers": [ { "color": "#746855" } ] }, { "featureType": "road.highway", "elementType": "geometry.stroke", "stylers": [ { "color": "#1f2835" } ] }, { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [ { "color": "#f3d19c" } ] }, { "featureType": "transit", "elementType": "geometry", "stylers": [ { "color": "#2f3948" } ] }, { "featureType": "transit.station", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] }, { "featureType": "water", "elementType": "geometry", "stylers": [ { "color": "#17263c" } ] }, { "featureType": "water", "elementType": "labels.text.fill", "stylers": [ { "color": "#515c6d" } ] }, { "featureType": "water", "elementType": "labels.text.stroke", "stylers": [ { "color": "#17263c" } ] } ];
 
         // =============================================================================
         // ERROR RECOVERY & GLOBAL HANDLERS
@@ -458,7 +488,6 @@
                     state.rideSubscription = null;
                 } catch (e) { console.warn('Erro ao remover subscription:', e); }
             }
-            stopRidePolling();
             showScreen('login-screen');
         }
 
@@ -520,6 +549,109 @@
                 return 'N/A';
             }
         }
+        
+        function parsePoint(pointData) {
+            // Case 1: Handle PostGIS WKT string format like "POINT(-46.63 23.55)"
+            if (typeof pointData === 'string') {
+                const match = pointData.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
+                if (match && match.length === 3) {
+                    return { lng: parseFloat(match[1]), lat: parseFloat(match[2]) };
+                }
+            }
+            // Case 2: Handle GeoJSON object format like { type: 'Point', coordinates: [-46.63, 23.55] }
+            if (typeof pointData === 'object' && pointData !== null && pointData.type === 'Point' && Array.isArray(pointData.coordinates) && pointData.coordinates.length === 2) {
+                return { lng: pointData.coordinates[0], lat: pointData.coordinates[1] };
+            }
+            // Return null if format is not recognized
+            return null;
+        }
+
+        // =============================================================================
+        // MAP FUNCTIONS
+        // =============================================================================
+        function initMap(pickupCoords) {
+            if (state.map) return;
+            const mapElement = document.getElementById('map');
+            if (!mapElement) return;
+
+            state.map = new google.maps.Map(mapElement, {
+                center: pickupCoords,
+                zoom: 15,
+                disableDefaultUI: true,
+                styles: mapStyle
+            });
+            
+            state.pickupMarker = new google.maps.Marker({
+                position: pickupCoords,
+                map: state.map,
+                title: 'Local de Partida'
+            });
+
+            state.directionsService = new google.maps.DirectionsService();
+            state.directionsRenderer = new google.maps.DirectionsRenderer({
+                map: state.map,
+                suppressMarkers: true, // Usaremos nossos próprios marcadores
+                polylineOptions: {
+                    strokeColor: '#8b5cf6', // Indigo-500
+                    strokeOpacity: 0.8,
+                    strokeWeight: 6
+                }
+            });
+        }
+
+        function updateMapWithRoute(driverCoords, pickupCoords) {
+            if (!state.map || !driverCoords || !pickupCoords) return;
+
+            // Criar ou atualizar marcador do motorista
+            if (!state.driverMarker) {
+                state.driverMarker = new google.maps.Marker({
+                    position: driverCoords,
+                    map: state.map,
+                    title: 'Motorista',
+                    icon: {
+                        path: 'M29.395,0H17.636c-3.117,0-5.643,3.467-5.643,6.584v34.804c0,3.116,2.526,5.644,5.643,5.644h11.759c3.116,0,5.644-2.527,5.644-5.644V6.584C35.038,3.467,32.511,0,29.395,0z M34.05,14.188v11.665l-2.729,0.351v-4.806L34.05,14.188z M32.618,10.773c-1.016,3.9-2.219,8.51-2.219,8.51H16.631l-2.222-8.51C14.41,10.773,23.293,7.755,32.618,10.773z M15.741,21.713v4.492l-2.73-0.349V14.502L15.741,21.713z M12.998,3.78c-1.386,0-2.5,1.114-2.5,2.5s1.114,2.5,2.5,2.5s2.5-1.114,2.5-2.5S14.384,3.78,12.998,3.78z M12.998,41.958c-1.386,0-2.5,1.114-2.5,2.5s1.114,2.5,2.5,2.5s2.5-1.114,2.5-2.5S14.384,41.958,12.998,41.958z M34.05,28.843v11.665l-2.729,0.351v-4.806L34.05,28.843z M34.05,43.511v-4.806l-2.729,0.351v4.455L34.05,43.511z M15.741,28.843v4.492l-2.73-0.349V21.826L15.741,28.843z M15.741,44.206v-4.806l-2.73,0.351v4.455L15.741,44.206z',
+                        fillColor: '#6d28d9',
+                        fillOpacity: 1,
+                        strokeWeight: 0,
+                        rotation: 0,
+                        scale: 0.8,
+                        anchor: new google.maps.Point(24, 24)
+                    }
+                });
+            } else {
+                state.driverMarker.setPosition(driverCoords);
+            }
+
+            // Calcular e desenhar a rota
+            state.directionsService.route({
+                origin: driverCoords,
+                destination: pickupCoords,
+                travelMode: 'DRIVING'
+            }, (response, status) => {
+                if (status === 'OK') {
+                    state.directionsRenderer.setDirections(response);
+                } else {
+                    console.warn('Directions request failed due to ' + status);
+                    const bounds = new google.maps.LatLngBounds();
+                    bounds.extend(driverCoords);
+                    bounds.extend(pickupCoords);
+                    state.map.fitBounds(bounds);
+                }
+            });
+        }
+        
+        function cleanupMap() {
+            if (state.driverLocationSubscription) {
+                supabaseClient.removeChannel(state.driverLocationSubscription);
+                state.driverLocationSubscription = null;
+            }
+            document.getElementById('map-container')?.classList.add('hidden');
+            state.map = null;
+            state.driverMarker = null;
+            state.pickupMarker = null;
+            state.directionsRenderer = null;
+            state.directionsService = null;
+        }
 
         // =============================================================================
         // RIDE STATUS UI MANAGEMENT (NEW UBER-LIKE STYLE)
@@ -527,9 +659,9 @@
         const timelineConfig = {
             'requested': { icon: '⏳', text: 'Procurando motorista' },
             'assigned': { icon: '🎯', text: 'Motorista encontrado' },
-            'accepted': { icon: '📍', text: 'Motorista no local' },
-            'arrived_pickup': { icon: '🚗', text: 'Viagem em andamento' },
-            'in_progress': { icon: '🏁', text: 'Viagem concluída' },
+            'accepted': { icon: '🚗', text: 'Motorista a caminho' },
+            'arrived_pickup': { icon: '📍', text: 'Motorista no local' },
+            'in_progress': { icon: '🛣️', text: 'Viagem em andamento' },
             'completed': { icon: '🏁', text: 'Viagem concluída' },
         };
         const statusOrder = ['requested', 'assigned', 'accepted', 'arrived_pickup', 'in_progress', 'completed'];
@@ -540,60 +672,31 @@
 
             timelineContainer.innerHTML = '';
             const currentIndex = statusOrder.indexOf(currentStatus);
+            if (currentIndex === -1) return; // Status desconhecido
 
-            // Special handling for the missing "Motorista a caminho" step
-            const rideAccepted = currentIndex >= statusOrder.indexOf('accepted');
+            statusOrder.forEach((statusKey, index) => {
+                // Não exibir etapas futuras até que o motorista seja encontrado
+                if (currentIndex < 1 && index > 1) return;
+                
+                // Ocultar a etapa "Concluída" até que a viagem esteja realmente em andamento
+                if (statusKey === 'completed' && currentIndex < statusOrder.indexOf('in_progress')) return;
+                
+                const config = timelineConfig[statusKey];
+                if (!config) return;
 
-            // 1. Procurando motorista
-            if(statusOrder.indexOf('requested') < statusOrder.length){
-                 const item = document.createElement('div');
-                item.className = `timeline-item ${currentIndex >= 0 ? 'completed' : ''} ${currentStatus === 'requested' ? 'active' : ''}`;
-                item.innerHTML = `<div class="timeline-icon">⏳</div><p class="timeline-text">Procurando motorista</p>`;
-                timelineContainer.appendChild(item);
-            }
-
-            // 2. Motorista encontrado
-             if(statusOrder.indexOf('assigned') < statusOrder.length){
                 const item = document.createElement('div');
-                item.className = `timeline-item ${currentIndex >= 1 ? 'completed' : ''} ${currentStatus === 'assigned' ? 'active' : ''}`;
-                item.innerHTML = `<div class="timeline-icon">🎯</div><p class="timeline-text">Motorista encontrado</p>`;
-                timelineContainer.appendChild(item);
-             }
-           
-            // 3. Motorista a caminho (Virtual Step)
-            if (currentIndex >= 1) { // Show if driver is assigned or further
-                const item = document.createElement('div');
-                item.className = `timeline-item ${rideAccepted ? 'completed' : 'active'}`;
-                item.innerHTML = `<div class="timeline-icon">✅</div><p class="timeline-text">Motorista a caminho</p>`;
-                timelineContainer.appendChild(item);
-            }
+                let itemClass = 'timeline-item';
 
-            // 4. Motorista no local
-            if (currentIndex >= 1) {
-                const config = timelineConfig['accepted'];
-                const item = document.createElement('div');
-                item.className = `timeline-item ${currentIndex >= 3 ? 'completed' : ''} ${currentStatus === 'accepted' ? 'active' : ''}`;
+                if (index < currentIndex) {
+                    itemClass += ' completed';
+                } else if (index === currentIndex) {
+                    itemClass += ' active';
+                }
+                
+                item.className = itemClass;
                 item.innerHTML = `<div class="timeline-icon">${config.icon}</div><p class="timeline-text">${config.text}</p>`;
                 timelineContainer.appendChild(item);
-            }
-
-            // 5. Viagem em andamento
-            if (currentIndex >= 2) {
-                const config = timelineConfig['arrived_pickup'];
-                const item = document.createElement('div');
-                item.className = `timeline-item ${currentIndex >= 4 ? 'completed' : ''} ${currentStatus === 'arrived_pickup' ? 'active' : ''}`;
-                item.innerHTML = `<div class="timeline-icon">${config.icon}</div><p class="timeline-text">${config.text}</p>`;
-                timelineContainer.appendChild(item);
-            }
-
-            // 6. Viagem concluída
-             if (currentIndex >= 3) {
-                const config = timelineConfig['in_progress'];
-                const item = document.createElement('div');
-                item.className = `timeline-item ${currentIndex >= 5 ? 'completed' : ''} ${currentStatus === 'in_progress' || currentStatus === 'completed' ? 'active' : ''}`;
-                item.innerHTML = `<div class="timeline-icon">${config.icon}</div><p class="timeline-text">${config.text}</p>`;
-                timelineContainer.appendChild(item);
-             }
+            });
         }
         
         function updateDriverPanel(driver, details) {
@@ -646,10 +749,12 @@
                 cancelBtn.classList.remove('hidden');
             }
 
-            // If driver is assigned, load info. Otherwise, show searching state.
+            // Manage driver info panel and map
             if (ride.driver_id) {
                 loadDriverInfo(ride.driver_id);
             } else {
+                // This state is for 'requested' status, before a driver is found
+                cleanupMap(); 
                 updateDriverPanel(null, null); // Resets to "searching"
                 document.getElementById('driver-details-panel').classList.add('active');
             }
@@ -694,7 +799,6 @@
                     supabaseClient.removeChannel(state.rideSubscription);
                     state.rideSubscription = null;
                 }
-                stopRidePolling();
                 await supabaseClient.auth.signOut();
                 toast.show('Logout realizado com sucesso', 'success');
             } catch (error) {
@@ -1016,7 +1120,8 @@
                     origin_address: originResult.formatted_address,
                     origin_location: `POINT(${originCoords.lng()} ${originCoords.lat()})`,
                     destinations: [destinationResult.formatted_address],
-                    status: 'requested'
+                    status: 'requested',
+                    estimated_price: state.currentEstimate.total
                 };
                 
                 const { data, error } = await supabaseClient
@@ -1063,28 +1168,6 @@
                 showRideRequestForm();
             }
         }
-        
-        async function pollRideStatus() {
-            if (!state.currentRide) return stopRidePolling();
-            const { data } = await supabaseClient.from('rides')
-                .select('status, driver_id').eq('id', state.currentRide.id).single();
-            if (data && (data.status !== state.currentRide.status || data.driver_id !== state.currentRide.driver_id)) {
-                console.log(`🔄 Polling detectou mudança! [Status: ${state.currentRide.status} -> ${data.status}]`);
-                await checkPendingRide();
-            }
-             if (!data || ['completed', 'canceled'].includes(data.status)) {
-                await checkPendingRide();
-            }
-        }
-
-        function startRidePolling() {
-            stopRidePolling();
-            state.ridePollInterval = setInterval(pollRideStatus, 15000);
-        }
-        function stopRidePolling() {
-            if (state.ridePollInterval) clearInterval(state.ridePollInterval);
-            state.ridePollInterval = null;
-        }
 
         function subscribeToRideUpdates(rideId) {
             if (state.rideSubscription) {
@@ -1100,22 +1183,28 @@
                         state.currentRide = { ...state.currentRide, ...updatedRide };
                         handleRideStateUpdate(state.currentRide);
                         
-                        if (['completed', 'canceled'].includes(updatedRide.status)) {
-                            stopRidePolling();
+                        if (updatedRide.status === 'completed') {
                             if(state.rideSubscription) supabaseClient.removeChannel(state.rideSubscription);
                             state.rideSubscription = null;
                             
-                            // DEBITAR VALOR DA CORRIDA SE COMPLETADA
-                            if (updatedRide.status === 'completed' && updatedRide.price) {
+                            if (updatedRide.price) {
                                 const ridePrice = parseFloat(updatedRide.price);
                                 debitWallet(ridePrice, `Corrida #${updatedRide.id} - ${updatedRide.origin_address} → ${updatedRide.destinations[0]}`);
-                                toast.show(`Corrida concluída! R$ ${ridePrice.toFixed(2)} debitado da sua carteira.`, 'success');
+                                toast.show(`Corrida concluída! R$ ${ridePrice.toFixed(2).replace('.',',')} debitado da sua carteira.`, 'success');
+                            } else {
+                                toast.show('Corrida concluída!', 'success');
                             }
+                            showRideSummary(updatedRide);
+
+                        } else if (updatedRide.status === 'canceled') {
+                            if(state.rideSubscription) supabaseClient.removeChannel(state.rideSubscription);
+                            state.rideSubscription = null;
                             
+                            toast.show('A viagem foi cancelada.', 'info');
                             setTimeout(() => {
                                 state.currentRide = null;
                                 showRideRequestForm();
-                            }, 5000);
+                            }, 3000);
                         }
                     })
                     .subscribe(status => {
@@ -1128,20 +1217,69 @@
         async function loadDriverInfo(driverId) {
             if (!driverId) return;
             try {
-                const { data, error } = await supabaseClient.from('profiles')
+                const { data: driverData, error: driverError } = await supabaseClient.from('profiles')
                     .select('full_name, phone_number').eq('id', driverId).single();
-                if (error) throw error;
-                const { data: details, error: detailsError } = await supabaseClient.from('driver_details')
-                    .select('car_model, license_plate, car_color').eq('profile_id', driverId).single();
+                if (driverError) throw driverError;
+                
+                const { data: detailsData, error: detailsError } = await supabaseClient.from('driver_details')
+                    .select('car_model, license_plate, car_color, current_location').eq('profile_id', driverId).single();
                 if (detailsError) throw detailsError;
                 
-                state.currentRide.driver = data;
-                state.currentRide.driver_details = details;
-                updateDriverPanel(data, details);
+                state.currentRide.driver = driverData;
+                state.currentRide.driver_details = detailsData;
+                updateDriverPanel(driverData, detailsData);
+
+                const rideStatus = state.currentRide.status;
+                if (['assigned', 'accepted', 'arrived_pickup', 'in_progress'].includes(rideStatus)) {
+                    const pickupCoords = parsePoint(state.currentRide.origin_location);
+                    
+                    if (pickupCoords) {
+                        // 1. Tornar o container do mapa visível e inicializar
+                        document.getElementById('map-container').classList.remove('hidden');
+                        if (!state.map) {
+                            initMap(pickupCoords);
+                        }
+
+                        // 2. Tentar desenhar a rota com a localização atual (se houver)
+                        const initialDriverCoords = parsePoint(detailsData.current_location);
+                        if (initialDriverCoords) {
+                             updateMapWithRoute(initialDriverCoords, pickupCoords);
+                        }
+                        
+                        // 3. SEMPRE se inscrever para futuras atualizações de localização
+                        subscribeToDriverLocation(driverId, pickupCoords);
+                    }
+                }
+
             } catch (error) {
                 console.error('❌ Erro ao carregar dados do motorista:', error.message);
                 updateDriverPanel({ full_name: 'Erro ao carregar' }, {});
             }
+        }
+        
+        function subscribeToDriverLocation(driverId, pickupCoords) {
+            if (state.driverLocationSubscription) return;
+
+            state.driverLocationSubscription = supabaseClient
+                .channel(`driver-location-${driverId}`)
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'driver_details',
+                    filter: `profile_id=eq.${driverId}`
+                }, payload => {
+                    const newLocation = payload.new.current_location;
+                    if (newLocation) {
+                        const driverCoords = parsePoint(newLocation);
+                        if (driverCoords) {
+                            console.log('📍 Posição do motorista recebida:', driverCoords);
+                            updateMapWithRoute(driverCoords, pickupCoords);
+                        }
+                    }
+                })
+                .subscribe(status => {
+                     if (status === 'SUBSCRIBED') console.log(`✅ Escutando localização do motorista ${driverId}!`);
+                });
         }
 
         function updateTripDetails(origin, destination, createdAt) {
@@ -1162,16 +1300,52 @@
         // UI & ACTION TRIGGERS
         // =============================================================================
         function showRideRequestForm() {
-            stopRidePolling();
             resetRideStatusUI();
+            cleanupMap();
             document.getElementById('ride-request-container')?.classList.remove('hidden');
             document.getElementById('ride-status-container')?.classList.add('hidden');
         }
 
         function showRideStatus() {
-            startRidePolling();
             document.getElementById('ride-request-container')?.classList.add('hidden');
             document.getElementById('ride-status-container')?.classList.remove('hidden');
+        }
+        
+        function showRideSummary(ride) {
+            // Hide all other status elements
+            document.getElementById('driver-details-panel')?.classList.add('hidden');
+            document.getElementById('map-container')?.classList.add('hidden');
+            document.getElementById('status-timeline')?.classList.add('hidden');
+            document.getElementById('trip-details')?.classList.add('hidden');
+            document.getElementById('ride-action-buttons')?.classList.add('hidden');
+
+            // Show the summary panel
+            const summaryPanel = document.getElementById('ride-summary-panel');
+            summaryPanel.classList.remove('hidden');
+            
+            // Populate data
+            let finalPriceText = 'N/A';
+            const finalPrice = ride.price || ride.estimated_price;
+            if (finalPrice) {
+                finalPriceText = parseFloat(finalPrice).toFixed(2).replace('.', ',');
+            }
+            document.getElementById('summary-price').textContent = `R$ ${finalPriceText}`;
+            document.getElementById('summary-origin').textContent = ride.origin_address || 'N/A';
+            document.getElementById('summary-destination').textContent = (ride.destinations && ride.destinations[0]) || 'N/A';
+        }
+
+        function finishRideSummary() {
+            state.currentRide = null;
+            const summaryPanel = document.getElementById('ride-summary-panel');
+            summaryPanel.classList.add('hidden');
+            
+            // Un-hide the ride status elements for the next ride
+            document.getElementById('driver-details-panel')?.classList.remove('hidden');
+            document.getElementById('status-timeline')?.classList.remove('hidden');
+            document.getElementById('trip-details')?.classList.remove('hidden');
+            document.getElementById('ride-action-buttons')?.classList.remove('hidden');
+
+            showRideRequestForm();
         }
 
         function callDriver() {
@@ -1448,7 +1622,6 @@
                     loadUserProfile(session.user.id);
                 } else if (event === 'SIGNED_OUT') {
                     state.user = state.profile = state.currentRide = null;
-                    stopRidePolling();
                     if(state.rideSubscription) {
                         supabaseClient.removeChannel(state.rideSubscription);
                         state.rideSubscription = null;

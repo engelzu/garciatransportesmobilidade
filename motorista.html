@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -1234,27 +1235,21 @@
                 `;
 
                 console.log('🔄 Buscando corridas do motorista...');
-
-                const { data: assignedRides, error: assignedError } = await supabaseClient
+                
+                // OPTIMIZED QUERY
+                const { data, error } = await supabaseClient
                     .from('rides')
                     .select(`
                         *, 
                         passenger:profiles!rides_passenger_id_fkey(full_name, phone_number)
                     `)
-                    .eq('driver_id', state.user.id)
-                    .in('status', ['assigned', 'accepted', 'arrived_pickup', 'in_progress']);
+                    .or(
+                        `and(driver_id.eq.${state.user.id},status.in.("assigned","accepted","arrived_pickup","in_progress")),` +
+                        `and(status.eq.requested,driver_id.is.null)`
+                    );
 
-                const { data: requestedRides, error: requestedError } = await supabaseClient
-                    .from('rides')
-                    .select(`
-                        *, 
-                        passenger:profiles!rides_passenger_id_fkey(full_name, phone_number)
-                    `)
-                    .eq('status', 'requested')
-                    .is('driver_id', null);
-                    
-                if (assignedError || requestedError) {
-                    console.error("❌ Erro ao buscar corridas:", assignedError || requestedError);
+                if (error) {
+                    console.error("❌ Erro ao buscar corridas:", error);
                     list.innerHTML = `
                         <div class="text-center py-8">
                             <p class="text-red-500 mb-4">❌ Erro ao carregar corridas</p>
@@ -1266,7 +1261,7 @@
                     return;
                 }
 
-                state.rides = [...(assignedRides || []), ...(requestedRides || [])];
+                state.rides = data || [];
                 
                 console.log('✅ Corridas carregadas:', state.rides.length);
                 console.log('📊 Dados das corridas:', state.rides);
@@ -1295,7 +1290,13 @@
                 }
 
                 list.innerHTML = '';
-                state.rides.forEach(ride => renderSingleRide(ride));
+                state.rides.sort((a, b) => {
+                    const aIsAssigned = a.driver_id === state.user.id;
+                    const bIsAssigned = b.driver_id === state.user.id;
+                    if (aIsAssigned && !bIsAssigned) return -1;
+                    if (!aIsAssigned && bIsAssigned) return 1;
+                    return new Date(b.created_at) - new Date(a.created_at);
+                }).forEach(ride => renderSingleRide(ride));
 
             } catch (error) {
                 console.error('❌ Erro ao carregar corridas:', error);
@@ -1397,12 +1398,7 @@
             supabaseClient.auth.onAuthStateChange(async (event, session) => {
                 console.log('🔐 Auth event:', event, session?.user?.id);
                 
-                if (event === 'SIGNED_IN' && session?.user) {
-                    if (!state.user) {
-                        state.user = session.user;
-                        await loadDriverData(session.user.id);
-                    }
-                } else if (event === 'SIGNED_OUT') {
+                if (event === 'SIGNED_OUT') {
                     state.user = null;
                     state.profile = null;
                     state.driverDetails = null;
@@ -1445,8 +1441,8 @@
             applyPhoneMask(document.getElementById('signup-phone'));
             applyPlateMask(document.getElementById('signup-plate'));
 
-            // Verificar sessão com delay para dar tempo do Supabase carregar
-            setTimeout(checkSession, 1500);
+            // Verificar sessão imediatamente
+            checkSession();
         });
 
         function togglePassword(inputId) {
