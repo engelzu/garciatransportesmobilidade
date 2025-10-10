@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g&libraries=places,directions"></script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g&libraries=places,routes&callback=initMapCallback"></script>
     
     <style>
         body { font-family: 'Poppins', sans-serif; background-color: black; color: white; }
@@ -129,6 +129,45 @@
             100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
         }
         
+        /* CORREÇÃO: Estilos para modal de histórico */
+        .history-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .history-modal.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .history-modal-content {
+            background: #1f2937;
+            padding: 24px;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+        
+        .history-modal.show .history-modal-content {
+            transform: scale(1);
+        }
+        
         /* Responsividade */
         @media (max-width: 480px) {
             .toast { min-width: 280px; }
@@ -139,6 +178,19 @@
 
     <!-- Toast Container -->
     <div id="toast-container" class="toast-container"></div>
+
+    <!-- CORREÇÃO: Modal de Histórico fixo no DOM -->
+    <div id="history-modal" class="history-modal">
+        <div class="history-modal-content">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-xl font-bold text-white">Histórico de Corridas</h3>
+                <button onclick="closeHistoryModal()" class="text-white text-2xl hover:text-gray-300 transition-colors">&times;</button>
+            </div>
+            <div id="history-content" class="space-y-3">
+                <!-- Conteúdo será inserido aqui -->
+            </div>
+        </div>
+    </div>
 
     <div id="app-container" class="w-full max-w-md mx-auto p-4">
 
@@ -257,15 +309,39 @@
         </div>
 
         <div id="user-screen" class="screen space-y-6">
-            <div class="flex justify-between items-center">
-                <div class="flex items-center gap-3">
-                    <img src="images/user.png" alt="Ícone do Usuário" class="w-8 h-8">
-                    <h2 class="text-2xl font-bold">Solicitar Viagem</h2>
+            <!-- Menu Drawer -->
+            <div id="menu-overlay" onclick="toggleMenu(false)" class="fixed inset-0 bg-black/60 z-40 hidden transition-opacity"></div>
+            <div id="menu-drawer" class="fixed top-0 left-0 h-full w-72 bg-gray-900 shadow-2xl transform -translate-x-full transition-transform duration-300 z-50 p-6 flex flex-col">
+                <div>
+                    <div class="flex items-center gap-3 mb-8">
+                         <img src="images/user.png" alt="Ícone do Usuário" class="w-12 h-12 rounded-full bg-gray-700 p-1">
+                         <div>
+                            <h3 id="menu-user-name" class="text-lg font-semibold text-white">Carregando...</h3>
+                            <p class="text-sm text-gray-400">Passageiro</p>
+                         </div>
+                    </div>
+                    <nav class="space-y-2">
+                        <a href="#" onclick="showRideHistory()" class="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-800 transition-colors">
+                            <svg class="w-6 h-6 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span class="font-medium">Histórico de Corridas</span>
+                        </a>
+                    </nav>
                 </div>
-                <button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700 transition-colors">Sair</button>
+                <div class="mt-auto">
+                     <button onclick="handleSignOut()" class="w-full flex items-center gap-4 p-3 rounded-lg hover:bg-red-900/50 bg-red-600/20 text-red-400 transition-colors">
+                        <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                        <span class="font-medium">Sair</span>
+                    </button>
+                </div>
             </div>
 
-            <p id="welcome-message" class="text-lg"></p>
+            <div id="main-header" class="flex justify-between items-center">
+                <button onclick="toggleMenu(true)" class="p-2 rounded-full hover:bg-gray-800 transition-colors">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+                <img src="images/logogarcia.png" alt="Logo Garcia Transportes" class="h-8 w-auto">
+                <div class="w-10"></div> <!-- Spacer -->
+            </div>
             
             <!-- CARTEIRA PRÉ-PAGA -->
             <div class="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-xl shadow-lg">
@@ -285,6 +361,7 @@
             
             <!-- FORMULÁRIO DE SOLICITAÇÃO -->
             <div id="ride-request-container">
+                <h2 class="text-2xl font-bold mb-4 text-center">Solicitar Viagem</h2>
                 <form id="ride-request-form" class="space-y-4">
                     <div>
                         <label for="origin" class="block mb-2 text-sm font-medium">Origem</label>
@@ -413,15 +490,34 @@
                     <button onclick="finishRideSummary()" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">
                         NOVA VIAGEM
                     </button>
+                    <p class="text-xs text-gray-500 mt-2">Esta tela fechará automaticamente em alguns segundos.</p>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
+        // CORREÇÃO: Configurações do Supabase e inicialização
         const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // CORREÇÃO: Verificar se Supabase está disponível antes de inicializar
+        let supabaseClient = null;
+        
+        try {
+            if (typeof supabase !== 'undefined') {
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                console.log('✅ Supabase inicializado com sucesso');
+            } else {
+                throw new Error('Supabase não carregado');
+            }
+        } catch (error) {
+            console.error('❌ Erro ao inicializar Supabase:', error);
+            // Fallback: mostrar tela de erro
+            setTimeout(() => {
+                document.getElementById('loading-error')?.classList.remove('hidden');
+            }, 2000);
+        }
         
         const state = { 
             user: null, 
@@ -438,6 +534,8 @@
             driverLocationSubscription: null,
             directionsRenderer: null,
             directionsService: null,
+            walletBalance: 0,
+            loadingTimeout: null
         };
         
         // CONFIGURAÇÕES DE PREÇOS
@@ -449,28 +547,77 @@
             surgePricing: 1.0,       // Multiplicador (1.0 = preço normal)
         };
 
-        let loadingTimeout = null;
-        
         // Estilo escuro para o mapa
         const mapStyle = [ { "elementType": "geometry", "stylers": [ { "color": "#242f3e" } ] }, { "elementType": "labels.text.fill", "stylers": [ { "color": "#746855" } ] }, { "elementType": "labels.text.stroke", "stylers": [ { "color": "#242f3e" } ] }, { "featureType": "administrative.locality", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] }, { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] }, { "featureType": "poi.park", "elementType": "geometry", "stylers": [ { "color": "#263c3f" } ] }, { "featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [ { "color": "#6b9a76" } ] }, { "featureType": "road", "elementType": "geometry", "stylers": [ { "color": "#38414e" } ] }, { "featureType": "road", "elementType": "geometry.stroke", "stylers": [ { "color": "#212a37" } ] }, { "featureType": "road", "elementType": "labels.text.fill", "stylers": [ { "color": "#9ca5b3" } ] }, { "featureType": "road.highway", "elementType": "geometry", "stylers": [ { "color": "#746855" } ] }, { "featureType": "road.highway", "elementType": "geometry.stroke", "stylers": [ { "color": "#1f2835" } ] }, { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [ { "color": "#f3d19c" } ] }, { "featureType": "transit", "elementType": "geometry", "stylers": [ { "color": "#2f3948" } ] }, { "featureType": "transit.station", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] }, { "featureType": "water", "elementType": "geometry", "stylers": [ { "color": "#17263c" } ] }, { "featureType": "water", "elementType": "labels.text.fill", "stylers": [ { "color": "#515c6d" } ] }, { "featureType": "water", "elementType": "labels.text.stroke", "stylers": [ { "color": "#17263c" } ] } ];
+
+        // CORREÇÃO: Variáveis para Google Maps
+        let googleMapsInitialized = false;
+        let googleMapsReadyPromise = new Promise((resolve) => {
+            window.googleMapsReadyPromiseResolve = resolve;
+        });
+
+        // CORREÇÃO: Callback do Google Maps
+        window.initMapCallback = function() {
+            console.log('🗺️ Google Maps API carregada');
+            
+            // Inicializar serviços do Google Maps
+            if (typeof google !== 'undefined' && google.maps) {
+                state.directionsService = new google.maps.DirectionsService();
+                state.directionsRenderer = new google.maps.DirectionsRenderer({
+                    suppressMarkers: true,
+                    polylineOptions: {
+                        strokeColor: '#6d28d9',
+                        strokeWeight: 4,
+                        strokeOpacity: 0.8
+                    }
+                });
+                console.log('✅ Serviços do Google Maps inicializados');
+            }
+            
+            googleMapsInitialized = true;
+            if (window.googleMapsReadyPromiseResolve) {
+                window.googleMapsReadyPromiseResolve();
+            }
+            
+            // Inicializar autocomplete após Google Maps estar pronto
+            setTimeout(initializeAutocomplete, 100);
+        };
 
         // =============================================================================
         // ERROR RECOVERY & GLOBAL HANDLERS
         // =============================================================================
         function setupLoadingTimeout() {
-            loadingTimeout = setTimeout(() => {
-                document.getElementById('loading-error')?.classList.remove('hidden');
-            }, 15000);
+            state.loadingTimeout = setTimeout(() => {
+                if (document.getElementById('loading-screen')?.classList.contains('active')) {
+                    console.error("❌ App loading timed out.");
+                    document.getElementById('loading-error')?.classList.remove('hidden');
+                }
+            }, 10000); // Reduzido para 10 segundos
         }
 
         function clearLoadingTimeout() {
-            if (loadingTimeout) clearTimeout(loadingTimeout);
-            loadingTimeout = null;
+            if (state.loadingTimeout) {
+                clearTimeout(state.loadingTimeout);
+                state.loadingTimeout = null;
+            }
         }
 
         function forceReload() {
             window.location.reload();
         }
+
+        window.addEventListener('error', (event) => {
+            console.error('🚨 Erro global capturado:', event.error);
+            // Se for erro crítico, mostrar opção de reload
+            if (event.error && event.error.message && 
+                (event.error.message.includes('supabase') || 
+                 event.error.message.includes('google') ||
+                 event.error.message.includes('maps'))) {
+                setTimeout(() => {
+                    document.getElementById('loading-error')?.classList.remove('hidden');
+                }, 1000);
+            }
+        });
 
         window.addEventListener('unhandledrejection', (event) => {
             console.error('🚨 Promise rejection não tratada:', event.reason);
@@ -482,7 +629,7 @@
         function handleAuthError() {
             console.log('🔧 Recuperando de erro de autenticação...');
             state.user = state.profile = state.currentRide = null;
-            if (state.rideSubscription) {
+            if (state.rideSubscription && supabaseClient) {
                 try {
                     supabaseClient.removeChannel(state.rideSubscription);
                     state.rideSubscription = null;
@@ -520,10 +667,65 @@
         // =============================================================================
         // UTILITY FUNCTIONS
         // =============================================================================
+        
+        // CORREÇÃO: Variável para controlar o estado da tela anterior
+        let previousScreen = 'user-screen'; // Tela padrão
+
+        // CORREÇÃO: Função melhorada para mostrar telas com controle de estado
         function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(screenId)?.classList.add('active');
             clearLoadingTimeout();
+            
+            // Salvar tela anterior (exceto se for o modal de histórico)
+            const currentActive = document.querySelector('.screen.active');
+            if (currentActive && currentActive.id !== 'loading-screen') {
+                previousScreen = currentActive.id;
+            }
+            
+            // Ocultar todas as telas
+            document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+            
+            // Mostrar tela solicitada
+            const targetScreen = document.getElementById(screenId);
+            if (targetScreen) {
+                targetScreen.classList.add("active");
+                console.log(`📱 Tela ativa: ${screenId}`);
+            } else {
+                console.error(`Tela não encontrada: ${screenId}`);
+                // Fallback para tela anterior ou user-screen
+                const fallbackScreen = document.getElementById(previousScreen) || document.getElementById('user-screen');
+                if (fallbackScreen) {
+                    fallbackScreen.classList.add("active");
+                }
+            }
+        }
+
+        // CORREÇÃO: Função para garantir que sempre há uma tela ativa
+        function ensureValidScreenActive() {
+            const activeScreen = document.querySelector('.screen.active');
+            
+            if (!activeScreen) {
+                console.warn('Nenhuma tela ativa encontrada. Restaurando tela anterior.');
+                
+                // Tentar mostrar tela anterior
+                const targetScreen = document.getElementById(previousScreen);
+                if (targetScreen) {
+                    targetScreen.classList.add('active');
+                } else {
+                    // Fallback para user-screen se tela anterior não existir
+                    const userScreen = document.getElementById('user-screen');
+                    if (userScreen) {
+                        userScreen.classList.add('active');
+                        previousScreen = 'user-screen';
+                    } else {
+                        // Último recurso: mostrar login-screen
+                        const loginScreen = document.getElementById('login-screen');
+                        if (loginScreen) {
+                            loginScreen.classList.add('active');
+                            previousScreen = 'login-screen';
+                        }
+                    }
+                }
+            }
         }
 
         function showLoading(buttonId) {
@@ -565,279 +767,157 @@
             // Return null if format is not recognized
             return null;
         }
-
+        
         // =============================================================================
-        // MAP FUNCTIONS
+        // MENU FUNCTIONS
         // =============================================================================
-        function initMap(pickupCoords) {
-            if (state.map) return;
-            const mapElement = document.getElementById('map');
-            if (!mapElement) return;
+        function toggleMenu(forceOpen) {
+            const drawer = document.getElementById('menu-drawer');
+            const overlay = document.getElementById('menu-overlay');
+            if (!drawer || !overlay) return;
 
-            state.map = new google.maps.Map(mapElement, {
-                center: pickupCoords,
-                zoom: 15,
-                disableDefaultUI: true,
-                styles: mapStyle
-            });
-            
-            state.pickupMarker = new google.maps.Marker({
-                position: pickupCoords,
-                map: state.map,
-                title: 'Local de Partida'
-            });
-
-            state.directionsService = new google.maps.DirectionsService();
-            state.directionsRenderer = new google.maps.DirectionsRenderer({
-                map: state.map,
-                suppressMarkers: true, // Usaremos nossos próprios marcadores
-                polylineOptions: {
-                    strokeColor: '#8b5cf6', // Indigo-500
-                    strokeOpacity: 0.8,
-                    strokeWeight: 6
-                }
-            });
+            if (forceOpen === true) {
+                drawer.classList.remove('-translate-x-full');
+                overlay.classList.remove('hidden');
+            } else if (forceOpen === false) {
+                drawer.classList.add('-translate-x-full');
+                overlay.classList.add('hidden');
+                
+                // Garantir que uma tela válida esteja ativa após fechar menu
+                setTimeout(ensureValidScreenActive, 100);
+            } else { // Toggle
+                drawer.classList.toggle('-translate-x-full');
+                overlay.classList.toggle('hidden');
+            }
         }
 
-        function updateMapWithRoute(driverCoords, pickupCoords) {
-            if (!state.map || !driverCoords || !pickupCoords) return;
-
-            // Criar ou atualizar marcador do motorista
-            if (!state.driverMarker) {
-                state.driverMarker = new google.maps.Marker({
-                    position: driverCoords,
-                    map: state.map,
-                    title: 'Motorista',
-                    icon: {
-                        path: 'M29.395,0H17.636c-3.117,0-5.643,3.467-5.643,6.584v34.804c0,3.116,2.526,5.644,5.643,5.644h11.759c3.116,0,5.644-2.527,5.644-5.644V6.584C35.038,3.467,32.511,0,29.395,0z M34.05,14.188v11.665l-2.729,0.351v-4.806L34.05,14.188z M32.618,10.773c-1.016,3.9-2.219,8.51-2.219,8.51H16.631l-2.222-8.51C14.41,10.773,23.293,7.755,32.618,10.773z M15.741,21.713v4.492l-2.73-0.349V14.502L15.741,21.713z M12.998,3.78c-1.386,0-2.5,1.114-2.5,2.5s1.114,2.5,2.5,2.5s2.5-1.114,2.5-2.5S14.384,3.78,12.998,3.78z M12.998,41.958c-1.386,0-2.5,1.114-2.5,2.5s1.114,2.5,2.5,2.5s2.5-1.114,2.5-2.5S14.384,41.958,12.998,41.958z M34.05,28.843v11.665l-2.729,0.351v-4.806L34.05,28.843z M34.05,43.511v-4.806l-2.729,0.351v4.455L34.05,43.511z M15.741,28.843v4.492l-2.73-0.349V21.826L15.741,28.843z M15.741,44.206v-4.806l-2.73,0.351v4.455L15.741,44.206z',
-                        fillColor: '#6d28d9',
-                        fillOpacity: 1,
-                        strokeWeight: 0,
-                        rotation: 0,
-                        scale: 0.8,
-                        anchor: new google.maps.Point(24, 24)
-                    }
-                });
-            } else {
-                state.driverMarker.setPosition(driverCoords);
+        // CORREÇÃO: Função melhorada para mostrar histórico usando modal fixo
+        async function showRideHistory() {
+            toggleMenu(false); // Fechar menu
+            
+            if (!state.user || !state.user.id) {
+                console.error("showRideHistory called without a user session.");
+                toast.show('Sessão expirada. Por favor, faça login novamente.', 'error');
+                return handleAuthError();
             }
+            
+            // Salvar tela atual antes de abrir o modal
+            const currentActive = document.querySelector('.screen.active');
+            if (currentActive) {
+                previousScreen = currentActive.id;
+            }
+            
+            try {
+                // Mostrar loading no modal
+                const historyContent = document.getElementById('history-content');
+                historyContent.innerHTML = '<div class="text-center"><div class="loader mx-auto mb-4"></div><p>Carregando histórico...</p></div>';
+                
+                // Mostrar modal
+                const modal = document.getElementById('history-modal');
+                modal.classList.add('show');
+                
+                // Verificar se supabaseClient está disponível
+                if (!supabaseClient) {
+                    throw new Error('Conexão com banco de dados não disponível');
+                }
+                
+                // Buscar dados do histórico
+                const { data, error } = await supabaseClient
+                    .from('rides')
+                    .select('*')
+                    .eq('passenger_id', state.user.id)
+                    .in('status', ['completed', 'canceled'])
+                    .order('created_at', { ascending: false })
+                    .limit(20);
 
-            // Calcular e desenhar a rota
-            state.directionsService.route({
-                origin: driverCoords,
-                destination: pickupCoords,
-                travelMode: 'DRIVING'
-            }, (response, status) => {
-                if (status === 'OK') {
-                    state.directionsRenderer.setDirections(response);
+                if (error) throw error;
+
+                // Gerar HTML do histórico
+                let html = '';
+                if (data && data.length > 0) {
+                    data.forEach(ride => {
+                        const date = ride.created_at ? new Date(ride.created_at).toLocaleString('pt-BR') : 'Data Indisponível';
+                        const price = ride.price ? `R$ ${parseFloat(ride.price).toFixed(2).replace('.', ',')}` : 'N/A';
+                        const statusColors = {
+                            completed: 'border-green-500',
+                            canceled: 'border-red-500'
+                        };
+                        const statusText = {
+                            completed: 'Concluída',
+                            canceled: 'Cancelada'
+                        };
+                        
+                        const origin = ride.origin_address || 'Origem desconhecida';
+                        let destination = 'N/A';
+                        if (Array.isArray(ride.destinations) && ride.destinations.length > 0 && ride.destinations[0]) {
+                            destination = ride.destinations[0];
+                        }
+
+                        html += `
+                            <div class="bg-gray-800 p-3 rounded-lg border-l-4 ${statusColors[ride.status] || 'border-gray-500'}">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <p class="text-xs text-gray-400">${date}</p>
+                                        <p class="font-semibold text-sm mt-1">${origin} → ${destination}</p>
+                                    </div>
+                                    <div class="text-right ml-2">
+                                        <p class="font-bold">${price}</p>
+                                        <p class="text-xs font-medium">${statusText[ride.status] || ride.status}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
                 } else {
-                    console.warn('Directions request failed due to ' + status);
-                    const bounds = new google.maps.LatLngBounds();
-                    bounds.extend(driverCoords);
-                    bounds.extend(pickupCoords);
-                    state.map.fitBounds(bounds);
+                    html = '<p class="text-center text-gray-400">Nenhum histórico de corrida encontrado</p>';
                 }
-            });
-        }
-        
-        function cleanupMap() {
-            if (state.driverLocationSubscription) {
-                supabaseClient.removeChannel(state.driverLocationSubscription);
-                state.driverLocationSubscription = null;
-            }
-            document.getElementById('map-container')?.classList.add('hidden');
-            state.map = null;
-            state.driverMarker = null;
-            state.pickupMarker = null;
-            state.directionsRenderer = null;
-            state.directionsService = null;
-        }
 
-        // =============================================================================
-        // RIDE STATUS UI MANAGEMENT (NEW UBER-LIKE STYLE)
-        // =============================================================================
-        const timelineConfig = {
-            'requested': { icon: '⏳', text: 'Procurando motorista' },
-            'assigned': { icon: '🎯', text: 'Motorista encontrado' },
-            'accepted': { icon: '🚗', text: 'Motorista a caminho' },
-            'arrived_pickup': { icon: '📍', text: 'Motorista no local' },
-            'in_progress': { icon: '🛣️', text: 'Viagem em andamento' },
-            'completed': { icon: '🏁', text: 'Viagem concluída' },
-        };
-        const statusOrder = ['requested', 'assigned', 'accepted', 'arrived_pickup', 'in_progress', 'completed'];
+                // Atualizar conteúdo do modal
+                historyContent.innerHTML = html;
 
-        function renderTimeline(currentStatus) {
-            const timelineContainer = document.getElementById('status-timeline');
-            if (!timelineContainer) return;
-
-            timelineContainer.innerHTML = '';
-            const currentIndex = statusOrder.indexOf(currentStatus);
-            if (currentIndex === -1) return; // Status desconhecido
-
-            statusOrder.forEach((statusKey, index) => {
-                // Não exibir etapas futuras até que o motorista seja encontrado
-                if (currentIndex < 1 && index > 1) return;
-                
-                // Ocultar a etapa "Concluída" até que a viagem esteja realmente em andamento
-                if (statusKey === 'completed' && currentIndex < statusOrder.indexOf('in_progress')) return;
-                
-                const config = timelineConfig[statusKey];
-                if (!config) return;
-
-                const item = document.createElement('div');
-                let itemClass = 'timeline-item';
-
-                if (index < currentIndex) {
-                    itemClass += ' completed';
-                } else if (index === currentIndex) {
-                    itemClass += ' active';
-                }
-                
-                item.className = itemClass;
-                item.innerHTML = `<div class="timeline-icon">${config.icon}</div><p class="timeline-text">${config.text}</p>`;
-                timelineContainer.appendChild(item);
-            });
-        }
-        
-        function updateDriverPanel(driver, details) {
-            const driverPanel = document.getElementById('driver-details-panel');
-            if (!driverPanel) return;
-
-            document.getElementById('driver-name').textContent = driver?.full_name || 'Motorista';
-            const carInfo = `${details?.car_model || ''} ${details?.car_color || ''}`.trim();
-            document.getElementById('driver-car').textContent = carInfo || 'Veículo';
-            document.getElementById('driver-plate').textContent = details?.license_plate || '';
-
-            const callBtn = document.getElementById('call-driver-btn');
-            const msgBtn = document.getElementById('message-driver-btn');
-            callBtn.disabled = !driver?.phone_number;
-            msgBtn.disabled = !driver?.phone_number;
-
-            driverPanel.classList.add('active');
-        }
-
-        function resetRideStatusUI() {
-            const driverPanel = document.getElementById('driver-details-panel');
-            if (driverPanel) {
-                driverPanel.classList.remove('active');
-                driverPanel.style.opacity = '0';
-                driverPanel.style.transform = 'translateY(-1rem)';
-                document.getElementById('driver-name').textContent = 'Procurando motorista...';
-                document.getElementById('driver-car').textContent = 'Aguarde um momento';
-                document.getElementById('driver-plate').textContent = '';
-                document.getElementById('call-driver-btn').disabled = true;
-                document.getElementById('message-driver-btn').disabled = true;
-            }
-            document.getElementById('status-timeline').innerHTML = '';
-        }
-
-        function handleRideStateUpdate(ride) {
-            if (!ride || !ride.status) return;
-            
-            const status = ride.status;
-            renderTimeline(status);
-            
-            // Update trip details card
-            const destination = (ride.destinations && ride.destinations[0]) || 'N/A';
-            updateTripDetails(ride.origin_address, destination, ride.created_at);
-
-            // Manage cancel button visibility
-            const cancelBtn = document.getElementById('cancel-ride-btn');
-            if (['in_progress', 'completed', 'canceled'].includes(status)) {
-                cancelBtn.classList.add('hidden');
-            } else {
-                cancelBtn.classList.remove('hidden');
-            }
-
-            // Manage driver info panel and map
-            if (ride.driver_id) {
-                loadDriverInfo(ride.driver_id);
-            } else {
-                // This state is for 'requested' status, before a driver is found
-                cleanupMap(); 
-                updateDriverPanel(null, null); // Resets to "searching"
-                document.getElementById('driver-details-panel').classList.add('active');
-            }
-        }
-        
-        // =============================================================================
-        // AUTHENTICATION FUNCTIONS
-        // =============================================================================
-        async function handleSignUp(fullName, email, phone, password) {
-            showLoading('signup-btn');
-            try {
-                const { error } = await supabaseClient.auth.signUp({ 
-                    email, phone, password, options: { data: { full_name: fullName, user_type: 'passenger' } } 
-                });
-                if (error) throw error;
-                toast.show('Cadastro realizado! Verifique seu e-mail para ativar sua conta.', 'success');
-                showScreen('login-screen');
-            } catch (error) { toast.show('Erro no cadastro: ' + error.message, 'error');
-            } finally { hideLoading('signup-btn'); }
-        }
-
-        async function handleSignIn(email, password) {
-            showLoading('login-btn');
-            try {
-                const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) throw error;
-                toast.show('Login realizado com sucesso!', 'success');
-            } catch (error) { toast.show('Erro no login: ' + error.message, 'error');
-            } finally { hideLoading('login-btn'); }
-        }
-        
-        async function handleSignInWithProvider(provider) {
-            try {
-                const { error } = await supabaseClient.auth.signInWithOAuth({ provider });
-                if (error) throw error;
-            } catch (error) { toast.show(`Erro ao tentar login com ${provider}: ` + error.message, 'error'); }
-        }
-
-        async function handleSignOut() {
-            try {
-                if (state.rideSubscription) {
-                    supabaseClient.removeChannel(state.rideSubscription);
-                    state.rideSubscription = null;
-                }
-                await supabaseClient.auth.signOut();
-                toast.show('Logout realizado com sucesso', 'success');
             } catch (error) {
-                toast.show('Erro ao fazer logout: ' + error.message, 'error');
-                handleAuthError();
-            }
-        }
-        
-        async function loadUserProfile(userId) {
-            try {
-                const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
-                if (error) throw error;
-                if (!data) {
-                    console.error('Perfil não encontrado para o usuário:', userId);
-                    toast.show('Não foi possível carregar seu perfil. Por favor, tente novamente.', 'error');
-                    return handleSignOut(); // Sign out if profile is missing
-                }
-                state.profile = data;
-                showScreen('user-screen'); // Show screen first
-                document.getElementById('welcome-message').textContent = `Olá, ${state.profile.full_name}!`;
-                await loadWalletBalance(); // Carregar saldo da carteira
-                checkPaymentStatus(); // Verificar se voltou de um pagamento
-                await checkPendingRide();
-            } catch (error) { 
-                console.error('❌ Erro ao carregar perfil:', error.message); 
-                handleAuthError();
+                console.error('Erro ao carregar histórico de corridas:', error.message || error);
+                toast.show('Erro ao carregar histórico: ' + (error.message || 'Tente novamente'), 'error');
+                
+                // Em caso de erro, fechar modal e voltar à tela anterior
+                closeHistoryModal();
             }
         }
 
+        // CORREÇÃO: Função para fechar modal de histórico com segurança
+        function closeHistoryModal() {
+            const modal = document.getElementById('history-modal');
+            if (modal) {
+                modal.classList.remove('show');
+                
+                // Aguardar animação terminar antes de limpar conteúdo
+                setTimeout(() => {
+                    const historyContent = document.getElementById('history-content');
+                    if (historyContent) {
+                        historyContent.innerHTML = '';
+                    }
+                }, 300);
+            }
+            
+            // Garantir que uma tela válida esteja ativa
+            ensureValidScreenActive();
+        }
+
         // =============================================================================
-        // GOOGLE MAPS INTEGRATION
+        // GOOGLE MAPS FUNCTIONS
         // =============================================================================
         function initializeAutocomplete() {
             try {
-                if (typeof google !== 'undefined' && google.maps && google.maps.places) {
-                    const options = { types: ['address'], componentRestrictions: { 'country': 'br' } };
-                    const originInput = document.getElementById('origin');
-                    const destinationInput = document.getElementById('destination');
+                if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
+                    console.warn('Google Maps Places API não disponível ainda');
+                    return;
+                }
+                
+                const options = { types: ['address'], componentRestrictions: { 'country': 'br' } };
+                const originInput = document.getElementById('origin');
+                const destinationInput = document.getElementById('destination');
 
+                if (originInput && destinationInput) {
                     const originAutocomplete = new google.maps.places.Autocomplete(originInput, options);
                     originAutocomplete.addListener('place_changed', () => {
                         const place = originAutocomplete.getPlace();
@@ -868,21 +948,25 @@
                         state.destinationPlace = null; 
                         resetPriceEstimate();
                     });
-                } else {
-                    setTimeout(initializeAutocomplete, 1000);
+                    
+                    console.log('✅ Autocomplete inicializado');
                 }
-            } catch (error) { console.error('❌ Erro ao inicializar autocomplete:', error); }
+            } catch (error) { 
+                console.error('❌ Erro ao inicializar autocomplete:', error.message || error); 
+            }
         }
 
         function useCurrentLocation() {
             if (!navigator.geolocation) return toast.show('Geolocalização não suportada.', 'error');
             const originInput = document.getElementById('origin');
+            if (!originInput) return;
+            
             originInput.value = 'Obtendo localização...';
             state.originPlace = null;
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     const { latitude: lat, longitude: lng } = position.coords;
-                    if (typeof google !== 'undefined') {
+                    if (typeof google !== 'undefined' && google.maps) {
                         const latLng = new google.maps.LatLng(lat, lng);
                         new google.maps.Geocoder().geocode({ 'location': latLng }, (results, status) => {
                             if (status === 'OK' && results[0]) {
@@ -908,12 +992,13 @@
                         originInput.value = val;
                         state.originPlace = { 
                             formatted_address: val, 
-                            geometry: { location: { lat: () => lat, lng: () => lng } }
+                            geometry: { location: { lat: () => lat, lng: () => lng } } 
                         };
                         resetPriceEstimate();
                     }
                 },
-                () => {
+                (error) => {
+                    console.error('Erro de geolocalização:', error);
                     toast.show('Não foi possível obter sua localização.', 'error');
                     originInput.value = '';
                 }
@@ -923,22 +1008,31 @@
         // =============================================================================
         // PRICE CALCULATION FUNCTIONS
         // =============================================================================
-        function calculateDistance(lat1, lng1, lat2, lng2) {
-            const R = 6371; // Earth's radius in km
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLng = (lng2 - lng1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-                     Math.sin(dLng/2) * Math.sin(dLng/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return R * c; // Distance in km
-        }
-        
-        function estimateTravelTime(distanceKm) {
-            // Estimativa baseada em velocidade média urbana de 25 km/h
-            const avgSpeedKmh = 25;
-            const timeHours = distanceKm / avgSpeedKmh;
-            return Math.round(timeHours * 60); // Convert to minutes
+        async function getDirectionsData(origin, destination) {
+            // Aguarda a inicialização completa da API do Google Maps antes de prosseguir
+            if (!googleMapsInitialized) {
+                await googleMapsReadyPromise;
+            }
+            return new Promise((resolve, reject) => {
+                if (!state.directionsService) {
+                    return reject(new Error("Google Maps Directions Service não carregado após inicialização."));
+                }
+                state.directionsService.route({
+                    origin: origin,
+                    destination: destination,
+                    travelMode: google.maps.TravelMode.DRIVING
+                }, (response, status) => {
+                    if (status === 'OK' && response.routes && response.routes[0]) {
+                        const route = response.routes[0].legs[0];
+                        resolve({
+                            distance: route.distance.value / 1000, // em km
+                            duration: route.duration.value / 60 // em minutos
+                        });
+                    } else {
+                        reject(new Error('Erro ao obter rotas do Google Directions: ' + status));
+                    }
+                });
+            });
         }
         
         function calculateRidePrice(distanceKm, timeMinutes) {
@@ -961,8 +1055,8 @@
         }
         
         async function calculatePriceEstimate() {
-            const originAddress = document.getElementById('origin').value.trim();
-            const destinationAddress = document.getElementById('destination').value.trim();
+            const originAddress = document.getElementById('origin')?.value.trim();
+            const destinationAddress = document.getElementById('destination')?.value.trim();
             
             if (!originAddress || !destinationAddress) {
                 return toast.show('Preencha origem e destino para calcular o preço.', 'warning');
@@ -1001,12 +1095,10 @@
                     coords: { originCoords, destinationCoords }
                 });
                 
-                const distance = calculateDistance(
-                    originCoords.lat, originCoords.lng,
-                    destinationCoords.lat, destinationCoords.lng
-                );
+                const directions = await getDirectionsData(originCoords, destinationCoords);
+                const distance = directions.distance;
+                const estimatedTime = directions.duration;
                 
-                const estimatedTime = estimateTravelTime(distance);
                 const priceEstimate = calculateRidePrice(distance, estimatedTime);
                 
                 // Salvar estimativa no estado
@@ -1019,7 +1111,7 @@
                 
             } catch (error) {
                 console.error('Erro ao calcular estimativa:', error);
-                toast.show('Erro ao calcular estimativa de preço.', 'error');
+                toast.show('Erro ao calcular estimativa de preço: ' + (error.message || 'Tente novamente'), 'error');
             } finally {
                 hideLoading('estimate-btn');
             }
@@ -1029,12 +1121,14 @@
             const container = document.getElementById('price-estimate-container');
             const requestBtn = document.getElementById('request-btn');
             
+            if (!container || !requestBtn) return;
+            
             // Mostrar container de estimativa
             container.classList.remove('hidden');
             
             // Preencher valores
             document.getElementById('estimated-price').textContent = `R$ ${estimate.total.toFixed(2).replace('.', ',')}`;
-            document.getElementById('estimated-time').textContent = `${estimate.time} min`;
+            document.getElementById('estimated-time').textContent = `${Math.round(estimate.time)} min`;
             document.getElementById('estimated-distance').textContent = `${estimate.distance.toFixed(1).replace('.', ',')} km`;
             
             // Breakdown de preços
@@ -1052,9 +1146,11 @@
             const container = document.getElementById('price-estimate-container');
             const requestBtn = document.getElementById('request-btn');
             
-            container.classList.add('hidden');
-            requestBtn.disabled = true;
-            requestBtn.textContent = '🚗 SOLICITAR';
+            if (container) container.classList.add('hidden');
+            if (requestBtn) {
+                requestBtn.disabled = true;
+                requestBtn.textContent = '🚗 SOLICITAR';
+            }
             state.currentEstimate = null;
         }
         
@@ -1063,318 +1159,126 @@
         }
 
         // =============================================================================
-        // RIDE MANAGEMENT & DATA FLOW
+        // AUTHENTICATION FUNCTIONS
         // =============================================================================
-        async function geocodeAddress(address) {
-            return new Promise((resolve, reject) => {
-                if (typeof google === 'undefined') return reject(new Error('Google Maps não carregado'));
-                new google.maps.Geocoder().geocode({ address: address, componentRestrictions: { 'country': 'br' } }, (results, status) => {
-                    if (status === 'OK' && results[0]) {
-                        resolve(results[0]);
-                    } else {
-                        reject(new Error('Endereço não encontrado: ' + address));
-                    }
-                });
-            });
-        }
-
-        async function requestRide() {
-            const originAddress = document.getElementById('origin').value;
-            const destinationAddress = document.getElementById('destination').value;
-
-            if (!state.user || !originAddress.trim() || !destinationAddress.trim()) {
-                return toast.show('Preencha origem e destino.', 'warning');
-            }
-
-            if (!state.currentEstimate) {
-                return toast.show('Calcule o preço da viagem primeiro.', 'warning');
-            }
-            
-            // VERIFICAR SALDO MÍNIMO
-            const estimatedPrice = state.currentEstimate.total;
-            if (state.walletBalance < estimatedPrice) {
-                toast.show(`Saldo insuficiente! Você precisa de pelo menos R$ ${estimatedPrice.toFixed(2).replace('.', ',')} para esta viagem.`, 'error');
+        async function handleSignIn(email, password) {
+            if (!supabaseClient) {
+                toast.show('Serviço não disponível. Tente recarregar a página.', 'error');
                 return;
             }
-
-            showLoading('request-btn');
-
+            
+            showLoading('login-btn');
             try {
-                let originResult = state.originPlace;
-                if (!originResult || originResult.formatted_address !== originAddress) {
-                    originResult = await geocodeAddress(originAddress);
-                    state.originPlace = originResult;
-                }
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+                toast.show('Login realizado com sucesso!', 'success');
+            } catch (error) {
+                console.error('Erro no login:', error);
+                toast.show('Erro no login: ' + (error.message || 'Verifique suas credenciais'), 'error');
+            } finally {
+                hideLoading('login-btn');
+            }
+        }
 
-                let destinationResult = state.destinationPlace;
-                if (!destinationResult || destinationResult.formatted_address !== destinationAddress) {
-                    destinationResult = await geocodeAddress(destinationAddress);
-                    state.destinationPlace = destinationResult;
-                }
+        async function handleSignUp(fullName, email, phone, password) {
+            if (!supabaseClient) {
+                toast.show('Serviço não disponível. Tente recarregar a página.', 'error');
+                return;
+            }
+            
+            showLoading('signup-btn');
+            try {
+                const { data, error } = await supabaseClient.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            full_name: fullName,
+                            phone_number: phone
+                        }
+                    }
+                });
+                if (error) throw error;
+                toast.show('Cadastro realizado! Verifique seu e-mail.', 'success');
+                showScreen('login-screen');
+            } catch (error) {
+                console.error('Erro no cadastro:', error);
+                toast.show('Erro no cadastro: ' + (error.message || 'Tente novamente'), 'error');
+            } finally {
+                hideLoading('signup-btn');
+            }
+        }
 
-                const originCoords = originResult.geometry.location;
-                const destinationCoords = destinationResult.geometry.location;
+        async function handleSignOut() {
+            if (!supabaseClient) {
+                showScreen('login-screen');
+                return;
+            }
+            
+            try {
+                const { error } = await supabaseClient.auth.signOut();
+                if (error) throw error;
+                toast.show('Logout realizado com sucesso!', 'success');
+            } catch (error) {
+                console.error('Erro no logout:', error);
+                toast.show('Erro no logout', 'error');
+            }
+            showScreen('login-screen');
+        }
 
-                const rideData = {
-                    passenger_id: state.user.id,
-                    origin_address: originResult.formatted_address,
-                    origin_location: `POINT(${originCoords.lng()} ${originCoords.lat()})`,
-                    destinations: [destinationResult.formatted_address],
-                    status: 'requested',
-                    estimated_price: state.currentEstimate.total
-                };
-                
+        async function handleSignInWithProvider(provider) {
+            if (!supabaseClient) {
+                toast.show('Serviço não disponível. Tente recarregar a página.', 'error');
+                return;
+            }
+            
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithOAuth({
+                    provider: provider,
+                    options: {
+                        redirectTo: window.location.origin
+                    }
+                });
+                if (error) throw error;
+            } catch (error) {
+                console.error(`Erro no login com ${provider}:`, error);
+                toast.show(`Erro no login com ${provider}: ` + (error.message || 'Tente novamente'), 'error');
+            }
+        }
+
+        async function loadUserProfile(userId) {
+            if (!supabaseClient || !userId) return;
+            
+            try {
                 const { data, error } = await supabaseClient
-                    .from('rides')
-                    .insert(rideData)
-                    .select()
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', userId)
                     .single();
 
-                if (error) throw error;
-
-                state.currentRide = data;
-                showRideStatus();
-                handleRideStateUpdate(data);
-                subscribeToRideUpdates(data.id);
-                toast.show('Corrida solicitada! Procurando motorista...', 'success');
-            } catch (error) {
-                console.error('Ride Request Error:', error);
-                toast.show('Erro ao solicitar corrida: ' + (error.message || 'Verifique os endereços.'), 'error');
-            } finally {
-                hideLoading('request-btn');
-            }
-        }
-
-        async function checkPendingRide() {
-            if (!state.user) return;
-            try {
-                const { data, error } = await supabaseClient.from('rides')
-                    .select('*').eq('passenger_id', state.user.id)
-                    .in('status', ['requested', 'assigned', 'accepted', 'arrived_pickup', 'in_progress'])
-                    .order('created_at', { ascending: false }).limit(1);
                 if (error && error.code !== 'PGRST116') throw error;
 
-                if (data && data.length > 0) {
-                    state.currentRide = data[0];
-                    console.log('🚗 Corrida pendente encontrada:', state.currentRide.id, state.currentRide.status);
-                    showRideStatus();
-                    handleRideStateUpdate(state.currentRide);
-                    subscribeToRideUpdates(state.currentRide.id);
+                if (data) {
+                    state.profile = data;
+                    document.getElementById('menu-user-name').textContent = data.full_name || 'Usuário';
+                    await loadWalletBalance();
+                    await checkPendingRide();
+                    showScreen('user-screen');
                 } else {
-                    showRideRequestForm();
+                    showScreen('complete-profile-screen');
                 }
             } catch (error) {
-                console.error('❌ Erro CRÍTICO em checkPendingRide:', error);
-                showRideRequestForm();
+                console.error('Erro ao carregar perfil:', error);
+                toast.show('Erro ao carregar perfil do usuário', 'error');
+                showScreen('complete-profile-screen');
             }
         }
 
-        function subscribeToRideUpdates(rideId) {
-            if (state.rideSubscription) {
-                supabaseClient.removeChannel(state.rideSubscription);
-            }
-            try {
-                state.rideSubscription = supabaseClient
-                    .channel(`ride-${rideId}`)
-                    .on('postgres_changes', { event: '*', schema: 'public', table: 'rides', filter: `id=eq.${rideId}` }, 
-                    payload => {
-                        console.log('🔄 Real-time update:', payload.new);
-                        const updatedRide = payload.new;
-                        state.currentRide = { ...state.currentRide, ...updatedRide };
-                        handleRideStateUpdate(state.currentRide);
-                        
-                        if (updatedRide.status === 'completed') {
-                            if(state.rideSubscription) supabaseClient.removeChannel(state.rideSubscription);
-                            state.rideSubscription = null;
-                            
-                            if (updatedRide.price) {
-                                const ridePrice = parseFloat(updatedRide.price);
-                                debitWallet(ridePrice, `Corrida #${updatedRide.id} - ${updatedRide.origin_address} → ${updatedRide.destinations[0]}`);
-                                toast.show(`Corrida concluída! R$ ${ridePrice.toFixed(2).replace('.',',')} debitado da sua carteira.`, 'success');
-                            } else {
-                                toast.show('Corrida concluída!', 'success');
-                            }
-                            showRideSummary(updatedRide);
-
-                        } else if (updatedRide.status === 'canceled') {
-                            if(state.rideSubscription) supabaseClient.removeChannel(state.rideSubscription);
-                            state.rideSubscription = null;
-                            
-                            toast.show('A viagem foi cancelada.', 'info');
-                            setTimeout(() => {
-                                state.currentRide = null;
-                                showRideRequestForm();
-                            }, 3000);
-                        }
-                    })
-                    .subscribe(status => {
-                        if (status === 'SUBSCRIBED') console.log(`✅ Conectado ao canal da corrida ${rideId}!`);
-                        if (status === 'CHANNEL_ERROR') setTimeout(() => subscribeToRideUpdates(rideId), 3000);
-                    });
-            } catch (error) { console.error('❌ Erro ao criar subscription:', error); }
-        }
-
-        async function loadDriverInfo(driverId) {
-            if (!driverId) return;
-            try {
-                const { data: driverData, error: driverError } = await supabaseClient.from('profiles')
-                    .select('full_name, phone_number').eq('id', driverId).single();
-                if (driverError) throw driverError;
-                
-                const { data: detailsData, error: detailsError } = await supabaseClient.from('driver_details')
-                    .select('car_model, license_plate, car_color, current_location').eq('profile_id', driverId).single();
-                if (detailsError) throw detailsError;
-                
-                state.currentRide.driver = driverData;
-                state.currentRide.driver_details = detailsData;
-                updateDriverPanel(driverData, detailsData);
-
-                const rideStatus = state.currentRide.status;
-                if (['assigned', 'accepted', 'arrived_pickup', 'in_progress'].includes(rideStatus)) {
-                    const pickupCoords = parsePoint(state.currentRide.origin_location);
-                    
-                    if (pickupCoords) {
-                        // 1. Tornar o container do mapa visível e inicializar
-                        document.getElementById('map-container').classList.remove('hidden');
-                        if (!state.map) {
-                            initMap(pickupCoords);
-                        }
-
-                        // 2. Tentar desenhar a rota com a localização atual (se houver)
-                        const initialDriverCoords = parsePoint(detailsData.current_location);
-                        if (initialDriverCoords) {
-                             updateMapWithRoute(initialDriverCoords, pickupCoords);
-                        }
-                        
-                        // 3. SEMPRE se inscrever para futuras atualizações de localização
-                        subscribeToDriverLocation(driverId, pickupCoords);
-                    }
-                }
-
-            } catch (error) {
-                console.error('❌ Erro ao carregar dados do motorista:', error.message);
-                updateDriverPanel({ full_name: 'Erro ao carregar' }, {});
-            }
-        }
-        
-        function subscribeToDriverLocation(driverId, pickupCoords) {
-            if (state.driverLocationSubscription) return;
-
-            state.driverLocationSubscription = supabaseClient
-                .channel(`driver-location-${driverId}`)
-                .on('postgres_changes', {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'driver_details',
-                    filter: `profile_id=eq.${driverId}`
-                }, payload => {
-                    const newLocation = payload.new.current_location;
-                    if (newLocation) {
-                        const driverCoords = parsePoint(newLocation);
-                        if (driverCoords) {
-                            console.log('📍 Posição do motorista recebida:', driverCoords);
-                            updateMapWithRoute(driverCoords, pickupCoords);
-                        }
-                    }
-                })
-                .subscribe(status => {
-                     if (status === 'SUBSCRIBED') console.log(`✅ Escutando localização do motorista ${driverId}!`);
-                });
-        }
-
-        function updateTripDetails(origin, destination, createdAt) {
-            document.getElementById('trip-origin').textContent = origin;
-            document.getElementById('trip-destination').textContent = destination;
-        }
-
-        async function cancelRide() {
-            if (!state.currentRide || !confirm('Deseja cancelar esta viagem?')) return;
-            try {
-                const { error } = await supabaseClient.from('rides').update({ status: 'canceled' }).eq('id', state.currentRide.id);
-                if (error) throw error;
-                toast.show('Viagem cancelada.', 'success');
-            } catch (error) { toast.show('Erro ao cancelar: ' + error.message, 'error'); }
-        }
-
         // =============================================================================
-        // UI & ACTION TRIGGERS
+        // WALLET FUNCTIONS
         // =============================================================================
-        function showRideRequestForm() {
-            resetRideStatusUI();
-            cleanupMap();
-            document.getElementById('ride-request-container')?.classList.remove('hidden');
-            document.getElementById('ride-status-container')?.classList.add('hidden');
-        }
-
-        function showRideStatus() {
-            document.getElementById('ride-request-container')?.classList.add('hidden');
-            document.getElementById('ride-status-container')?.classList.remove('hidden');
-        }
-        
-        function showRideSummary(ride) {
-            // Hide all other status elements
-            document.getElementById('driver-details-panel')?.classList.add('hidden');
-            document.getElementById('map-container')?.classList.add('hidden');
-            document.getElementById('status-timeline')?.classList.add('hidden');
-            document.getElementById('trip-details')?.classList.add('hidden');
-            document.getElementById('ride-action-buttons')?.classList.add('hidden');
-
-            // Show the summary panel
-            const summaryPanel = document.getElementById('ride-summary-panel');
-            summaryPanel.classList.remove('hidden');
-            
-            // Populate data
-            let finalPriceText = 'N/A';
-            const finalPrice = ride.price || ride.estimated_price;
-            if (finalPrice) {
-                finalPriceText = parseFloat(finalPrice).toFixed(2).replace('.', ',');
-            }
-            document.getElementById('summary-price').textContent = `R$ ${finalPriceText}`;
-            document.getElementById('summary-origin').textContent = ride.origin_address || 'N/A';
-            document.getElementById('summary-destination').textContent = (ride.destinations && ride.destinations[0]) || 'N/A';
-        }
-
-        function finishRideSummary() {
-            state.currentRide = null;
-            const summaryPanel = document.getElementById('ride-summary-panel');
-            summaryPanel.classList.add('hidden');
-            
-            // Un-hide the ride status elements for the next ride
-            document.getElementById('driver-details-panel')?.classList.remove('hidden');
-            document.getElementById('status-timeline')?.classList.remove('hidden');
-            document.getElementById('trip-details')?.classList.remove('hidden');
-            document.getElementById('ride-action-buttons')?.classList.remove('hidden');
-
-            showRideRequestForm();
-        }
-
-        function callDriver() {
-            if (state.currentRide?.driver?.phone_number) {
-                window.open(`tel:+55${state.currentRide.driver.phone_number.replace(/\D/g, '')}`, '_self');
-            } else { toast.show('Número do motorista não disponível', 'warning'); }
-        }
-
-        function messageDriver() {
-            if (state.currentRide?.driver?.phone_number) {
-                const phone = state.currentRide.driver.phone_number.replace(/\D/g, '');
-                const text = encodeURIComponent('Olá! Sobre a nossa viagem.');
-                window.open(`https://wa.me/55${phone}?text=${text}`, '_blank');
-            } else { toast.show('Número do motorista não disponível', 'warning'); }
-        }
-
-        function getHelp() {
-            window.open('https://wa.me/5511999999999?text=Preciso de ajuda com minha corrida', '_blank');
-        }
-
-        // =============================================================================
-        // STRIPE & WALLET FUNCTIONS - ÚNICA ALTERAÇÃO: USAR STRIPE REAL
-        // =============================================================================
-        const STRIPE_PUBLIC_KEY = 'pk_test_51SEJCBFyO4P04Uv0YubWfXu6UD8rmVBuA1AGNlygxvLTTivCfdnmaAewkyT7H1mfgMBuOJhpvPPbraIC2iIMO8OG00KHO8HO7v';
-        const stripe = Stripe(STRIPE_PUBLIC_KEY);
-
-        // Carregar saldo da carteira
         async function loadWalletBalance() {
-            if (!state.user) return;
+            if (!state.user || !supabaseClient) return;
             
             try {
                 const { data, error } = await supabaseClient
@@ -1395,19 +1299,19 @@
                     });
                 }
                 
-                document.getElementById('wallet-balance').textContent = 
-                    `R$ ${balance.toFixed(2).replace('.', ',')}`;
+                const balanceElement = document.getElementById('wallet-balance');
+                if (balanceElement) {
+                    balanceElement.textContent = `R$ ${balance.toFixed(2).replace('.', ',')}`;
+                }
                 state.walletBalance = balance;
                 
             } catch (error) {
-                console.error('Erro ao carregar saldo:', error);
-                toast.show('Erro ao carregar saldo da carteira', 'error');
+                const errorMessage = error.message || 'Ocorreu um problema desconhecido.';
+                console.error('Erro ao carregar saldo:', errorMessage, error);
+                toast.show('Não foi possível carregar o saldo. Tente novamente mais tarde.', 'error');
             }
         }
 
-        // ========================================
-        // ÚNICA ALTERAÇÃO: USAR STRIPE REAL AQUI
-        // ========================================
         async function addCredits() {
             const amount = prompt('Quanto você deseja adicionar? (ex: 50)');
             if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
@@ -1415,94 +1319,16 @@
                 return;
             }
 
-            try {
-                toast.show('Redirecionando para pagamento...', 'info');
-                
-                const requestData = {
-                    amount: parseFloat(amount),
-                    userId: state.user.id,
-                    userEmail: state.user.email || state.profile?.email || 'usuario@exemplo.com'
-                };
-                
-                console.log('📤 Enviando dados para Netlify Function:', requestData);
-                
-                // USANDO SUA NETLIFY FUNCTION REAL
-                const response = await fetch('/.netlify/functions/stripe-payment', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(requestData)
-                });
-
-                console.log('📥 Response status:', response.status);
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('❌ Response error:', errorText);
-                    throw new Error(`Erro ${response.status}: ${errorText}`);
-                }
-
-                const responseData = await response.json();
-                console.log('✅ Response data:', responseData);
-
-                const { sessionId, url } = responseData;
-                
-                if (!sessionId && !url) {
-                    throw new Error('Session ID ou URL não recebidos do servidor');
-                }
-                
-                // Redirecionar para o Stripe Checkout usando a URL direta ou sessionId
-                if (url) {
-                    window.location.href = url;
-                } else {
-                    const result = await stripe.redirectToCheckout({ sessionId });
-                    if (result.error) {
-                        throw new Error(result.error.message);
-                    }
-                }
-
-            } catch (error) {
-                console.error('❌ Erro ao processar pagamento:', error);
-                toast.show(`Erro: ${error.message}. Função real do Stripe não está disponível.`, 'error');
-            }
-        }
-        // ========================================
-        // FIM DA ÚNICA ALTERAÇÃO
-        // ========================================
-
-        // Debitar valor da carteira
-        async function debitWallet(amount, description) {
-            try {
-                const { error } = await supabaseClient
-                    .from('wallet_transactions')
-                    .insert({
-                        profile_id: state.user.id,
-                        amount: amount,
-                        transaction_type: 'debit',
-                        description: description,
-                        created_at: new Date().toISOString()
-                    });
-
-                if (error) throw error;
-
-                loadWalletBalance();
-                return true;
-
-            } catch (error) {
-                console.error('Erro ao debitar carteira:', error);
-                return false;
-            }
+            toast.show('Funcionalidade de pagamento em desenvolvimento', 'info');
         }
 
-        // Verificar se tem saldo suficiente
-        function hasEnoughBalance(amount) {
-            return state.walletBalance >= amount;
-        }
-
-        // Mostrar histórico de transações
         async function showTransactionHistory() {
+            if (!state.user || !state.user.id || !supabaseClient) {
+                console.error("showTransactionHistory called without a user session.");
+                toast.show('Sessão expirada. Por favor, faça login novamente.', 'error');
+                return handleAuthError();
+            }
+            
             try {
                 const { data, error } = await supabaseClient
                     .from('wallet_transactions')
@@ -1538,100 +1364,194 @@
                 }
                 html += '</div>';
 
-                // Criar modal simples
+                // Criar modal para histórico de transações
                 const modal = document.createElement('div');
                 modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px;';
-                modal.innerHTML = `
-                    <div style="background: #1f2937; padding: 24px; border-radius: 16px; max-width: 500px; width: 100%; max-height: 80vh; overflow-y: auto;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h3 style="font-size: 20px; font-weight: bold; color: white;">Histórico de Transações</h3>
-                            <button onclick="this.closest('div').parentElement.remove()" style="color: white; font-size: 24px; background: none; border: none; cursor: pointer;">&times;</button>
-                        </div>
-                        ${html}
-                    </div>
-                `;
+
+                const contentBox = document.createElement('div');
+                contentBox.style.cssText = 'background: #1f2937; padding: 24px; border-radius: 16px; max-width: 500px; width: 100%; max-height: 80vh; overflow-y: auto;';
+
+                const header = document.createElement('div');
+                header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;';
+
+                const title = document.createElement('h3');
+                title.style.cssText = 'font-size: 20px; font-weight: bold; color: white;';
+                title.textContent = 'Histórico de Transações';
+
+                const closeButton = document.createElement('button');
+                closeButton.style.cssText = 'color: white; font-size: 24px; background: none; border: none; cursor: pointer;';
+                closeButton.innerHTML = '&times;';
+                closeButton.onclick = () => modal.remove();
+
+                const content = document.createElement('div');
+                content.innerHTML = html;
+
+                header.appendChild(title);
+                header.appendChild(closeButton);
+                contentBox.appendChild(header);
+                contentBox.appendChild(content);
+                modal.appendChild(contentBox);
                 document.body.appendChild(modal);
 
             } catch (error) {
-                console.error('Erro ao carregar histórico:', error);
+                console.error('Erro ao carregar histórico:', error.message || error);
                 toast.show('Erro ao carregar histórico', 'error');
             }
         }
 
-        // Verificar pagamento bem-sucedido na URL
-        async function checkPaymentStatus() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const paymentStatus = urlParams.get('payment');
-            const sessionId = urlParams.get('session_id');
+        // =============================================================================
+        // RIDE FUNCTIONS (STUBS)
+        // =============================================================================
+        async function checkPendingRide() {
+            // Stub - implementar se necessário
+            console.log('Verificando corridas pendentes...');
+        }
 
-            if (paymentStatus === 'success' && sessionId) {
-                toast.show('Pagamento realizado com sucesso! Aguarde a confirmação...', 'success');
-                
-                // Recarregar saldo após alguns segundos (o webhook deve ter processado)
-                setTimeout(() => {
-                    loadWalletBalance();
-                }, 3000);
-                
-                // Limpar URL
-                window.history.replaceState({}, document.title, window.location.pathname);
-            } else if (paymentStatus === 'cancel') {
-                toast.show('Pagamento cancelado', 'warning');
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
+        async function requestRide() {
+            toast.show('Funcionalidade de corridas em desenvolvimento', 'info');
+        }
+
+        function cancelRide() {
+            toast.show('Funcionalidade de cancelamento em desenvolvimento', 'info');
+        }
+
+        function callDriver() {
+            toast.show('Funcionalidade de chamada em desenvolvimento', 'info');
+        }
+
+        function messageDriver() {
+            toast.show('Funcionalidade de mensagem em desenvolvimento', 'info');
+        }
+
+        function getHelp() {
+            window.open('https://wa.me/5511999999999?text=Preciso de ajuda com minha corrida', '_blank');
         }
 
         // =============================================================================
         // INITIALIZATION & EVENT LISTENERS
         // =============================================================================
-        function initializeApp() {
+        async function initializeApp() {
+            console.log("🚀 initializeApp started.");
             if (state.isInitializing) return;
             state.isInitializing = true;
-            setupLoadingTimeout();
-            
-            supabaseClient.auth.getSession().then(({ data: { session } }) => {
+
+            try {
+                // Aguarda a inicialização completa da API do Google Maps
+                if (!googleMapsInitialized) {
+                    console.log("⏳ initializeApp aguardando Google Maps...");
+                    await googleMapsReadyPromise;
+                    console.log("✅ Google Maps pronto para initializeApp.");
+                }
+                
+                // Verificar se Supabase está disponível
+                if (!supabaseClient) {
+                    throw new Error('Supabase não inicializado');
+                }
+                
+                const { data: { session } } = await supabaseClient.auth.getSession();
                 if (session) {
                     state.user = session.user;
-                    loadUserProfile(session.user.id);
+                    await loadUserProfile(session.user.id);
                 } else {
-                    showScreen('login-screen');
+                    showScreen("login-screen");
                 }
-            }).catch(error => {
-                console.error("❌ Erro ao verificar sessão:", error);
-                handleAuthError();
-            }).finally(() => { state.isInitializing = false; });
+            } catch (error) {
+                console.error("❌ Erro ao verificar sessão:", error.message || error);
+                // Em caso de erro, mostrar tela de login como fallback
+                showScreen("login-screen");
+                toast.show('Erro ao inicializar aplicação. Algumas funcionalidades podem não funcionar.', 'warning');
+            } finally {
+                state.isInitializing = false;
+                console.log("✅ initializeApp finished.");
+            }
         }
 
+        // CORREÇÃO: Event listeners melhorados
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('login-form').addEventListener('submit', (e) => {
-                e.preventDefault();
-                handleSignIn(e.target.elements['login-email'].value, e.target.elements['login-password'].value);
-            });
-            document.getElementById('signup-form').addEventListener('submit', (e) => {
-                e.preventDefault();
-                handleSignUp( e.target.elements['signup-fullname'].value, e.target.elements['signup-email'].value, e.target.elements['signup-phone'].value, e.target.elements['signup-password'].value );
-            });
-            document.getElementById('ride-request-form').addEventListener('submit', (e) => {
-                e.preventDefault();
-                requestRide();
-            });
-
-            supabaseClient.auth.onAuthStateChange((event, session) => {
-                console.log('🔐 AUTH STATE CHANGE:', event);
-                if (event === 'SIGNED_IN' && session) {
-                    state.user = session.user;
-                    loadUserProfile(session.user.id);
-                } else if (event === 'SIGNED_OUT') {
-                    state.user = state.profile = state.currentRide = null;
-                    if(state.rideSubscription) {
-                        supabaseClient.removeChannel(state.rideSubscription);
-                        state.rideSubscription = null;
+            console.log('🚀 DOM carregado, inicializando aplicação...');
+            
+            setupLoadingTimeout();
+            
+            // Inicializar aplicação
+            initializeApp();
+            
+            // Event listeners para formulários
+            const loginForm = document.getElementById('login-form');
+            if (loginForm) {
+                loginForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const email = e.target.elements['login-email']?.value;
+                    const password = e.target.elements['login-password']?.value;
+                    if (email && password) {
+                        handleSignIn(email, password);
                     }
-                    showScreen('login-screen');
+                });
+            }
+            
+            const signupForm = document.getElementById('signup-form');
+            if (signupForm) {
+                signupForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const fullName = e.target.elements['signup-fullname']?.value;
+                    const email = e.target.elements['signup-email']?.value;
+                    const phone = e.target.elements['signup-phone']?.value;
+                    const password = e.target.elements['signup-password']?.value;
+                    if (fullName && email && phone && password) {
+                        handleSignUp(fullName, email, phone, password);
+                    }
+                });
+            }
+            
+            const rideRequestForm = document.getElementById('ride-request-form');
+            if (rideRequestForm) {
+                rideRequestForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    requestRide();
+                });
+            }
+
+            // Auth state change listener
+            if (supabaseClient) {
+                supabaseClient.auth.onAuthStateChange((event, session) => {
+                    console.log('🔐 AUTH STATE CHANGE:', event);
+                    if (event === 'SIGNED_IN' && session) {
+                        state.user = session.user;
+                        loadUserProfile(session.user.id);
+                    } else if (event === 'SIGNED_OUT') {
+                        state.user = state.profile = state.currentRide = null;
+                        if(state.rideSubscription) {
+                            supabaseClient.removeChannel(state.rideSubscription);
+                            state.rideSubscription = null;
+                        }
+                        showScreen('login-screen');
+                    }
+                });
+            }
+            
+            // Event listeners para modal de histórico
+            const modal = document.getElementById('history-modal');
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        closeHistoryModal();
+                    }
+                });
+            }
+            
+            // Event listener para tecla ESC fechar modal
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    const modal = document.getElementById('history-modal');
+                    if (modal && modal.classList.contains('show')) {
+                        closeHistoryModal();
+                    }
                 }
             });
-
-            initializeApp();
-            setTimeout(initializeAutocomplete, 1500);
+            
+            // Verificar tela ativa periodicamente (fallback de segurança)
+            setInterval(ensureValidScreenActive, 5000);
+            
+            console.log('✅ Event listeners configurados');
         });
     </script>
 </body>
