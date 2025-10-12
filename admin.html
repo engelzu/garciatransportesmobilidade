@@ -1,242 +1,168 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel de Administração - Garcia Mobilidade</title>
+    <title>Admin - Garcia Mobilidade</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Poppins', sans-serif; background-color: #111827; color: white; }
-        .screen { display: none; }
-        .screen.active { display: flex; } /* Alterado para flex para centralizar o conteúdo */
-        .card { background-color: #1F2937; border-radius: 0.5rem; padding: 1.5rem; }
-        .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #6d28d9; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        body { font-family: 'Poppins', sans-serif; background-color: #111827; color: #e5e7eb; }
+        .view { display: none; }
+        .view.active { display: block; }
+        .loader { border: 4px solid #4b5563; border-radius: 50%; border-top: 4px solid #6d28d9; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .btn-loading { position: relative; color: transparent !important; }
+        .btn-loading::after { content: ''; position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; margin: -10px 0 0 -10px; border: 2px solid #ffffff; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+
+        /* Toast Notifications */
+        .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 1000; }
+        .toast { background: #1f2937; border-left: 4px solid; color: white; padding: 16px; border-radius: 8px; margin-bottom: 10px; min-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); transform: translateY(150px); opacity: 0; transition: all 0.4s cubic-bezier(0.21, 1.02, 0.73, 1); }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success { border-left-color: #22c55e; }
+        .toast.error { border-left-color: #ef4444; }
+        .toast.info { border-left-color: #3b82f6; }
     </style>
 </head>
 <body class="min-h-screen">
 
-    <div id="loading-screen" class="screen active items-center justify-center min-h-screen">
-        <div class="loader"></div>
-    </div>
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
 
-    <div id="login-screen" class="screen items-center justify-center min-h-screen">
-        <div class="w-full max-w-sm space-y-4 p-4">
-            <img src="images/logogarcia.png" alt="Logo Garcia Transportes" class="mx-auto h-20 w-auto mb-8">
-            <h2 class="text-3xl font-bold text-center">Painel de Administração</h2>
+    <!-- Login Screen -->
+    <div id="login-screen" class="flex items-center justify-center min-h-screen">
+        <div class="w-full max-w-sm p-8 space-y-6 bg-gray-800 rounded-xl shadow-lg">
+            <img src="images/logogarcia.png" alt="Logo Garcia Transportes" class="mx-auto h-16 w-auto">
+            <h2 class="text-2xl font-bold text-center text-white">Painel de Administração</h2>
             <form id="login-form" class="space-y-4">
                 <div>
-                    <label for="admin-email" class="block mb-2 text-sm font-medium">E-mail de Administrador</label>
-                    <input type="email" id="admin-email" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required>
+                    <label for="login-email" class="block mb-2 text-sm font-medium text-gray-300">E-mail</label>
+                    <input type="email" id="login-email" class="w-full p-3 text-white rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
                 </div>
                 <div>
-                    <label for="admin-password" class="block mb-2 text-sm font-medium">Senha</label>
-                    <input type="password" id="admin-password" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none" required>
+                    <label for="login-password" class="block mb-2 text-sm font-medium text-gray-300">Senha</label>
+                    <input type="password" id="login-password" class="w-full p-3 text-white rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:border-indigo-500" required>
                 </div>
-                <button type="submit" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENTRAR</button>
+                <button type="submit" id="login-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">ENTRAR</button>
             </form>
         </div>
     </div>
 
-    <div id="admin-dashboard" class="screen p-4 sm:p-6 lg:p-8" style="display: none;">
-        <header class="flex justify-between items-center mb-6 pb-4 border-b border-gray-700">
-            <h1 class="text-3xl font-bold">Dashboard</h1>
-            <button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700">Sair</button>
-        </header>
-
-        <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-1 space-y-6">
-                <div class="card">
-                    <h2 class="text-xl font-semibold mb-4">Aprovações de Motoristas Pendentes</h2>
-                    <div id="pending-drivers-list" class="space-y-4"></div>
-                </div>
+    <!-- Admin Panel -->
+    <div id="admin-panel" class="hidden h-screen lg:grid lg:grid-cols-[280px_1fr]">
+        <!-- Sidebar -->
+        <aside class="flex flex-col h-full bg-gray-900 border-r border-gray-800 p-6">
+            <img src="images/logogarcia.png" alt="Logo Garcia Transportes" class="h-10 w-auto mb-10">
+            <nav id="sidebar-nav" class="flex flex-col space-y-2">
+                <a href="#dashboard" class="nav-link flex items-center gap-3 p-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors" data-view="dashboard-view">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#drivers" class="nav-link flex items-center gap-3 p-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors" data-view="drivers-view">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197"></path></svg>
+                    <span>Motoristas</span>
+                </a>
+                <a href="#rides" class="nav-link flex items-center gap-3 p-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors" data-view="rides-view">
+                   <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <span>Corridas</span>
+                </a>
+                <a href="#settings" class="nav-link flex items-center gap-3 p-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors" data-view="settings-view">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <span>Configurações</span>
+                </a>
+            </nav>
+            <div class="mt-auto">
+                <button id="logout-btn" class="w-full flex items-center gap-3 p-3 rounded-lg text-red-400 hover:bg-red-900/50 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    <span>Sair</span>
+                </button>
             </div>
-            <div class="lg:col-span-2 space-y-6">
-                 <div class="card">
-                    <h2 class="text-xl font-semibold mb-4">Corridas Solicitadas (Aguardando Atribuição)</h2>
-                    <div id="requested-rides-list" class="space-y-4"></div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex flex-col h-screen overflow-y-auto bg-gray-900/50">
+            <header class="sticky top-0 bg-gray-900/80 backdrop-blur-sm border-b border-gray-800 p-6 z-10">
+                <h1 id="view-title" class="text-2xl font-bold text-white">Dashboard</h1>
+            </header>
+            <div id="content-wrapper" class="p-8">
+                <!-- Dashboard View -->
+                <div id="dashboard-view" class="view">
+                    <div id="dashboard-stats" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- Stat Cards will be injected here -->
+                    </div>
                 </div>
-                <div class="card">
-                    <h2 class="text-xl font-semibold mb-4">Corridas em Andamento</h2>
-                    <div id="ongoing-rides-list" class="space-y-4"></div>
+
+                <!-- Drivers View -->
+                <div id="drivers-view" class="view">
+                    <div class="bg-gray-800 rounded-xl overflow-hidden">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-700/50">
+                                <tr>
+                                    <th class="p-4 font-semibold">Nome</th>
+                                    <th class="p-4 font-semibold">Contato</th>
+                                    <th class="p-4 font-semibold">Veículo</th>
+                                    <th class="p-4 font-semibold">Status</th>
+                                    <th class="p-4 font-semibold">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drivers-table-body">
+                                <!-- Driver rows will be injected here -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
+
+                <!-- Rides View -->
+                <div id="rides-view" class="view">
+                    <div class="bg-gray-800 rounded-xl overflow-hidden">
+                         <table class="w-full text-left text-sm">
+                            <thead class="bg-gray-700/50">
+                                <tr>
+                                    <th class="p-3 font-semibold">Data</th>
+                                    <th class="p-3 font-semibold">Passageiro</th>
+                                    <th class="p-3 font-semibold">Motorista</th>
+                                    <th class="p-3 font-semibold">Valor</th>
+                                    <th class="p-3 font-semibold">Comissão</th>
+                                    <th class="p-3 font-semibold">Repasse</th>
+                                    <th class="p-3 font-semibold">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rides-table-body">
+                                <!-- Ride rows will be injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Settings View -->
+                <div id="settings-view" class="view">
+                     <div class="max-w-md mx-auto bg-gray-800 p-8 rounded-xl">
+                        <h2 class="text-xl font-bold mb-4">Configurações da Plataforma</h2>
+                        <form id="settings-form" class="space-y-4">
+                            <div>
+                                <label for="commission-rate" class="block mb-2 text-sm font-medium text-gray-300">Taxa de Comissão (%)</label>
+                                <input type="number" id="commission-rate" step="0.1" min="0" max="100" class="w-full p-3 text-white rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="Ex: 25">
+                                <p class="text-xs text-gray-400 mt-2">Este é o percentual que a plataforma retém de cada corrida.</p>
+                            </div>
+                            <button type="submit" id="save-settings-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">SALVAR ALTERAÇÕES</button>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- Universal Loading State -->
+                <div id="loading-indicator" class="hidden text-center py-20">
+                    <div class="loader mx-auto"></div>
+                    <p class="mt-4 text-gray-400">Carregando dados...</p>
+                </div>
+
             </div>
         </main>
     </div>
 
-    <script>
-        const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
-        const state = { user: null, profiles: [], driverDetails: [], rides: [] };
-
-        function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(s => {
-                s.classList.remove('active');
-                // Garante que o dashboard não seja um flex container
-                if (s.id === 'admin-dashboard') {
-                    s.style.display = 'none';
-                }
-            });
-            const screenElement = document.getElementById(screenId);
-            screenElement.classList.add('active');
-            
-            // O dashboard é a única tela que não é centralizada, então tratamos de forma especial
-            if (screenId === 'admin-dashboard') {
-                screenElement.style.display = 'block';
-            }
-        }
-
-        async function handleAdminLogin(email, password) {
-            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) alert('E-mail ou senha incorretos!');
-        }
-
-        async function handleSignOut() { await supabaseClient.auth.signOut(); }
-
-        async function loadAdminData() {
-            const { data: profiles, error: pError } = await supabaseClient.from('profiles').select('*');
-            const { data: driverDetails, error: ddError } = await supabaseClient.from('driver_details').select('*');
-            const { data: rides, error: rError } = await supabaseClient.from('rides').select('*, profiles(*)');
-
-            if (pError || ddError || rError) {
-                console.error("Erro ao carregar dados:", pError || ddError || rError);
-                alert("Não foi possível carregar os dados do painel.");
-                return;
-            }
-            state.profiles = profiles;
-            state.driverDetails = driverDetails;
-            state.rides = rides;
-            renderAllSections();
-        }
-
-        function renderAllSections() {
-            renderPendingDrivers();
-            renderRequestedRides();
-            renderOngoingRides();
-        }
-
-        function renderPendingDrivers() {
-            const list = document.getElementById('pending-drivers-list');
-            const pendingDrivers = state.driverDetails.filter(d => d.approval_status === 'pending');
-            if (pendingDrivers.length === 0) { list.innerHTML = `<p class="text-gray-400">Nenhum motorista aguardando aprovação.</p>`; return; }
-            list.innerHTML = pendingDrivers.map(detail => {
-                const profile = state.profiles.find(p => p.id === detail.profile_id);
-                if (!profile) return '';
-                return `<div class="p-3 rounded-lg bg-gray-700/50 border border-gray-600">
-                        <p class="font-bold">${profile.full_name}</p>
-                        <p class="text-sm text-gray-300">${detail.car_model} - ${detail.license_plate}</p>
-                        <button onclick="approveDriver('${detail.profile_id}')" class="w-full mt-2 py-1.5 text-sm font-semibold rounded-md bg-green-600 hover:bg-green-700">Aprovar</button>
-                    </div>`;
-            }).join('');
-        }
-
-        function renderRequestedRides() {
-            const list = document.getElementById('requested-rides-list');
-            const requestedRides = state.rides.filter(r => r.status === 'requested');
-            if (requestedRides.length === 0) { list.innerHTML = `<p class="text-gray-400">Nenhuma corrida solicitada no momento.</p>`; return; }
-            const availableDrivers = state.driverDetails
-                .filter(d => d.approval_status === 'approved' && d.work_status === 'online')
-                .map(d => state.profiles.find(p => p.id === d.profile_id)).filter(Boolean);
-            list.innerHTML = requestedRides.map(ride => {
-                const passenger = ride.profiles;
-                const driverOptions = availableDrivers.map(driver => `<option value="${driver.id}">${driver.full_name}</option>`).join('');
-                return `<div class="p-3 rounded-lg bg-gray-700/50 border border-gray-600">
-                        <p><strong>Passageiro:</strong> ${passenger?.full_name || 'N/A'}</p>
-                        <p class="text-sm"><strong>Origem:</strong> ${ride.origin_address}</p>
-                        <p class="text-sm"><strong>Destino:</strong> ${Array.isArray(ride.destinations) ? ride.destinations.join(', ') : ride.destinations}</p>
-                        <div class="mt-3 flex gap-2 items-center">
-                            <select id="driver-select-${ride.id}" class="w-full p-2 rounded-md bg-gray-800 border-gray-600 text-sm">
-                                <option value="">Selecione um motorista...</option>
-                                ${driverOptions}
-                            </select>
-                            <button onclick="assignDriver('${ride.id}')" class="py-2 px-4 font-semibold rounded-md bg-indigo-600 hover:bg-indigo-700 text-sm whitespace-nowrap">Atribuir</button>
-                        </div>
-                    </div>`;
-            }).join('');
-        }
-        
-        function renderOngoingRides() {
-            const list = document.getElementById('ongoing-rides-list');
-            const ongoingStatuses = ['assigned', 'accepted', 'arrived_pickup', 'in_progress'];
-            const ongoingRides = state.rides.filter(r => ongoingStatuses.includes(r.status));
-            if (ongoingRides.length === 0) { list.innerHTML = `<p class="text-gray-400">Nenhuma corrida em andamento.</p>`; return; }
-            list.innerHTML = ongoingRides.map(ride => {
-                const passenger = ride.profiles;
-                const driver = state.profiles.find(p => p.id === ride.driver_id);
-                return `<div class="p-3 rounded-lg bg-gray-700/50 border border-gray-600 text-sm">
-                        <p><strong>Passageiro:</strong> ${passenger?.full_name || 'N/A'}</p>
-                        <p><strong>Motorista:</strong> ${driver?.full_name || 'N/A'}</p>
-                        <p><strong>Status:</strong> <span class="font-semibold text-yellow-400">${ride.status.toUpperCase()}</span></p>
-                    </div>`;
-            }).join('');
-        }
-
-        async function approveDriver(profileId) {
-            const { error } = await supabaseClient.from('driver_details').update({ approval_status: 'approved' }).eq('profile_id', profileId);
-            if (error) { alert('Erro ao aprovar motorista.'); console.error(error); } 
-            else { alert('Motorista aprovado com sucesso!'); }
-        }
-        
-        async function assignDriver(rideId) {
-            const selectElement = document.getElementById(`driver-select-${rideId}`);
-            const driverId = selectElement.value;
-            if (!driverId) return alert('Por favor, selecione um motorista.');
-            const { error } = await supabaseClient.from('rides').update({ driver_id: driverId, status: 'assigned' }).eq('id', rideId);
-            if (error) { alert('Erro ao atribuir corrida.'); console.error(error); } 
-            else { alert('Corrida atribuída com sucesso!'); }
-        }
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('login-form').addEventListener('submit', (e) => {
-                e.preventDefault();
-                handleAdminLogin(document.getElementById('admin-email').value, document.getElementById('admin-password').value);
-            });
-            
-            supabaseClient.channel('public-changes')
-                .on('postgres_changes', { event: '*', schema: 'public' }, payload => {
-                    if (document.getElementById('admin-dashboard').classList.contains('active')) {
-                        loadAdminData();
-                    }
-                })
-                .subscribe();
-
-            async function checkInitialSession() {
-                try {
-                    const { data: { session } } = await supabaseClient.auth.getSession();
-                    if (session && session.user) {
-                        const { data: profile, error } = await supabaseClient.from('profiles').select('role').eq('id', session.user.id).single();
-                        if (error) throw error;
-                        if (profile && profile.role === 'admin') {
-                            showScreen('admin-dashboard');
-                            await loadAdminData();
-                        } else {
-                            showScreen('login-screen');
-                        }
-                    } else {
-                        showScreen('login-screen');
-                    }
-                } catch (error) {
-                    console.error("Erro na verificação de sessão:", error);
-                    showScreen('login-screen');
-                }
-            }
-
-            supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                if (event === 'SIGNED_IN') {
-                    await checkInitialSession();
-                } else if (event === 'SIGNED_OUT') {
-                    showScreen('login-screen');
-                }
-            });
-
-            checkInitialSession();
-        });
-    </script>
+    <script type="module" src="admin.js"></script>
 </body>
 </html>
