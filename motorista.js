@@ -344,14 +344,7 @@ async function loadDriverJobs() {
     const listContainer = document.getElementById('driver-jobs-list');
     listContainer.innerHTML = `<div class="loader mx-auto"></div>`;
 
-    const RIDE_COLUMNS = `
-        id,
-        status,
-        price,
-        origin_address,
-        destination_address,
-        passenger:profiles!rides_passenger_id_fkey(full_name)
-    `;
+    const RIDE_COLUMNS = 'id,status,price,origin_address,destination_address,passenger:profiles!rides_passenger_id_fkey(full_name)';
 
     // Buscar corridas atribuídas ao motorista
     const { data: assignedRides, error: assignedError } = await supabaseClient
