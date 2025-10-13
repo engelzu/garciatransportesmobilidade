@@ -13,7 +13,8 @@ const state = {
     driverDetails: null, 
     rides: [], 
     rideSubscription: null, 
-    locationWatcher: null 
+    locationWatcher: null,
+    commissionRate: 0.25 // Default commission rate (25%)
 };
 
 // --- UTILITIES ---
@@ -308,10 +309,16 @@ function createRideElement(ride) {
     let actionButton = '';
     let statusPill = `<span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-500/20 text-yellow-300">${ride.status.toUpperCase()}</span>`;
 
-    // Extract destination address from the 'destinations' jsonb array.
     const destinationAddress = (ride.destinations && Array.isArray(ride.destinations) && ride.destinations.length > 0)
         ? ride.destinations[0]
-        : (ride.destination_address || 'N/A');
+        : 'N/A';
+    
+    const driverEarningsHtml = `
+        <div class="text-right">
+            <p class="text-sm text-gray-400">Seu ganho</p>
+            <p class="text-2xl font-bold text-green-400">${formatCurrency(ride.driver_earning_preview)}</p>
+        </div>
+    `;
 
     switch(ride.status) {
         case 'requested':
@@ -324,7 +331,6 @@ function createRideElement(ride) {
                 </button>
             `;
             break;
-        // Add other cases for assigned, in_progress etc. if needed
     }
 
     return `
@@ -340,7 +346,7 @@ function createRideElement(ride) {
                         <strong>Telefone:</strong> ${passenger.phone_number || 'N/A'}
                     </p>
                 </div>
-                ${statusPill}
+                ${driverEarningsHtml}
             </div>
             
             <div>
@@ -375,6 +381,18 @@ async function loadDriverJobs() {
     listContainer.innerHTML = `<div class="loader mx-auto"></div>`;
 
     try {
+        const { data: configData, error: configError } = await supabaseClient
+            .from('app_config')
+            .select('value')
+            .eq('key', 'COMMISSION_RATE')
+            .single();
+
+        if (configError) {
+            console.warn('Não foi possível buscar a taxa de comissão, usando o valor padrão.');
+        } else {
+            state.commissionRate = parseFloat(configData.value);
+        }
+
         const { data: assignedRides, error: assignedError } = await supabaseClient
             .from('rides')
             .select('*')
@@ -409,13 +427,17 @@ async function loadDriverJobs() {
             passengersMap = new Map(passengers.map(p => [p.id, p]));
         }
 
-        const ridesWithPassengers = allRides.map(ride => ({
-            ...ride,
-            passenger: passengersMap.get(ride.passenger_id) || { full_name: 'Passageiro', phone_number: 'N/A' }
-        }));
+        const ridesWithData = allRides.map(ride => {
+            const driverEarningPreview = ride.price ? ride.price * (1 - state.commissionRate) : 0;
+            return {
+                ...ride,
+                passenger: passengersMap.get(ride.passenger_id) || { full_name: 'Passageiro', phone_number: 'N/A' },
+                driver_earning_preview: driverEarningPreview
+            };
+        });
 
-        state.rides = ridesWithPassengers;
-        listContainer.innerHTML = ridesWithPassengers.map(createRideElement).join('');
+        state.rides = ridesWithData;
+        listContainer.innerHTML = ridesWithData.map(createRideElement).join('');
         
         if (requestedRides.length > 0) {
             startRinging();
