@@ -213,7 +213,7 @@ function showProfileScreen() {
         return;
     }
     // Populate form
-    document.getElementById('profile-avatar-preview').src = state.profile.avatar_url || 'https://via.placeholder.com/128';
+    document.getElementById('profile-avatar-preview').src = state.driverDetails.selfie_with_id_url || 'https://via.placeholder.com/128';
     document.getElementById('profile-fullname').value = state.profile.full_name || '';
     document.getElementById('profile-email').value = state.user.email || '';
     document.getElementById('profile-phone').value = state.profile.phone_number || '';
@@ -246,21 +246,21 @@ async function handleProfileUpdate() {
     showLoading('profile-save-btn');
     try {
         const avatarFile = document.getElementById('profile-avatar-upload').files[0];
-        let avatarUrl = state.profile.avatar_url; // Keep old one by default
+        let newAvatarUrl = state.driverDetails.selfie_with_id_url;
 
         if (avatarFile) {
-            avatarUrl = await uploadAvatar(state.user.id, avatarFile);
+            newAvatarUrl = await uploadAvatar(state.user.id, avatarFile);
         }
 
         const updates = {
             profile: {
                 phone_number: document.getElementById('profile-phone').value,
-                avatar_url: avatarUrl
             },
             driverDetails: {
                 pix_key: document.getElementById('profile-pix-key').value,
                 car_model: document.getElementById('profile-model').value,
                 car_color: document.getElementById('profile-color').value,
+                selfie_with_id_url: newAvatarUrl, // Update the correct field
             }
         };
 
@@ -278,10 +278,10 @@ async function handleProfileUpdate() {
         
         // Refresh local state
         state.profile.phone_number = updates.profile.phone_number;
-        state.profile.avatar_url = updates.profile.avatar_url;
         state.driverDetails.pix_key = updates.driverDetails.pix_key;
         state.driverDetails.car_model = updates.driverDetails.car_model;
         state.driverDetails.car_color = updates.driverDetails.car_color;
+        state.driverDetails.selfie_with_id_url = updates.driverDetails.selfie_with_id_url;
 
         toast.show('Perfil atualizado com sucesso!', 'success');
         showScreen('driver-screen');
@@ -455,7 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
             reader.onload = (e) => {
                 document.getElementById('profile-avatar-preview').src = e.target.result;
             };
-            reader.readAsDataURL(file);
+            reader.readAsURL(file);
         }
     });
 
