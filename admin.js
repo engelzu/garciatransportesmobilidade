@@ -109,6 +109,11 @@ async function showView(viewId) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('bg-gray-800', 'text-white'));
     
+    // Hide all content before showing loader
+    document.getElementById('dashboard-view').style.display = 'none';
+    document.getElementById('drivers-view').style.display = 'none';
+    document.getElementById('rides-view').style.display = 'none';
+    document.getElementById('settings-view').style.display = 'none';
     showContentLoading();
     
     const viewElement = document.getElementById(viewId);
@@ -122,6 +127,7 @@ async function showView(viewId) {
     await views[viewId].loader();
     
     hideContentLoading();
+    viewElement.style.display = ''; // Reset display style
     viewElement.classList.add('active');
 }
 
@@ -136,12 +142,12 @@ async function loadDashboardData() {
 
     const { count: driverCount, error: driverError } = await supabaseClient
         .from('driver_details')
-        .select('*', { count: 'exact' })
+        .select('*', { count: 'exact', head: true })
         .eq('approval_status', 'approved');
         
     const { count: pendingDriverCount, error: pendingDriverError } = await supabaseClient
         .from('driver_details')
-        .select('*', { count: 'exact' })
+        .select('*', { count: 'exact', head: true })
         .eq('approval_status', 'pending');
 
     if (ridesError || driverError || pendingDriverError) {
@@ -183,17 +189,17 @@ function renderDashboard(stats) {
 
 // Drivers
 async function loadDriversData() {
-    // CORREÇÃO: A sintaxe da consulta foi alterada para o padrão do Supabase, que é mais robusto.
     const { data, error } = await supabaseClient
         .from('driver_details')
         .select(`
             *,
-            profiles(*)
+            profiles(full_name, email, phone_number)
         `);
     
     if (error) {
         console.error("Erro ao carregar motoristas:", error);
         toast.show('Erro ao carregar motoristas: ' + error.message, 'error');
+        document.getElementById('drivers-table-body').innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-400">Falha ao carregar dados.</td></tr>`;
         return;
     }
     
@@ -213,20 +219,24 @@ function renderDrivers(drivers) {
         rejected: '<span class="px-2 py-1 text-xs font-medium rounded-full bg-red-500/20 text-red-300">Rejeitado</span>',
     };
 
-    // CORREÇÃO: Ajustado para ler os dados do perfil de 'driver.profiles' em vez de 'driver.profile'.
     tbody.innerHTML = drivers.map(driver => `
         <tr class="border-b border-gray-700 hover:bg-gray-700/50">
-            <td class="p-4 font-medium">${driver.profiles.full_name}</td>
-            <td class="p-4 text-gray-300">${driver.profiles.email}<br>${driver.profiles.phone_number || ''}</td>
+            <td class="p-4 font-medium">${driver.profiles?.full_name || 'N/A'}</td>
+            <td class="p-4 text-gray-300">
+                ${driver.profiles?.email || ''}<br>
+                <span class="font-mono text-xs">${driver.profiles?.phone_number || ''}</span><br>
+                <strong class="text-xs text-indigo-300">PIX:</strong> <span class="text-xs">${driver.pix_key || 'Não informado'}</span>
+            </td>
             <td class="p-4 text-gray-300">${driver.car_model} (${driver.car_color})<br><span class="font-mono">${driver.license_plate}</span></td>
             <td class="p-4">${statusMap[driver.approval_status] || driver.approval_status}</td>
             <td class="p-4">
-                ${driver.approval_status === 'pending' ? `
-                <div class="flex gap-2">
-                    <button data-action="approve-driver" data-id="${driver.profile_id}" class="px-3 py-1 text-sm font-semibold rounded-md bg-green-600 hover:bg-green-700">Aprovar</button>
-                    <button data-action="reject-driver" data-id="${driver.profile_id}" class="px-3 py-1 text-sm font-semibold rounded-md bg-red-600 hover:bg-red-700">Rejeitar</button>
+                <div class="flex flex-col items-start gap-2">
+                    ${driver.selfie_with_id_url ? `<button data-action="view-selfie" data-url="${driver.selfie_with_id_url}" class="px-3 py-1 text-xs font-semibold rounded-md bg-blue-600 hover:bg-blue-700">Ver Foto</button>` : ''}
+                    ${driver.approval_status === 'pending' ? `
+                        <button data-action="approve-driver" data-id="${driver.profile_id}" class="px-3 py-1 text-xs font-semibold rounded-md bg-green-600 hover:bg-green-700">Aprovar</button>
+                        <button data-action="reject-driver" data-id="${driver.profile_id}" class="px-3 py-1 text-xs font-semibold rounded-md bg-red-600 hover:bg-red-700">Rejeitar</button>
+                    ` : ''}
                 </div>
-                ` : 'N/A'}
             </td>
         </tr>
     `).join('');
@@ -339,7 +349,6 @@ async function initializeApp() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     
     if (session) {
-        // Double check if user is admin
         const { data: profile } = await supabaseClient
             .from('profiles')
             .select('user_type')
@@ -352,7 +361,6 @@ async function initializeApp() {
             document.getElementById('admin-panel').classList.remove('hidden');
             showView('dashboard-view');
         } else {
-            // Logged in but not admin, log them out from admin panel
             await handleLogout();
         }
     } else {
@@ -390,7 +398,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCommissionRate(newRate);
     });
 
-    // Dynamic Actions (Approve/Reject Driver)
+    // Dynamic Actions (Drivers Table)
     document.getElementById('drivers-table-body').addEventListener('click', (e) => {
         const button = e.target.closest('button');
         if (!button) return;
@@ -406,6 +414,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (confirm(`Tem certeza que deseja REJEITAR este motorista?`)) {
                  updateDriverStatus(id, 'rejected');
             }
+        } else if (action === 'view-selfie') {
+            const imageUrl = button.dataset.url;
+            const modal = document.getElementById('image-modal');
+            const modalImage = document.getElementById('modal-image');
+            if (modal && modalImage && imageUrl) {
+                modalImage.src = imageUrl;
+                modal.classList.add('show');
+            }
+        }
+    });
+
+    // Close Modal
+    document.getElementById('image-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'image-modal') {
+            e.target.classList.remove('show');
         }
     });
     

@@ -26,12 +26,26 @@
         .toast.success { border-left-color: #22c55e; }
         .toast.error { border-left-color: #ef4444; }
         .toast.info { border-left-color: #3b82f6; }
+        
+        /* Modal Styles */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 50; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
+        .modal-overlay.show { opacity: 1; visibility: visible; }
+        .modal-content { background: #1f2937; padding: 1rem; border-radius: 1rem; max-width: 90%; max-height: 90vh; transform: scale(0.9); transition: transform 0.3s ease; }
+        .modal-overlay.show .modal-content { transform: scale(1); }
+        .modal-content img { max-height: 80vh; border-radius: 0.5rem; }
     </style>
 </head>
 <body class="min-h-screen">
 
     <!-- Toast Container -->
     <div id="toast-container" class="toast-container"></div>
+
+    <!-- Image Modal -->
+    <div id="image-modal" class="modal-overlay">
+        <div class="modal-content">
+            <img id="modal-image" src="" alt="Documento do Motorista">
+        </div>
+    </div>
 
     <!-- Login Screen -->
     <div id="login-screen" class="flex items-center justify-center min-h-screen">
@@ -98,12 +112,12 @@
 
                 <!-- Drivers View -->
                 <div id="drivers-view" class="view">
-                    <div class="bg-gray-800 rounded-xl overflow-hidden">
-                        <table class="w-full text-left">
+                    <div class="bg-gray-800 rounded-xl overflow-x-auto">
+                        <table class="w-full text-left text-sm">
                             <thead class="bg-gray-700/50">
                                 <tr>
                                     <th class="p-4 font-semibold">Nome</th>
-                                    <th class="p-4 font-semibold">Contato</th>
+                                    <th class="p-4 font-semibold">Contato / PIX</th>
                                     <th class="p-4 font-semibold">Veículo</th>
                                     <th class="p-4 font-semibold">Status</th>
                                     <th class="p-4 font-semibold">Ações</th>
