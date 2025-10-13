@@ -197,6 +197,7 @@ async function loadDriverData(user) {
     }
 
     if (details.approval_status === 'approved') {
+        document.getElementById('driver-avatar').src = details.selfie_with_id_url || 'https://via.placeholder.com/64';
         document.getElementById('driver-welcome-message').textContent = `Olá, ${profile.full_name}!`;
         document.getElementById('work-status-toggle').checked = details.work_status === 'online';
         if(details.work_status === 'online') startLocationTracking();
@@ -285,6 +286,9 @@ async function handleProfileUpdate() {
         state.driverDetails.car_model = updates.driverDetails.car_model;
         state.driverDetails.car_color = updates.driverDetails.car_color;
         state.driverDetails.selfie_with_id_url = updates.driverDetails.selfie_with_id_url;
+
+        // Update main screen avatar
+        document.getElementById('driver-avatar').src = state.driverDetails.selfie_with_id_url || 'https://via.placeholder.com/64';
 
         toast.show('Perfil atualizado com sucesso!', 'success');
         showScreen('driver-screen');
