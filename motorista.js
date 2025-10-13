@@ -460,7 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
             reader.onload = (e) => {
                 document.getElementById('profile-avatar-preview').src = e.target.result;
             };
-            reader.readAsURL(file);
+            reader.readAsDataURL(file);
         }
     });
 
