@@ -428,7 +428,7 @@ async function loadDriverJobs() {
         }
 
         const ridesWithData = allRides.map(ride => {
-            const driverEarningPreview = ride.price ? ride.price * (1 - state.commissionRate) : 0;
+            const driverEarningPreview = (typeof ride.price === 'number') ? ride.price * (1 - state.commissionRate) : 0;
             return {
                 ...ride,
                 passenger: passengersMap.get(ride.passenger_id) || { full_name: 'Passageiro', phone_number: 'N/A' },
