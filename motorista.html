@@ -46,6 +46,30 @@
         /* New Ride Alert Animation */
         @keyframes newRideAlert { 0%, 100% { background-color: #059669; } 50% { background-color: #10b981; } }
         .new-ride-alert { animation: newRideAlert 1s ease-in-out infinite; }
+        
+        /* Ride Card Styles from Reference */
+        .destination-box {
+            background: #10B9811A; /* Fundo verde transparente */
+            border: 1px solid #10B981;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            animation: glow 2s infinite alternate;
+        }
+
+        .destination-box strong {
+            color: #FBBF24; /* Amarelo/Dourado */
+        }
+        
+        .destination-box span {
+            color: #10B981; /* Verde */
+            font-weight: 500;
+        }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 4px #10B981, 0 0 8px #10B981; }
+            to { box-shadow: 0 0 8px #10B981, 0 0 16px #10B981, 0 0 24px #10B981; }
+        }
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen">
@@ -182,6 +206,10 @@
                     <span class="toggle-slider"></span>
                 </label>
             </div>
+            
+            <button id="silence-btn" onclick="stopRinging()" class="hidden w-full mb-2 py-2 px-4 font-semibold rounded-lg bg-yellow-500 text-gray-900 hover:bg-yellow-600 transition-colors">
+                🔇 Silenciar Alerta
+            </button>
             
             <div id="driver-jobs-list" class="space-y-4">
                 <p class="text-center text-gray-400">Nenhuma corrida no momento.</p>

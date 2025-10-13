@@ -306,33 +306,58 @@ async function handleProfileUpdate() {
 function createRideElement(ride) {
     const passenger = ride.passenger || {};
     let actionButton = '';
-    
+    let statusPill = `<span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-500/20 text-yellow-300">${ride.status.toUpperCase()}</span>`;
+
     switch(ride.status) {
         case 'requested':
-            actionButton = `<button onclick="acceptRide('${ride.id}')" class="w-full py-2 px-4 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors new-ride-alert">ACEITAR CORRIDA</button>`;
+            actionButton = `
+                <button onclick="acceptRide('${ride.id}')" class="w-full py-3 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors new-ride-alert">
+                    🚗 ACEITAR NOVA CORRIDA
+                </button>
+                <button onclick="openMap('${ride.origin_address}', '${ride.destination_address}')" class="w-full py-3 font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 transition-colors">
+                    🗺️ VER NO MAPA
+                </button>
+            `;
             break;
-        case 'assigned':
-            actionButton = `<button onclick="updateRideStatus('${ride.id}', 'in_progress')" class="w-full py-2 px-4 font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors">INICIAR CORRIDA</button>`;
-            break;
-        case 'in_progress':
-            actionButton = `<button onclick="updateRideStatus('${ride.id}', 'completed')" class="w-full py-2 px-4 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">FINALIZAR CORRIDA</button>`;
-            break;
+        // Add other cases for assigned, in_progress etc. if needed
     }
 
     return `
-        <div class="p-4 rounded-lg bg-gray-800 space-y-3 border-l-4 border-yellow-400" data-ride-id="${ride.id}">
+        <div class="p-4 rounded-lg bg-gray-800 space-y-4" data-ride-id="${ride.id}">
             <div class="flex justify-between items-start">
                 <div>
-                    <p class="font-bold text-lg">${passenger.full_name || 'Passageiro'}</p>
-                    <p class="text-sm text-gray-400">Origem: ${ride.origin_address || 'N/A'}</p>
-                    <p class="text-sm text-gray-400">Destino: ${ride.destination_address || 'N/A'}</p>
+                    <p class="flex items-center gap-2">
+                        <span>👤</span>
+                        <strong>Passageiro:</strong> ${passenger.full_name || 'N/A'}
+                    </p>
+                    <p class="flex items-center gap-2 text-sm text-gray-300">
+                        <span>📞</span>
+                        <strong>Telefone:</strong> ${passenger.phone_number || 'N/A'}
+                    </p>
                 </div>
-                <div class="text-right">
-                     <p class="text-xl font-bold text-green-400">${formatCurrency(ride.price)}</p>
-                     <p class="text-xs text-gray-500">Status: ${ride.status}</p>
-                </div>
+                ${statusPill}
             </div>
-            ${actionButton}
+            
+            <div>
+                <p class="flex items-start gap-2 text-sm text-gray-300">
+                    <span>🏠</span>
+                    <div>
+                        <strong>Origem:</strong><br>
+                        ${ride.origin_address || 'N/A'}
+                    </div>
+                </p>
+            </div>
+
+            <div class="destination-box">
+                <p>
+                    <strong>📍 DESTINO</strong><br>
+                    <span class="font-semibold text-lg">${ride.destination_address || 'N/A'}</span>
+                </p>
+            </div>
+            
+            <div class="space-y-2">
+                ${actionButton}
+            </div>
         </div>
     `;
 }
@@ -345,7 +370,6 @@ async function loadDriverJobs() {
     listContainer.innerHTML = `<div class="loader mx-auto"></div>`;
 
     try {
-        // Step 1: Fetch assigned and requested rides without joins
         const { data: assignedRides, error: assignedError } = await supabaseClient
             .from('rides')
             .select('*')
@@ -364,30 +388,35 @@ async function loadDriverJobs() {
         
         if (allRides.length === 0) {
             listContainer.innerHTML = '<p class="text-center text-gray-400">Nenhuma corrida no momento.</p>';
+            stopRinging();
             return;
         }
 
-        // Step 2: Batch fetch passenger data for all unique passenger IDs
         const passengerIds = [...new Set(allRides.map(ride => ride.passenger_id).filter(id => id))];
         
         let passengersMap = new Map();
         if (passengerIds.length > 0) {
             const { data: passengers, error: passengersError } = await supabaseClient
                 .from('profiles')
-                .select('id, full_name')
+                .select('id, full_name, phone_number')
                 .in('id', passengerIds);
             if (passengersError) throw passengersError;
             passengersMap = new Map(passengers.map(p => [p.id, p]));
         }
 
-        // Step 3: Combine ride data with passenger data
         const ridesWithPassengers = allRides.map(ride => ({
             ...ride,
-            passenger: passengersMap.get(ride.passenger_id) || { full_name: 'Passageiro' }
+            passenger: passengersMap.get(ride.passenger_id) || { full_name: 'Passageiro', phone_number: 'N/A' }
         }));
 
         state.rides = ridesWithPassengers;
         listContainer.innerHTML = ridesWithPassengers.map(createRideElement).join('');
+        
+        if (requestedRides.length > 0) {
+            startRinging();
+        } else {
+            stopRinging();
+        }
 
     } catch (error) {
         console.error("Erro ao carregar corridas:", error);
@@ -405,7 +434,6 @@ async function acceptRide(rideId) {
         toast.show('Erro ao aceitar a corrida. Tente novamente.', 'error');
     } else {
         toast.show('Corrida aceita!', 'success');
-        // No need to call loadDriverJobs(), subscription will handle it.
     }
 }
 
@@ -418,8 +446,34 @@ async function updateRideStatus(rideId, newStatus) {
         toast.show('Erro ao atualizar o status da corrida.', 'error');
     } else {
         toast.show('Status da corrida atualizado.', 'success');
-        // No need to call loadDriverJobs(), subscription will handle it.
     }
+}
+
+function openMap(origin, destination) {
+    if (!origin || !destination) {
+        return toast.show('Origem ou destino não informados.', 'warning');
+    }
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+    window.open(url, '_blank');
+}
+
+function startRinging() {
+    const ringtone = document.getElementById('ringtone');
+    const silenceBtn = document.getElementById('silence-btn');
+    if (ringtone.paused) {
+        ringtone.play().catch(e => console.error("Erro ao tocar áudio:", e));
+    }
+    silenceBtn.classList.remove('hidden');
+}
+
+function stopRinging() {
+    const ringtone = document.getElementById('ringtone');
+    const silenceBtn = document.getElementById('silence-btn');
+    if (!ringtone.paused) {
+        ringtone.pause();
+        ringtone.currentTime = 0;
+    }
+    silenceBtn.classList.add('hidden');
 }
 
 
@@ -544,3 +598,5 @@ window.toggleWorkStatus = toggleWorkStatus;
 window.showProfileScreen = showProfileScreen;
 window.acceptRide = acceptRide;
 window.updateRideStatus = updateRideStatus;
+window.openMap = openMap;
+window.stopRinging = stopRinging;
