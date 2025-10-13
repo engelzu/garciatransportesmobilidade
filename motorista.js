@@ -55,6 +55,12 @@ function hideLoading(buttonId) {
     }
 }
 
+function formatCurrency(value) {
+    if (typeof value !== 'number') return 'R$ --,--';
+    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+
 // --- AUTHENTICATION & PROFILE ---
 
 async function handleSignIn(email, password) {
@@ -114,8 +120,8 @@ async function handleSignUp(formData) {
     if (formData.password.length < 6) {
         return toast.show('A senha deve ter pelo menos 6 caracteres.', 'warning');
     }
-    if (!formData.selfieFile.type.startsWith('image/')) {
-        return toast.show('O arquivo de foto deve ser uma imagem.', 'warning');
+    if (!formData.selfieFile || !formData.selfieFile.type.startsWith('image/')) {
+        return toast.show('O arquivo de foto deve ser uma imagem válida.', 'warning');
     }
     
     showLoading('signup-btn');
@@ -164,11 +170,8 @@ async function handleSignUp(formData) {
         console.error("Signup Error:", error);
         toast.show(`Erro no cadastro: ${error.message}`, 'error');
 
-        // Cleanup: if user was created but details failed, delete the user
         if (createdUser) {
-            // This requires admin privileges, so we can't do it from the client.
-            // This is a case for manual cleanup or a server-side function.
-            console.warn("User created in Auth but details insertion failed. Manual cleanup may be required for user ID:", createdUser.id);
+            console.warn("Usuário criado no Auth mas a inserção de detalhes falhou. Limpeza manual pode ser necessária para o usuário ID:", createdUser.id);
         }
     } finally {
         hideLoading('signup-btn');
@@ -177,10 +180,10 @@ async function handleSignUp(formData) {
 
 async function loadDriverData(user) {
     state.user = user;
-    const { data: profile, error: profileError } = await supabaseClient.from('profiles').select('*').eq('id', user.id).single();
+    const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', user.id).single();
     if (profile) state.profile = profile;
 
-    const { data: details, error: detailsError } = await supabaseClient.from('driver_details').select('*').eq('profile_id', user.id).single();
+    const { data: details } = await supabaseClient.from('driver_details').select('*').eq('profile_id', user.id).single();
     if (details) state.driverDetails = details;
     
     if (profile?.user_type !== 'driver') {
@@ -189,7 +192,6 @@ async function loadDriverData(user) {
     }
 
     if (!details) {
-        // This case shouldn't happen with the new flow, but as a fallback
         showScreen('pending-approval-screen');
         return;
     }
@@ -199,11 +201,85 @@ async function loadDriverData(user) {
         document.getElementById('work-status-toggle').checked = details.work_status === 'online';
         if(details.work_status === 'online') startLocationTracking();
         showScreen('driver-screen');
-        // loadDriverJobs(); // Add this back when ride logic is complete
+        loadDriverJobs();
     } else {
         showScreen('pending-approval-screen');
     }
 }
+
+
+// --- RIDE MANAGEMENT ---
+function createRideElement(ride) {
+    const passenger = ride.passenger || {};
+    let actionButton = '';
+    
+    switch(ride.status) {
+        case 'requested':
+            actionButton = `<button onclick="acceptRide('${ride.id}')" class="w-full py-2 px-4 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors new-ride-alert">ACEITAR CORRIDA</button>`;
+            break;
+        case 'assigned':
+            actionButton = `<button onclick="updateRideStatus('${ride.id}', 'in_progress')" class="w-full py-2 px-4 font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors">INICIAR CORRIDA</button>`;
+            break;
+        case 'in_progress':
+            actionButton = `<button onclick="updateRideStatus('${ride.id}', 'completed')" class="w-full py-2 px-4 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">FINALIZAR CORRIDA</button>`;
+            break;
+    }
+
+    return `
+        <div class="p-4 rounded-lg bg-gray-800 space-y-3 border-l-4 border-yellow-400" data-ride-id="${ride.id}">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="font-bold text-lg">${passenger.full_name || 'Carregando...'}</p>
+                    <p class="text-sm text-gray-400">Origem: ${ride.origin_address || 'N/A'}</p>
+                    <p class="text-sm text-gray-400">Destino: ${ride.destination_address || 'N/A'}</p>
+                </div>
+                <div class="text-right">
+                     <p class="text-xl font-bold text-green-400">${formatCurrency(ride.price)}</p>
+                     <p class="text-xs text-gray-500">Status: ${ride.status}</p>
+                </div>
+            </div>
+            ${actionButton}
+        </div>
+    `;
+}
+
+
+async function loadDriverJobs() {
+    if (!state.user) return;
+
+    const listContainer = document.getElementById('driver-jobs-list');
+    listContainer.innerHTML = `<div class="loader mx-auto"></div>`;
+
+    // Buscar corridas atribuídas ao motorista
+    const { data: assignedRides, error: assignedError } = await supabaseClient
+        .from('rides')
+        .select(`*, passenger:profiles!rides_passenger_id_fkey(full_name)`)
+        .eq('driver_id', state.user.id)
+        .in('status', ['assigned', 'in_progress']);
+
+    // Buscar corridas disponíveis para todos
+    const { data: requestedRides, error: requestedError } = await supabaseClient
+        .from('rides')
+        .select(`*, passenger:profiles!rides_passenger_id_fkey(full_name)`)
+        .eq('status', 'requested');
+
+    if (assignedError || requestedError) {
+        toast.show('Erro ao carregar corridas.', 'error');
+        listContainer.innerHTML = '<p class="text-center text-red-400">Erro ao buscar corridas.</p>';
+        return;
+    }
+
+    const allRides = [...(assignedRides || []), ...(requestedRides || [])];
+    state.rides = allRides;
+
+    if (allRides.length === 0) {
+        listContainer.innerHTML = '<p class="text-center text-gray-400">Nenhuma corrida no momento.</p>';
+        return;
+    }
+    
+    listContainer.innerHTML = allRides.map(createRideElement).join('');
+}
+
 
 // --- RIDE & LOCATION ---
 

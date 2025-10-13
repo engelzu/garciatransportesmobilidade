@@ -109,11 +109,7 @@ async function showView(viewId) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('bg-gray-800', 'text-white'));
     
-    // Hide all content before showing loader
-    document.getElementById('dashboard-view').style.display = 'none';
-    document.getElementById('drivers-view').style.display = 'none';
-    document.getElementById('rides-view').style.display = 'none';
-    document.getElementById('settings-view').style.display = 'none';
+    document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
     showContentLoading();
     
     const viewElement = document.getElementById(viewId);
@@ -127,7 +123,7 @@ async function showView(viewId) {
     await views[viewId].loader();
     
     hideContentLoading();
-    viewElement.style.display = ''; // Reset display style
+    viewElement.style.display = '';
     viewElement.classList.add('active');
 }
 
@@ -197,7 +193,6 @@ async function loadDriversData() {
         `);
     
     if (error) {
-        console.error("Erro ao carregar motoristas:", error);
         toast.show('Erro ao carregar motoristas: ' + error.message, 'error');
         document.getElementById('drivers-table-body').innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-400">Falha ao carregar dados.</td></tr>`;
         return;
