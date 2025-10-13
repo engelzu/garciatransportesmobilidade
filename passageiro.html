@@ -348,6 +348,9 @@
 
             <!-- CONTAINER DE STATUS DA CORRIDA (NOVO LAYOUT) -->
             <div id="ride-status-container" class="hidden space-y-4">
+                <!-- MAP CONTAINER -->
+                <div id="map-container" class="w-full h-64 bg-gray-700 rounded-xl mb-4 hidden"></div>
+
                 <!-- Painel do Motorista (Estilo Uber) -->
                 <div id="driver-details-panel" class="bg-gray-800/80 backdrop-blur-sm p-4 rounded-xl space-y-4 transition-all duration-500 transform -translate-y-4 opacity-0">
                     <div class="flex items-center gap-4">
@@ -381,6 +384,7 @@
                 <div id="trip-details" class="p-4 bg-gray-800/80 backdrop-blur-sm rounded-xl text-sm space-y-2">
                     <p class="flex items-start gap-2"><strong class="text-green-400">🟢 Origem:</strong> <span id="trip-origin" class="flex-1">-</span></p>
                     <p class="flex items-start gap-2"><strong class="text-red-400">🔴 Destino:</strong> <span id="trip-destination" class="flex-1">-</span></p>
+                    <p class="flex items-start gap-2 border-t border-white/10 pt-2 mt-2"><strong class="text-yellow-400">💰 Valor:</strong> <span id="trip-price" class="font-bold">-</span></p>
                 </div>
 
                 <!-- Botões de Ação -->
@@ -411,6 +415,10 @@
             originPlace: null,
             destinationPlace: null,
             currentEstimate: null,
+            mapInstance: null,
+            driverMarker: null,
+            passengerMarker: null,
+            driverLocationSubscription: null,
         };
         
         // CONFIGURAÇÕES DE PREÇOS
@@ -519,6 +527,112 @@
             } catch {
                 return 'N/A';
             }
+        }
+
+        // =============================================================================
+        // MAP FUNCTIONS
+        // =============================================================================
+        function destroyMap() {
+            if (state.driverLocationSubscription) {
+                supabaseClient.removeChannel(state.driverLocationSubscription);
+                state.driverLocationSubscription = null;
+            }
+            const mapContainer = document.getElementById('map-container');
+            if (mapContainer && state.mapInstance) {
+                mapContainer.classList.add('hidden');
+                mapContainer.innerHTML = '';
+            }
+            state.mapInstance = null;
+            state.driverMarker = null;
+            state.passengerMarker = null;
+        }
+
+        async function initializeMap(ride) {
+            if (state.mapInstance) return;
+
+            const mapContainer = document.getElementById('map-container');
+            mapContainer.classList.remove('hidden');
+
+            const matches = ride.origin_location.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
+            if (!matches) return console.error("Não foi possível parsear a localização de origem.");
+            
+            const pickupLocation = { lng: parseFloat(matches[1]), lat: parseFloat(matches[2]) };
+
+            const mapOptions = {
+                center: pickupLocation,
+                zoom: 15,
+                disableDefaultUI: true,
+                styles: [
+                    { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+                    { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+                    { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+                    { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
+                    { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
+                    { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
+                    { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
+                ],
+            };
+            state.mapInstance = new google.maps.Map(mapContainer, mapOptions);
+
+            state.passengerMarker = new google.maps.Marker({
+                position: pickupLocation,
+                map: state.mapInstance,
+                title: 'Ponto de Partida',
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 8,
+                    fillColor: "#4285F4",
+                    fillOpacity: 1,
+                    strokeWeight: 2,
+                    strokeColor: "white",
+                }
+            });
+
+            state.driverMarker = new google.maps.Marker({
+                map: state.mapInstance,
+                title: 'Motorista',
+                icon: {
+                    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="36px" height="36px"><path d="M0 0h24v24H0z" fill="none"/><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5S18.33 16 17.5 16zM5 11l1.5-4.5h11L19 11H5z"/></svg>'),
+                    scaledSize: new google.maps.Size(36, 36),
+                    anchor: new google.maps.Point(18, 18)
+                }
+            });
+
+            listenForDriverLocation(ride.driver_id);
+        }
+
+        function updateDriverLocationOnMap(locationString) {
+            if (!state.mapInstance || !state.driverMarker) return;
+            const matches = locationString.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
+            if (!matches) return;
+            
+            const driverLocation = { lng: parseFloat(matches[1]), lat: parseFloat(matches[2]) };
+            state.driverMarker.setPosition(driverLocation);
+
+            const bounds = new google.maps.LatLngBounds();
+            bounds.extend(state.passengerMarker.getPosition());
+            bounds.extend(state.driverMarker.getPosition());
+            state.mapInstance.fitBounds(bounds, 50);
+        }
+
+        function listenForDriverLocation(driverId) {
+            if (state.driverLocationSubscription) {
+                supabaseClient.removeChannel(state.driverLocationSubscription);
+            }
+            state.driverLocationSubscription = supabaseClient
+                .channel(`driver-location-${driverId}`)
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'driver_details', filter: `profile_id=eq.${driverId}` }, payload => {
+                    if (payload.new.current_location) {
+                        updateDriverLocationOnMap(payload.new.current_location);
+                    }
+                })
+                .subscribe();
+            
+            supabaseClient.from('driver_details').select('current_location').eq('profile_id', driverId).single().then(({data}) => {
+                if (data && data.current_location) {
+                    updateDriverLocationOnMap(data.current_location);
+                }
+            });
         }
 
         // =============================================================================
@@ -638,12 +752,25 @@
             const destination = (ride.destinations && ride.destinations[0]) || 'N/A';
             updateTripDetails(ride.origin_address, destination, ride.created_at);
 
+            // Persist ride price on UI
+            const tripPriceEl = document.getElementById('trip-price');
+            if (tripPriceEl && ride.price) {
+                tripPriceEl.textContent = `R$ ${parseFloat(ride.price).toFixed(2).replace('.', ',')}`;
+            }
+
             // Manage cancel button visibility
             const cancelBtn = document.getElementById('cancel-ride-btn');
             if (['in_progress', 'completed', 'canceled'].includes(status)) {
                 cancelBtn.classList.add('hidden');
             } else {
                 cancelBtn.classList.remove('hidden');
+            }
+
+            // Handle map visibility and initialization
+            if (ride.driver_id && ['assigned', 'accepted', 'in_progress'].includes(status)) {
+                initializeMap(ride);
+            } else {
+                destroyMap();
             }
 
             // If driver is assigned, load info. Otherwise, show searching state.
@@ -1165,6 +1292,7 @@
         function showRideRequestForm() {
             stopRidePolling();
             resetRideStatusUI();
+            destroyMap();
             document.getElementById('ride-request-container')?.classList.remove('hidden');
             document.getElementById('ride-status-container')?.classList.add('hidden');
         }
