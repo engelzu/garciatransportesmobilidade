@@ -323,7 +323,7 @@ function createRideElement(ride) {
         <div class="p-4 rounded-lg bg-gray-800 space-y-3 border-l-4 border-yellow-400" data-ride-id="${ride.id}">
             <div class="flex justify-between items-start">
                 <div>
-                    <p class="font-bold text-lg">${passenger.full_name || 'Carregando...'}</p>
+                    <p class="font-bold text-lg">${passenger.full_name || 'Passageiro'}</p>
                     <p class="text-sm text-gray-400">Origem: ${ride.origin_address || 'N/A'}</p>
                     <p class="text-sm text-gray-400">Destino: ${ride.destination_address || 'N/A'}</p>
                 </div>
@@ -344,36 +344,82 @@ async function loadDriverJobs() {
     const listContainer = document.getElementById('driver-jobs-list');
     listContainer.innerHTML = `<div class="loader mx-auto"></div>`;
 
-    const RIDE_COLUMNS = 'id,status,price,origin_address,destination_address,passenger:profiles!rides_passenger_id_fkey(full_name)';
+    try {
+        // Step 1: Fetch assigned and requested rides without joins
+        const { data: assignedRides, error: assignedError } = await supabaseClient
+            .from('rides')
+            .select('*')
+            .eq('driver_id', state.user.id)
+            .in('status', ['assigned', 'in_progress']);
+        if (assignedError) throw assignedError;
 
-    // Buscar corridas atribuídas ao motorista
-    const { data: assignedRides, error: assignedError } = await supabaseClient
-        .from('rides')
-        .select(RIDE_COLUMNS)
-        .eq('driver_id', state.user.id)
-        .in('status', ['assigned', 'in_progress']);
+        const { data: requestedRides, error: requestedError } = await supabaseClient
+            .from('rides')
+            .select('*')
+            .eq('status', 'requested')
+            .is('driver_id', null);
+        if (requestedError) throw requestedError;
 
-    // Buscar corridas disponíveis para todos
-    const { data: requestedRides, error: requestedError } = await supabaseClient
-        .from('rides')
-        .select(RIDE_COLUMNS)
-        .eq('status', 'requested');
+        const allRides = [...(assignedRides || []), ...(requestedRides || [])];
+        
+        if (allRides.length === 0) {
+            listContainer.innerHTML = '<p class="text-center text-gray-400">Nenhuma corrida no momento.</p>';
+            return;
+        }
 
-    if (assignedError || requestedError) {
+        // Step 2: Batch fetch passenger data for all unique passenger IDs
+        const passengerIds = [...new Set(allRides.map(ride => ride.passenger_id).filter(id => id))];
+        
+        let passengersMap = new Map();
+        if (passengerIds.length > 0) {
+            const { data: passengers, error: passengersError } = await supabaseClient
+                .from('profiles')
+                .select('id, full_name')
+                .in('id', passengerIds);
+            if (passengersError) throw passengersError;
+            passengersMap = new Map(passengers.map(p => [p.id, p]));
+        }
+
+        // Step 3: Combine ride data with passenger data
+        const ridesWithPassengers = allRides.map(ride => ({
+            ...ride,
+            passenger: passengersMap.get(ride.passenger_id) || { full_name: 'Passageiro' }
+        }));
+
+        state.rides = ridesWithPassengers;
+        listContainer.innerHTML = ridesWithPassengers.map(createRideElement).join('');
+
+    } catch (error) {
+        console.error("Erro ao carregar corridas:", error);
         toast.show('Erro ao carregar corridas.', 'error');
         listContainer.innerHTML = '<p class="text-center text-red-400">Erro ao buscar corridas.</p>';
-        return;
     }
+}
 
-    const allRides = [...(assignedRides || []), ...(requestedRides || [])];
-    state.rides = allRides;
-
-    if (allRides.length === 0) {
-        listContainer.innerHTML = '<p class="text-center text-gray-400">Nenhuma corrida no momento.</p>';
-        return;
+async function acceptRide(rideId) {
+    const { error } = await supabaseClient
+        .from('rides')
+        .update({ driver_id: state.user.id, status: 'assigned' })
+        .eq('id', rideId);
+    if (error) {
+        toast.show('Erro ao aceitar a corrida. Tente novamente.', 'error');
+    } else {
+        toast.show('Corrida aceita!', 'success');
+        // No need to call loadDriverJobs(), subscription will handle it.
     }
-    
-    listContainer.innerHTML = allRides.map(createRideElement).join('');
+}
+
+async function updateRideStatus(rideId, newStatus) {
+    const { error } = await supabaseClient
+        .from('rides')
+        .update({ status: newStatus })
+        .eq('id', rideId);
+    if (error) {
+        toast.show('Erro ao atualizar o status da corrida.', 'error');
+    } else {
+        toast.show('Status da corrida atualizado.', 'success');
+        // No need to call loadDriverJobs(), subscription will handle it.
+    }
 }
 
 
@@ -470,6 +516,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Ride Subscription
+    supabaseClient
+        .channel('public:rides')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rides' }, payload => {
+            console.log('Change received!', payload);
+            if (document.getElementById('driver-screen').classList.contains('active')) {
+                loadDriverJobs();
+            }
+        })
+        .subscribe();
+
     // Check initial session
     supabaseClient.auth.getSession().then(({ data: { session } }) => {
         if (session) {
@@ -485,3 +542,5 @@ window.showScreen = showScreen;
 window.handleSignOut = handleSignOut;
 window.toggleWorkStatus = toggleWorkStatus;
 window.showProfileScreen = showProfileScreen;
+window.acceptRide = acceptRide;
+window.updateRideStatus = updateRideStatus;
