@@ -188,12 +188,12 @@ async function loadDriversData() {
         .from('driver_details')
         .select(`
             *,
-            profiles (full_name, email, phone_number)
+            profiles(*)
         `);
     
     if (error) {
         console.error("Erro ao carregar motoristas:", error);
-        toast.show('Erro ao carregar motoristas.', 'error');
+        toast.show('Erro ao carregar motoristas: ' + error.message, 'error');
         return;
     }
     
