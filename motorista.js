@@ -88,8 +88,8 @@ async function uploadDriverSelfie(userId, file) {
     if (!file) throw new Error("Nenhum arquivo de imagem selecionado.");
 
     const fileExt = file.name.split('.').pop();
-    const fileName = `${userId}-${Date.now()}.${fileExt}`;
-    const filePath = `public/${fileName}`;
+    const fileName = `selfie-${Date.now()}.${fileExt}`;
+    const filePath = `${userId}/${fileName}`; // Use user-specific folder
 
     const { error: uploadError } = await supabaseClient.storage
         .from('driver_documents')
@@ -229,17 +229,15 @@ async function uploadAvatar(userId, file) {
     if (!file) return null;
     
     const fileExt = file.name.split('.').pop();
-    // Using a unique timestamp to create a new file each time, avoiding the upsert option which might be causing issues.
-    const fileName = `avatar-${userId}-${Date.now()}.${fileExt}`;
-    const filePath = `public/${fileName}`;
+    const fileName = `avatar-${Date.now()}.${fileExt}`;
+    const filePath = `${userId}/${fileName}`; // Use user-specific folder
 
-    // Using a standard upload instead of one with upsert: true.
     const { error: uploadError } = await supabaseClient.storage
         .from('driver_documents')
         .upload(filePath, file);
 
     if (uploadError) {
-        // This re-throws the original error from Supabase
+        console.error("Supabase Storage Upload Error:", uploadError);
         throw uploadError;
     }
 
