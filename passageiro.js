@@ -563,12 +563,38 @@ async function loadWalletBalance() {
 }
 
 async function addCredits() {
-    toast.show('Funcionalidade de adicionar créditos em desenvolvimento.', 'info');
+    const amountString = prompt("Qual valor você deseja adicionar à sua carteira? (ex: 50,00)", "50.00");
+    if (amountString === null) return; 
+
+    const amount = parseFloat(amountString.replace(',', '.'));
+    if (isNaN(amount) || amount <= 0) {
+        return toast.show('Por favor, insira um valor válido.', 'error');
+    }
+    
+    showLoading('add-credits-btn');
+    try {
+        const { error } = await supabaseClient.from('wallet_transactions').insert({
+            profile_id: state.user.id,
+            amount: amount,
+            transaction_type: 'credit',
+            description: `Crédito adicionado via App.`,
+            status: 'completed'
+        });
+        if (error) throw error;
+        
+        await loadWalletBalance(); 
+        toast.show(`R$ ${amount.toFixed(2).replace('.',',')} adicionados com sucesso!`, 'success');
+    } catch (error) {
+        console.error("Credit Error:", error);
+        toast.show('Não foi possível adicionar créditos. Tente novamente.', 'error');
+    } finally {
+        hideLoading('add-credits-btn');
+    }
 }
 
 async function debitWallet(amount, description) {
     try {
-        const { error } = await supabaseClient.from('wallet_transactions').insert({ profile_id: state.user.id, amount, transaction_type: 'debit', description });
+        const { error } = await supabaseClient.from('wallet_transactions').insert({ profile_id: state.user.id, amount: -Math.abs(amount), transaction_type: 'debit', description });
         if (error) throw error;
         await loadWalletBalance();
     } catch (error) { console.error('Erro ao debitar carteira:', error); }

@@ -307,18 +307,32 @@ async function handleProfileUpdate() {
 function createRideElement(ride) {
     const passenger = ride.passenger || {};
     let actionButton = '';
-    let statusPill = `<span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-500/20 text-yellow-300">${ride.status.toUpperCase()}</span>`;
 
     const destinationAddress = (ride.destinations && Array.isArray(ride.destinations) && ride.destinations.length > 0)
         ? ride.destinations[0]
         : 'N/A';
     
-    const driverEarningsHtml = `
-        <div class="text-right">
-            <p class="text-sm text-gray-400">Seu ganho</p>
-            <p class="text-2xl font-bold text-green-400">${formatCurrency(ride.driver_earning_preview)}</p>
-        </div>
-    `;
+    let ridePriceHtml;
+    // Check if price is a valid number greater than zero
+    if (typeof ride.price === 'number' && ride.price > 0) {
+        ridePriceHtml = `
+            <div class="text-right">
+                <p class="text-sm text-gray-400">Total da Viagem</p>
+                <p class="text-lg font-bold">${formatCurrency(ride.price)}</p>
+            </div>
+            <div class="text-right">
+                <p class="text-sm text-gray-400">Seu ganho</p>
+                <p class="text-2xl font-bold text-green-400">${formatCurrency(ride.driver_earning_preview)}</p>
+            </div>
+        `;
+    } else {
+         ridePriceHtml = `
+            <div class="text-right p-2 rounded-md bg-yellow-500/10 border border-yellow-500/30">
+                 <p class="text-yellow-300 font-semibold">Valor não informado</p>
+                 <p class="text-xs text-yellow-400/80">O valor aparecerá após aceitar.</p>
+            </div>
+         `;
+    }
 
     switch(ride.status) {
         case 'requested':
@@ -346,7 +360,9 @@ function createRideElement(ride) {
                         <strong>Telefone:</strong> ${passenger.phone_number || 'N/A'}
                     </p>
                 </div>
-                ${driverEarningsHtml}
+                <div class="flex flex-col gap-2 items-end">
+                   ${ridePriceHtml}
+                </div>
             </div>
             
             <div>
