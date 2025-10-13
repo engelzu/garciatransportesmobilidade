@@ -189,7 +189,7 @@ async function loadDriversData() {
         .from('driver_details')
         .select(`
             *,
-            profiles(full_name, email, phone_number)
+            profiles(full_name, phone_number)
         `);
     
     if (error) {
