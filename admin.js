@@ -183,10 +183,13 @@ function renderDashboard(stats) {
 
 // Drivers
 async function loadDriversData() {
-    // CORREÇÃO: A query foi reescrita para ser mais clara e evitar erros de sintaxe.
+    // CORREÇÃO: A sintaxe da consulta foi alterada para o padrão do Supabase, que é mais robusto.
     const { data, error } = await supabaseClient
         .from('driver_details')
-        .select('*, profile:profiles(full_name, email, phone_number)');
+        .select(`
+            *,
+            profiles (full_name, email, phone_number)
+        `);
     
     if (error) {
         console.error("Erro ao carregar motoristas:", error);
@@ -210,10 +213,11 @@ function renderDrivers(drivers) {
         rejected: '<span class="px-2 py-1 text-xs font-medium rounded-full bg-red-500/20 text-red-300">Rejeitado</span>',
     };
 
+    // CORREÇÃO: Ajustado para ler os dados do perfil de 'driver.profiles' em vez de 'driver.profile'.
     tbody.innerHTML = drivers.map(driver => `
         <tr class="border-b border-gray-700 hover:bg-gray-700/50">
-            <td class="p-4 font-medium">${driver.profile.full_name}</td>
-            <td class="p-4 text-gray-300">${driver.profile.email}<br>${driver.profile.phone_number || ''}</td>
+            <td class="p-4 font-medium">${driver.profiles.full_name}</td>
+            <td class="p-4 text-gray-300">${driver.profiles.email}<br>${driver.profiles.phone_number || ''}</td>
             <td class="p-4 text-gray-300">${driver.car_model} (${driver.car_color})<br><span class="font-mono">${driver.license_plate}</span></td>
             <td class="p-4">${statusMap[driver.approval_status] || driver.approval_status}</td>
             <td class="p-4">
