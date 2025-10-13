@@ -213,6 +213,7 @@ function showProfileScreen() {
         return;
     }
     // Populate form
+    document.getElementById('profile-avatar-preview').src = state.profile.avatar_url || 'https://via.placeholder.com/128';
     document.getElementById('profile-fullname').value = state.profile.full_name || '';
     document.getElementById('profile-email').value = state.user.email || '';
     document.getElementById('profile-phone').value = state.profile.phone_number || '';
@@ -224,12 +225,37 @@ function showProfileScreen() {
     showScreen('profile-screen');
 }
 
+async function uploadAvatar(userId, file) {
+    if (!file) return null;
+    
+    const fileExt = file.name.split('.').pop();
+    const fileName = `avatar-${userId}-${Date.now()}.${fileExt}`;
+    const filePath = `public/${fileName}`;
+
+    const { error: uploadError } = await supabaseClient.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true }); // Use upsert to overwrite if needed
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabaseClient.storage.from('avatars').getPublicUrl(filePath);
+    return data.publicUrl;
+}
+
 async function handleProfileUpdate() {
     showLoading('profile-save-btn');
     try {
+        const avatarFile = document.getElementById('profile-avatar-upload').files[0];
+        let avatarUrl = state.profile.avatar_url; // Keep old one by default
+
+        if (avatarFile) {
+            avatarUrl = await uploadAvatar(state.user.id, avatarFile);
+        }
+
         const updates = {
             profile: {
                 phone_number: document.getElementById('profile-phone').value,
+                avatar_url: avatarUrl
             },
             driverDetails: {
                 pix_key: document.getElementById('profile-pix-key').value,
@@ -238,14 +264,12 @@ async function handleProfileUpdate() {
             }
         };
 
-        // Update profiles table
         const { error: profileError } = await supabaseClient
             .from('profiles')
             .update(updates.profile)
             .eq('id', state.user.id);
         if (profileError) throw profileError;
         
-        // Update driver_details table
         const { error: detailsError } = await supabaseClient
             .from('driver_details')
             .update(updates.driverDetails)
@@ -254,6 +278,7 @@ async function handleProfileUpdate() {
         
         // Refresh local state
         state.profile.phone_number = updates.profile.phone_number;
+        state.profile.avatar_url = updates.profile.avatar_url;
         state.driverDetails.pix_key = updates.driverDetails.pix_key;
         state.driverDetails.car_model = updates.driverDetails.car_model;
         state.driverDetails.car_color = updates.driverDetails.car_color;
@@ -420,6 +445,18 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('profile-form').addEventListener('submit', (e) => {
         e.preventDefault();
         handleProfileUpdate();
+    });
+
+    // Avatar Preview
+    document.getElementById('profile-avatar-upload').addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('profile-avatar-preview').src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
     });
 
     // Check initial session
