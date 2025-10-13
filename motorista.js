@@ -308,13 +308,18 @@ function createRideElement(ride) {
     let actionButton = '';
     let statusPill = `<span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-500/20 text-yellow-300">${ride.status.toUpperCase()}</span>`;
 
+    // Extract destination address from the 'destinations' jsonb array.
+    const destinationAddress = (ride.destinations && Array.isArray(ride.destinations) && ride.destinations.length > 0)
+        ? ride.destinations[0]
+        : (ride.destination_address || 'N/A');
+
     switch(ride.status) {
         case 'requested':
             actionButton = `
                 <button onclick="acceptRide('${ride.id}')" class="w-full py-3 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors new-ride-alert">
                     🚗 ACEITAR NOVA CORRIDA
                 </button>
-                <button onclick="openMap('${ride.origin_address}', '${ride.destination_address}')" class="w-full py-3 font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 transition-colors">
+                <button onclick="openMap('${ride.origin_address}', '${destinationAddress}')" class="w-full py-3 font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 transition-colors">
                     🗺️ VER NO MAPA
                 </button>
             `;
@@ -351,7 +356,7 @@ function createRideElement(ride) {
             <div class="destination-box">
                 <p>
                     <strong>📍 DESTINO</strong><br>
-                    <span class="font-semibold text-lg">${ride.destination_address || 'N/A'}</span>
+                    <span class="font-semibold text-lg">${destinationAddress}</span>
                 </p>
             </div>
             
