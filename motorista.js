@@ -306,20 +306,15 @@ async function handleProfileUpdate() {
 // --- RIDE MANAGEMENT ---
 function createRideElement(ride) {
     const passenger = ride.passenger || {};
-    let actionButton = '';
+    let actionButtons = '';
 
     const destinationAddress = (ride.destinations && Array.isArray(ride.destinations) && ride.destinations.length > 0)
         ? ride.destinations[0]
         : 'N/A';
     
     let ridePriceHtml;
-    // Check if price is a valid number greater than zero
     if (typeof ride.price === 'number' && ride.price > 0) {
         ridePriceHtml = `
-            <div class="text-right">
-                <p class="text-sm text-gray-400">Total da Viagem</p>
-                <p class="text-lg font-bold">${formatCurrency(ride.price)}</p>
-            </div>
             <div class="text-right">
                 <p class="text-sm text-gray-400">Seu ganho</p>
                 <p class="text-2xl font-bold text-green-400">${formatCurrency(ride.driver_earning_preview)}</p>
@@ -336,14 +331,47 @@ function createRideElement(ride) {
 
     switch(ride.status) {
         case 'requested':
-            actionButton = `
+            actionButtons = `
                 <button onclick="acceptRide('${ride.id}')" class="w-full py-3 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors new-ride-alert">
                     🚗 ACEITAR NOVA CORRIDA
                 </button>
-                <button onclick="openMap('${ride.origin_address}', '${destinationAddress}')" class="w-full py-3 font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 transition-colors">
+            `;
+            break;
+        case 'assigned':
+            actionButtons = `
+                <button onclick="updateRideStatus('${ride.id}', 'accepted')" class="w-full py-3 font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors">
+                    📍 CHEGUEI AO LOCAL DE PARTIDA
+                </button>
+                <button onclick="openMap('${ride.origin_address}', '${destinationAddress}')" class="mt-2 w-full py-2 font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 transition-colors">
                     🗺️ VER NO MAPA
                 </button>
+                 <button onclick="updateRideStatus('${ride.id}', 'canceled')" class="mt-2 w-full py-2 text-sm rounded-lg bg-red-800 hover:bg-red-700 transition-colors">
+                    ❌ Cancelar
+                </button>
             `;
+            break;
+        case 'accepted':
+             actionButtons = `
+                <button onclick="updateRideStatus('${ride.id}', 'in_progress')" class="w-full py-3 font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors">
+                    ▶️ INICIAR VIAGEM
+                </button>
+                 <button onclick="openMap('${ride.origin_address}', '${destinationAddress}')" class="mt-2 w-full py-2 font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 transition-colors">
+                    🗺️ VER ROTA PARA O DESTINO
+                </button>
+            `;
+            break;
+        case 'in_progress':
+            actionButtons = `
+                <button onclick="updateRideStatus('${ride.id}', 'completed')" class="w-full py-3 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors">
+                    🏁 FINALIZAR VIAGEM
+                </button>
+            `;
+            break;
+        case 'completed':
+            actionButtons = `<p class="text-center text-green-400 font-bold text-lg p-3 bg-green-900/50 rounded-lg">✅ CORRIDA FINALIZADA</p>`;
+            break;
+        case 'canceled':
+            actionButtons = `<p class="text-center text-red-400 font-bold text-lg p-3 bg-red-900/50 rounded-lg">❌ CORRIDA CANCELADA</p>`;
             break;
     }
 
@@ -383,7 +411,7 @@ function createRideElement(ride) {
             </div>
             
             <div class="space-y-2">
-                ${actionButton}
+                ${actionButtons}
             </div>
         </div>
     `;
@@ -408,14 +436,16 @@ async function loadDriverJobs() {
         } else {
             state.commissionRate = parseFloat(configData.value);
         }
-
+        
+        // Prioridade 1: Corridas já atribuídas ao motorista
         const { data: assignedRides, error: assignedError } = await supabaseClient
             .from('rides')
             .select('*')
             .eq('driver_id', state.user.id)
-            .in('status', ['assigned', 'in_progress']);
+            .in('status', ['assigned', 'accepted', 'in_progress']);
         if (assignedError) throw assignedError;
 
+        // Prioridade 2: Novas corridas disponíveis para todos
         const { data: requestedRides, error: requestedError } = await supabaseClient
             .from('rides')
             .select('*')
@@ -423,6 +453,7 @@ async function loadDriverJobs() {
             .is('driver_id', null);
         if (requestedError) throw requestedError;
 
+        // Combina as listas, com as corridas já aceitas no topo
         const allRides = [...(assignedRides || []), ...(requestedRides || [])];
         
         if (allRides.length === 0) {
@@ -455,6 +486,7 @@ async function loadDriverJobs() {
         state.rides = ridesWithData;
         listContainer.innerHTML = ridesWithData.map(createRideElement).join('');
         
+        // Toca o alarme apenas se houver corridas NOVAS (requested)
         if (requestedRides.length > 0) {
             startRinging();
         } else {
@@ -477,20 +509,43 @@ async function acceptRide(rideId) {
         toast.show('Erro ao aceitar a corrida. Tente novamente.', 'error');
     } else {
         toast.show('Corrida aceita!', 'success');
+        // Não precisa recarregar, o listener de real-time fará isso.
     }
 }
 
 async function updateRideStatus(rideId, newStatus) {
+    let rideUpdate = { status: newStatus };
+
+    // Se a corrida está sendo completada, calcula os ganhos
+    if (newStatus === 'completed') {
+        const ride = state.rides.find(r => r.id === rideId);
+        if (!ride || typeof ride.price !== 'number' || ride.price <= 0) {
+            toast.show('Erro: Preço da corrida inválido para finalizar.', 'error');
+            return;
+        }
+        
+        const platform_fee = ride.price * state.commissionRate;
+        const driver_earnings = ride.price - platform_fee;
+
+        rideUpdate = {
+            ...rideUpdate,
+            platform_fee: platform_fee,
+            driver_earnings: driver_earnings
+        };
+    }
+    
     const { error } = await supabaseClient
         .from('rides')
-        .update({ status: newStatus })
+        .update(rideUpdate)
         .eq('id', rideId);
+        
     if (error) {
         toast.show('Erro ao atualizar o status da corrida.', 'error');
     } else {
         toast.show('Status da corrida atualizado.', 'success');
     }
 }
+
 
 function openMap(origin, destination) {
     if (!origin || !destination) {
