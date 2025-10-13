@@ -39,6 +39,12 @@
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen">
+    
+    <!-- API KEY WARNING -->
+    <div id="api-key-warning" class="fixed top-0 left-0 right-0 bg-red-800 p-3 text-center z-[2000] text-sm">
+        <strong>ATENÇÃO DESENVOLVEDOR:</strong> Você precisa substituir 'YOUR_GOOGLE_MAPS_API_KEY' pela sua chave de API do Google Maps no arquivo <strong>passageiro.html</strong> para que o mapa e os endereços funcionem.
+        <button onclick="this.parentElement.remove()" class="ml-4 font-bold">FECHAR</button>
+    </div>
 
     <!-- Toast Container -->
     <div id="toast-container" class="toast-container"></div>
@@ -48,6 +54,11 @@
         <div id="loading-screen" class="screen active text-center">
             <div class="loader mx-auto"></div>
             <p class="mt-4 text-gray-400">Carregando...</p>
+            <div id="loading-error" class="hidden mt-6 bg-red-900/50 border border-red-700 p-4 rounded-lg">
+                <p class="text-red-300">Parece que algo deu errado...</p>
+                <p class="text-sm text-gray-400 mt-2">Por favor, verifique sua conexão e tente recarregar.</p>
+                <button onclick="forceReload()" class="mt-4 py-2 px-4 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">Recarregar</button>
+            </div>
         </div>
 
         <div id="login-screen" class="screen space-y-6 bg-gray-800 p-8 rounded-xl shadow-lg">
