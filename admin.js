@@ -3,7 +3,6 @@
 const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
 
-// CORREÇÃO: Acessa a função createClient diretamente do objeto global 'supabase'
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const state = {
@@ -184,18 +183,13 @@ function renderDashboard(stats) {
 
 // Drivers
 async function loadDriversData() {
+    // CORREÇÃO: A query foi reescrita para ser mais clara e evitar erros de sintaxe.
     const { data, error } = await supabaseClient
         .from('driver_details')
-        .select(`
-            profile_id,
-            license_plate,
-            car_model,
-            car_color,
-            approval_status,
-            profile:profiles(full_name, email, phone_number)
-        `);
+        .select('*, profile:profiles(full_name, email, phone_number)');
     
     if (error) {
+        console.error("Erro ao carregar motoristas:", error);
         toast.show('Erro ao carregar motoristas.', 'error');
         return;
     }
@@ -205,7 +199,7 @@ async function loadDriversData() {
 
 function renderDrivers(drivers) {
     const tbody = document.getElementById('drivers-table-body');
-    if (drivers.length === 0) {
+    if (!drivers || drivers.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-400">Nenhum motorista encontrado.</td></tr>';
         return;
     }
