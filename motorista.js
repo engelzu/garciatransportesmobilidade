@@ -229,14 +229,19 @@ async function uploadAvatar(userId, file) {
     if (!file) return null;
     
     const fileExt = file.name.split('.').pop();
-    const fileName = `avatar-${userId}.${fileExt}`; // Consistent name for easier updates
+    // Using a unique timestamp to create a new file each time, avoiding the upsert option which might be causing issues.
+    const fileName = `avatar-${userId}-${Date.now()}.${fileExt}`;
     const filePath = `public/${fileName}`;
 
+    // Using a standard upload instead of one with upsert: true.
     const { error: uploadError } = await supabaseClient.storage
-        .from('driver_documents') // Use the existing 'driver_documents' bucket
-        .upload(filePath, file, { upsert: true });
+        .from('driver_documents')
+        .upload(filePath, file);
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+        // This re-throws the original error from Supabase
+        throw uploadError;
+    }
 
     const { data } = supabaseClient.storage.from('driver_documents').getPublicUrl(filePath);
     return data.publicUrl;
