@@ -229,16 +229,16 @@ async function uploadAvatar(userId, file) {
     if (!file) return null;
     
     const fileExt = file.name.split('.').pop();
-    const fileName = `avatar-${userId}-${Date.now()}.${fileExt}`;
+    const fileName = `avatar-${userId}.${fileExt}`; // Consistent name for easier updates
     const filePath = `public/${fileName}`;
 
     const { error: uploadError } = await supabaseClient.storage
-        .from('avatars')
-        .upload(filePath, file, { upsert: true }); // Use upsert to overwrite if needed
+        .from('driver_documents') // Use the existing 'driver_documents' bucket
+        .upload(filePath, file, { upsert: true });
 
     if (uploadError) throw uploadError;
 
-    const { data } = supabaseClient.storage.from('avatars').getPublicUrl(filePath);
+    const { data } = supabaseClient.storage.from('driver_documents').getPublicUrl(filePath);
     return data.publicUrl;
 }
 
