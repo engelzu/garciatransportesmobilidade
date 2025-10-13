@@ -207,6 +207,66 @@ async function loadDriverData(user) {
     }
 }
 
+function showProfileScreen() {
+    if (!state.user || !state.profile || !state.driverDetails) {
+        toast.show('Dados do motorista não carregados.', 'error');
+        return;
+    }
+    // Populate form
+    document.getElementById('profile-fullname').value = state.profile.full_name || '';
+    document.getElementById('profile-email').value = state.user.email || '';
+    document.getElementById('profile-phone').value = state.profile.phone_number || '';
+    document.getElementById('profile-pix-key').value = state.driverDetails.pix_key || '';
+    document.getElementById('profile-model').value = state.driverDetails.car_model || '';
+    document.getElementById('profile-color').value = state.driverDetails.car_color || '';
+    document.getElementById('profile-plate').value = state.driverDetails.license_plate || '';
+
+    showScreen('profile-screen');
+}
+
+async function handleProfileUpdate() {
+    showLoading('profile-save-btn');
+    try {
+        const updates = {
+            profile: {
+                phone_number: document.getElementById('profile-phone').value,
+            },
+            driverDetails: {
+                pix_key: document.getElementById('profile-pix-key').value,
+                car_model: document.getElementById('profile-model').value,
+                car_color: document.getElementById('profile-color').value,
+            }
+        };
+
+        // Update profiles table
+        const { error: profileError } = await supabaseClient
+            .from('profiles')
+            .update(updates.profile)
+            .eq('id', state.user.id);
+        if (profileError) throw profileError;
+        
+        // Update driver_details table
+        const { error: detailsError } = await supabaseClient
+            .from('driver_details')
+            .update(updates.driverDetails)
+            .eq('profile_id', state.user.id);
+        if (detailsError) throw detailsError;
+        
+        // Refresh local state
+        state.profile.phone_number = updates.profile.phone_number;
+        state.driverDetails.pix_key = updates.driverDetails.pix_key;
+        state.driverDetails.car_model = updates.driverDetails.car_model;
+        state.driverDetails.car_color = updates.driverDetails.car_color;
+
+        toast.show('Perfil atualizado com sucesso!', 'success');
+        showScreen('driver-screen');
+
+    } catch (error) {
+        toast.show(`Erro ao atualizar perfil: ${error.message}`, 'error');
+    } finally {
+        hideLoading('profile-save-btn');
+    }
+}
 
 // --- RIDE MANAGEMENT ---
 function createRideElement(ride) {
@@ -356,6 +416,12 @@ document.addEventListener('DOMContentLoaded', () => {
         handleSignUp(formData);
     });
 
+    // Profile Form
+    document.getElementById('profile-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        handleProfileUpdate();
+    });
+
     // Check initial session
     supabaseClient.auth.getSession().then(({ data: { session } }) => {
         if (session) {
@@ -370,3 +436,4 @@ document.addEventListener('DOMContentLoaded', () => {
 window.showScreen = showScreen;
 window.handleSignOut = handleSignOut;
 window.toggleWorkStatus = toggleWorkStatus;
+window.showProfileScreen = showProfileScreen;

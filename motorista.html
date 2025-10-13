@@ -154,9 +154,14 @@
         <div id="driver-screen" class="screen space-y-4">
             <div class="flex justify-between items-center">
                 <h2 class="text-2xl font-bold">Minhas Corridas</h2>
-                <button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700 transition-colors">
-                    Sair
-                </button>
+                <div class="flex items-center gap-2">
+                     <button onclick="showProfileScreen()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">
+                        Meu Perfil
+                    </button>
+                    <button onclick="handleSignOut()" class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700 transition-colors">
+                        Sair
+                    </button>
+                </div>
             </div>
             <p id="driver-welcome-message" class="text-lg text-center"></p>
 
@@ -175,6 +180,50 @@
                 <p class="text-center text-gray-400">Nenhuma corrida no momento.</p>
             </div>
         </div>
+
+        <div id="profile-screen" class="screen space-y-4">
+            <div class="flex justify-between items-center">
+                <h2 class="text-2xl font-bold">Meu Perfil</h2>
+                <button onclick="showScreen('driver-screen')" class="py-2 px-4 text-sm font-semibold rounded-lg bg-gray-600 hover:bg-gray-700 transition-colors">
+                    Voltar
+                </button>
+            </div>
+            <form id="profile-form" class="space-y-4 bg-gray-800 p-6 rounded-xl">
+                <div>
+                    <label for="profile-fullname" class="block mb-1 text-sm font-medium">Nome Completo</label>
+                    <input type="text" id="profile-fullname" class="w-full p-2.5 rounded-lg bg-gray-700 border border-gray-600 cursor-not-allowed" readonly>
+                </div>
+                <div>
+                    <label for="profile-email" class="block mb-1 text-sm font-medium">E-mail</label>
+                    <input type="email" id="profile-email" class="w-full p-2.5 rounded-lg bg-gray-700 border border-gray-600 cursor-not-allowed" readonly>
+                </div>
+                <div>
+                    <label for="profile-phone" class="block mb-1 text-sm font-medium">Telefone</label>
+                    <input type="tel" id="profile-phone" class="w-full p-2.5 rounded-lg bg-gray-900 border border-gray-600 focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="profile-pix-key" class="block mb-1 text-sm font-medium">Chave PIX</label>
+                    <input type="text" id="profile-pix-key" class="w-full p-2.5 rounded-lg bg-gray-900 border border-gray-600 focus:outline-none focus:border-indigo-500">
+                </div>
+                <h3 class="text-lg font-semibold border-b border-gray-700 pt-2 pb-2">Veículo</h3>
+                <div>
+                    <label for="profile-model" class="block mb-1 text-sm font-medium">Modelo</label>
+                    <input type="text" id="profile-model" class="w-full p-2.5 rounded-lg bg-gray-900 border border-gray-600 focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="profile-color" class="block mb-1 text-sm font-medium">Cor</label>
+                    <input type="text" id="profile-color" class="w-full p-2.5 rounded-lg bg-gray-900 border border-gray-600 focus:outline-none focus:border-indigo-500">
+                </div>
+                 <div>
+                    <label for="profile-plate" class="block mb-1 text-sm font-medium">Placa</label>
+                    <input type="text" id="profile-plate" class="w-full p-2.5 rounded-lg bg-gray-700 border border-gray-600 cursor-not-allowed" readonly>
+                </div>
+                <button type="submit" id="profile-save-btn" class="w-full py-3 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors !mt-6">
+                    SALVAR ALTERAÇÕES
+                </button>
+            </form>
+        </div>
+
     </div>
     
     <audio id="ringtone" loop src="https://assets.mixkit.co/sfx/preview/mixkit-bell-notification-933.mp3"></audio>
