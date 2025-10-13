@@ -5,6 +5,8 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+const DEFAULT_AVATAR_URL = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjOTRBNEI1Ij48cGF0aCBkPSJNMCAwaDI0djI0SDB6IiBmaWxsPSJub25lIi8+PHBhdGggZD0iTTEyIDJjLTIuMiAwLTQgMS44LTQgNHMxLjggNCA0IDQgNCAxLjggNC00LTEuOC00LTQtNHptMCAxOGMtMi42NyAwLTggMS4zNC04IDR2MmgxNnYtMmMwLTIuNjYtNS4zMy00LTgtNHoiLz48L3N2Zz4=';
+
 const state = { 
     user: null, 
     profile: null, 
@@ -197,7 +199,7 @@ async function loadDriverData(user) {
     }
 
     if (details.approval_status === 'approved') {
-        document.getElementById('driver-avatar').src = details.selfie_with_id_url || 'https://via.placeholder.com/64';
+        document.getElementById('driver-avatar').src = details.selfie_with_id_url || DEFAULT_AVATAR_URL;
         document.getElementById('driver-welcome-message').textContent = `Olá, ${profile.full_name}!`;
         document.getElementById('work-status-toggle').checked = details.work_status === 'online';
         if(details.work_status === 'online') startLocationTracking();
@@ -214,7 +216,7 @@ function showProfileScreen() {
         return;
     }
     // Populate form
-    document.getElementById('profile-avatar-preview').src = state.driverDetails.selfie_with_id_url || 'https://via.placeholder.com/128';
+    document.getElementById('profile-avatar-preview').src = state.driverDetails.selfie_with_id_url || DEFAULT_AVATAR_URL;
     document.getElementById('profile-fullname').value = state.profile.full_name || '';
     document.getElementById('profile-email').value = state.user.email || '';
     document.getElementById('profile-phone').value = state.profile.phone_number || '';
@@ -288,7 +290,7 @@ async function handleProfileUpdate() {
         state.driverDetails.selfie_with_id_url = updates.driverDetails.selfie_with_id_url;
 
         // Update main screen avatar
-        document.getElementById('driver-avatar').src = state.driverDetails.selfie_with_id_url || 'https://via.placeholder.com/64';
+        document.getElementById('driver-avatar').src = state.driverDetails.selfie_with_id_url || DEFAULT_AVATAR_URL;
 
         toast.show('Perfil atualizado com sucesso!', 'success');
         showScreen('driver-screen');
@@ -342,17 +344,26 @@ async function loadDriverJobs() {
     const listContainer = document.getElementById('driver-jobs-list');
     listContainer.innerHTML = `<div class="loader mx-auto"></div>`;
 
+    const RIDE_COLUMNS = `
+        id,
+        status,
+        price,
+        origin_address,
+        destination_address,
+        passenger:profiles!rides_passenger_id_fkey(full_name)
+    `;
+
     // Buscar corridas atribuídas ao motorista
     const { data: assignedRides, error: assignedError } = await supabaseClient
         .from('rides')
-        .select(`*, passenger:profiles!rides_passenger_id_fkey(full_name)`)
+        .select(RIDE_COLUMNS)
         .eq('driver_id', state.user.id)
         .in('status', ['assigned', 'in_progress']);
 
     // Buscar corridas disponíveis para todos
     const { data: requestedRides, error: requestedError } = await supabaseClient
         .from('rides')
-        .select(`*, passenger:profiles!rides_passenger_id_fkey(full_name)`)
+        .select(RIDE_COLUMNS)
         .eq('status', 'requested');
 
     if (assignedError || requestedError) {
