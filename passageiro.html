@@ -551,8 +551,6 @@
             if (state.mapInstance) return;
 
             const mapContainer = document.getElementById('map-container');
-            mapContainer.classList.remove('hidden');
-
             const matches = ride.origin_location.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
             if (!matches) return console.error("Não foi possível parsear a localização de origem.");
             
@@ -572,7 +570,15 @@
                     { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
                 ],
             };
+            
+            mapContainer.classList.remove('hidden');
+            await new Promise(resolve => setTimeout(resolve, 0));
+
             state.mapInstance = new google.maps.Map(mapContainer, mapOptions);
+            
+            // FIX: Force map to resize and re-center after its container becomes visible.
+            google.maps.event.trigger(state.mapInstance, 'resize');
+            state.mapInstance.setCenter(pickupLocation);
 
             state.passengerMarker = new google.maps.Marker({
                 position: pickupLocation,
@@ -602,7 +608,7 @@
         }
 
         function updateDriverLocationOnMap(locationString) {
-            if (!state.mapInstance || !state.driverMarker) return;
+            if (!state.mapInstance || !state.driverMarker || !locationString) return;
             const matches = locationString.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
             if (!matches) return;
             
