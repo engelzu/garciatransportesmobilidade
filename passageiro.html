@@ -165,7 +165,7 @@
                 </button>
                 
                 <button onclick="handleSignInWithProvider('facebook')" class="w-full py-3 font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#3F51B5" d="M42,37c0,2.762-2.238,5-5,5H11c-2.761,0-5-2.238-5-5V11c0-2.762,2.239-5,5-5h26c2.762,0,5,2.238,5,5V37z"></path><path fill="#FFF" d="M34.368,25H31v13h-5V25h-3v-4h3v-2.41c0-3.408,1.72-5.59,5.592-5.59H35v4h--2.287C31.104,17,31,17.6,31,18.723V21h4L34.368,25z"></path></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#3F51B5" d="M42,37c0,2.762-2.238,5-5,5H11c-2.761,0-5-2.238-5-5V11c0-2.762,2.239-5,5-5h26c2.762,0,5,2.238,5,5V37z"></path><path fill="#FFF" d="M34.368,25H31v13h-5V25h-3v-4h3v-2.41c0-3.408,1.72-5.59,5.592-5.59H35v4h-2.287C31.104,17,31,17.6,31,18.723V21h4L34.368,25z"></path></svg>
                     Entrar com Facebook
                 </button>
             </div>
@@ -550,34 +550,36 @@
         }
 
         async function initializeMap(ride) {
-            if (state.mapInstance) {
-                console.log('[initializeMap] Map instance already exists. Exiting.');
-                return;
-            }
-            console.log('[initializeMap] Initializing map for ride:', ride.id);
+            if (state.mapInstance) return;
+            console.log('[MAP_DEBUG] Attempting to initialize map...');
 
             const mapContainer = document.getElementById('map-container');
-            // Add a dedicated inner div for the map and an overlay for messages
-            mapContainer.innerHTML = `
-                <div id="map-canvas" style="width: 100%; height: 100%;"></div>
-                <div id="map-overlay" class="absolute inset-0 bg-gray-800/50 flex items-center justify-center z-10">
-                    <p class="text-white p-4 text-center">Aguardando localização do motorista...</p>
-                </div>
-            `;
+            if (!mapContainer) {
+                console.error('[MAP_DEBUG] Map container not found!');
+                return;
+            }
+            mapContainer.innerHTML = `<div id="map-canvas" style="width: 100%; height: 100%;"></div>`;
             
             const matches = ride.origin_location?.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
             if (!matches) {
-                console.error("Localização de origem inválida:", ride.origin_location);
+                console.error("[MAP_DEBUG] Invalid origin location format:", ride.origin_location);
                 return;
             }
             
             const pickupLocation = { lng: parseFloat(matches[1]), lat: parseFloat(matches[2]) };
+            
             mapContainer.classList.remove('hidden');
 
-            await new Promise(resolve => setTimeout(resolve, 50));
+            // Defer map creation until the next browser paint to ensure the container has dimensions
+            await new Promise(resolve => setTimeout(resolve, 100));
 
             const mapCanvas = document.getElementById('map-canvas');
-            if (!mapCanvas) return;
+            if (!mapCanvas || mapCanvas.clientHeight === 0) {
+                 console.error('[MAP_DEBUG] Map canvas not ready or not visible. Aborting map creation.');
+                 mapContainer.classList.add('hidden');
+                 return;
+            }
+            console.log(`[MAP_DEBUG] Map canvas is ready. Creating map object.`);
 
             state.mapInstance = new google.maps.Map(mapCanvas, {
                 center: pickupLocation,
@@ -588,6 +590,7 @@
             
             google.maps.event.trigger(state.mapInstance, 'resize');
             state.mapInstance.setCenter(pickupLocation);
+            console.log('[MAP_DEBUG] Map created and centered.');
 
             state.passengerMarker = new google.maps.Marker({
                 position: pickupLocation,
@@ -608,9 +611,6 @@
         function updateDriverLocationOnMap(locationString) {
             if (!state.mapInstance || !state.driverMarker || !locationString) return;
             
-            const overlay = document.getElementById('map-overlay');
-            if(overlay) overlay.style.display = 'none';
-            
             const matches = locationString.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
             if (!matches) return;
             
@@ -620,7 +620,7 @@
             const bounds = new google.maps.LatLngBounds();
             if(state.passengerMarker) bounds.extend(state.passengerMarker.getPosition());
             bounds.extend(driverLocation);
-            state.mapInstance.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
+            state.mapInstance.fitBounds(bounds, 100); // 100px padding
         }
 
         function listenForDriverLocation(driverId) {
@@ -632,13 +632,7 @@
                     if (payload.new.current_location) updateDriverLocationOnMap(payload.new.current_location);
                 }).subscribe();
             
-            setTimeout(() => {
-                const overlay = document.getElementById('map-overlay');
-                if (overlay && overlay.style.display !== 'none') {
-                    overlay.querySelector('p').textContent = 'Não foi possível obter a localização do motorista em tempo real.';
-                }
-            }, 20000);
-
+            // Fetch initial location in case we missed the first update
             supabaseClient.from('driver_details').select('current_location').eq('profile_id', driverId).single().then(({data, error}) => {
                 if (error) console.error("[listenForDriverLocation] Erro ao buscar localização inicial (RLS pode estar bloqueando):", error.message);
                 if (data && data.current_location) {
@@ -752,7 +746,6 @@
 
         function handleRideStateUpdate(ride) {
             if (!ride || !ride.status) return;
-            console.log(`[handleRideStateUpdate] Ride status: ${ride.status}, Driver ID: ${ride.driver_id}`);
             
             renderTimeline(ride.status);
             
@@ -772,10 +765,8 @@
             }
 
             if (ride.driver_id && ['assigned', 'accepted', 'in_progress'].includes(ride.status)) {
-                 console.log('[handleRideStateUpdate] Condições para inicializar o mapa atendidas.');
                 initializeMap(ride);
             } else {
-                 console.log('[handleRideStateUpdate] Condições para o mapa NÃO atendidas. Destruindo mapa, se existir.');
                 destroyMap();
             }
 
@@ -1228,26 +1219,28 @@
                     .channel(`ride-${rideId}`)
                     .on('postgres_changes', { event: '*', schema: 'public', table: 'rides', filter: `id=eq.${rideId}` }, 
                     payload => {
-                        console.log('🔄 Real-time update:', payload.new);
+                        console.log('🔄 Real-time update received:', payload.new);
                         const updatedRide = payload.new;
-                        state.currentRide = { ...state.currentRide, ...updatedRide };
-                        handleRideStateUpdate(state.currentRide);
                         
+                        // New robust logic: either reset the UI or update it
                         if (['completed', 'canceled'].includes(updatedRide.status)) {
-                            stopRidePolling();
-                            if(state.rideSubscription) supabaseClient.removeChannel(state.rideSubscription);
-                            state.rideSubscription = null;
-                            
-                            if (updatedRide.status === 'completed' && updatedRide.price) {
-                                const ridePrice = parseFloat(updatedRide.price);
-                                debitWallet(ridePrice, `Corrida #${updatedRide.id} - ${updatedRide.origin_address} → ${updatedRide.destinations[0]}`);
-                                toast.show(`Corrida concluída! O valor de R$ ${ridePrice.toFixed(2)} foi debitado.`, 'success');
-                            } else if (updatedRide.status === 'canceled') {
-                                toast.show('A viagem foi cancelada.', 'info');
+                            console.log(`[RESET_LOGIC] Ride finished with status: ${updatedRide.status}. Resetting UI.`);
+                            try {
+                                if (updatedRide.status === 'completed' && updatedRide.price) {
+                                    const ridePrice = parseFloat(updatedRide.price);
+                                    debitWallet(ridePrice, `Corrida #${updatedRide.id}`);
+                                    toast.show(`Corrida concluída! O valor de R$ ${ridePrice.toFixed(2)} foi debitado.`, 'success');
+                                } else if (updatedRide.status === 'canceled') {
+                                    toast.show('A viagem foi cancelada.', 'info');
+                                }
+                            } catch (e) {
+                                console.error("[RESET_LOGIC] Error during pre-reset cleanup:", e);
+                            } finally {
+                                showRideRequestForm();
                             }
-                            
-                            // Reset UI immediately
-                            showRideRequestForm();
+                        } else {
+                            state.currentRide = { ...state.currentRide, ...updatedRide };
+                            handleRideStateUpdate(state.currentRide);
                         }
                     })
                     .subscribe(status => {
