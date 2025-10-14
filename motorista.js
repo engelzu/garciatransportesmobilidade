@@ -593,14 +593,29 @@ async function toggleWorkStatus() {
 function startLocationTracking() {
     if (!navigator.geolocation) return toast.show('Geolocalização não suportada.', 'warning');
     if (state.locationWatcher) return;
+    
     state.locationWatcher = navigator.geolocation.watchPosition(
         (position) => {
             const { latitude, longitude } = position.coords;
             const location = `POINT(${longitude} ${latitude})`;
-            supabaseClient.from('driver_details').update({ current_location: location }).eq('profile_id', state.user.id).then();
+            console.log(`[LocationTracking] Nova posição encontrada: ${latitude}, ${longitude}`);
+            supabaseClient
+                .from('driver_details')
+                .update({ current_location: location })
+                .eq('profile_id', state.user.id)
+                .then(({ error }) => {
+                    if (error) {
+                        console.error('Supabase location update error:', error.message);
+                    } else {
+                        console.log(`[LocationTracking] Localização enviada com sucesso para o Supabase.`);
+                    }
+                });
         },
-        (error) => toast.show('Erro de localização. Verifique as permissões.', 'error'),
-        { enableHighAccuracy: true }
+        (error) => {
+            toast.show('Erro de localização. Verifique as permissões do GPS.', 'error');
+            console.error('Geolocation error:', error);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
 }
 

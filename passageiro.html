@@ -165,7 +165,7 @@
                 </button>
                 
                 <button onclick="handleSignInWithProvider('facebook')" class="w-full py-3 font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#3F51B5" d="M42,37c0,2.762-2.238,5-5,5H11c-2.761,0-5-2.238-5-5V11c0-2.762,2.239-5,5-5h26c2.762,0,5,2.238,5,5V37z"></path><path fill="#FFF" d="M34.368,25H31v13h-5V25h-3v-4h3v-2.41c0-3.408,1.72-5.59,5.592-5.59H35v4h-2.287C31.104,17,31,17.6,31,18.723V21h4L34.368,25z"></path></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#3F51B5" d="M42,37c0,2.762-2.238,5-5,5H11c-2.761,0-5-2.238-5-5V11c0-2.762,2.239-5,5-5h26c2.762,0,5,2.238,5,5V37z"></path><path fill="#FFF" d="M34.368,25H31v13h-5V25h-3v-4h3v-2.41c0-3.408,1.72-5.59,5.592-5.59H35v4h--2.287C31.104,17,31,17.6,31,18.723V21h4L34.368,25z"></path></svg>
                     Entrar com Facebook
                 </button>
             </div>
@@ -349,7 +349,9 @@
             <!-- CONTAINER DE STATUS DA CORRIDA (NOVO LAYOUT) -->
             <div id="ride-status-container" class="hidden space-y-4">
                 <!-- MAP CONTAINER -->
-                <div id="map-container" class="w-full h-64 bg-gray-700 rounded-xl mb-4 hidden"></div>
+                <div id="map-container" class="relative w-full h-64 bg-gray-700 rounded-xl mb-4 hidden">
+                    <!-- Map will be initialized here -->
+                </div>
 
                 <!-- Painel do Motorista (Estilo Uber) -->
                 <div id="driver-details-panel" class="bg-gray-800/80 backdrop-blur-sm p-4 rounded-xl space-y-4 transition-all duration-500 transform -translate-y-4 opacity-0">
@@ -538,9 +540,9 @@
                 state.driverLocationSubscription = null;
             }
             const mapContainer = document.getElementById('map-container');
-            if (mapContainer && state.mapInstance) {
+            if (mapContainer) {
                 mapContainer.classList.add('hidden');
-                mapContainer.innerHTML = '';
+                mapContainer.innerHTML = ''; // Clear content to ensure clean re-initialization
             }
             state.mapInstance = null;
             state.driverMarker = null;
@@ -548,44 +550,41 @@
         }
 
         async function initializeMap(ride) {
-            if (state.mapInstance) return;
-
-            const mapContainer = document.getElementById('map-container');
-            
-            if (!ride.origin_location) {
-                console.error("Dados de localização de origem ausentes na corrida.");
-                toast.show("Não foi possível carregar a localização da partida.", "error");
+            if (state.mapInstance) {
+                console.log('[initializeMap] Map instance already exists. Exiting.');
                 return;
             }
+            console.log('[initializeMap] Initializing map for ride:', ride.id);
+
+            const mapContainer = document.getElementById('map-container');
+            // Add a dedicated inner div for the map and an overlay for messages
+            mapContainer.innerHTML = `
+                <div id="map-canvas" style="width: 100%; height: 100%;"></div>
+                <div id="map-overlay" class="absolute inset-0 bg-gray-800/50 flex items-center justify-center z-10">
+                    <p class="text-white p-4 text-center">Aguardando localização do motorista...</p>
+                </div>
+            `;
             
-            const matches = ride.origin_location.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
+            const matches = ride.origin_location?.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
             if (!matches) {
-                console.error("Não foi possível parsear a localização de origem:", ride.origin_location);
-                toast.show("Erro ao carregar dados de localização.", "error");
+                console.error("Localização de origem inválida:", ride.origin_location);
                 return;
             }
             
             const pickupLocation = { lng: parseFloat(matches[1]), lat: parseFloat(matches[2]) };
+            mapContainer.classList.remove('hidden');
 
-            const mapOptions = {
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            const mapCanvas = document.getElementById('map-canvas');
+            if (!mapCanvas) return;
+
+            state.mapInstance = new google.maps.Map(mapCanvas, {
                 center: pickupLocation,
                 zoom: 15,
                 disableDefaultUI: true,
-                styles: [
-                    { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-                    { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-                    { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-                    { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
-                    { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
-                    { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
-                    { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
-                ],
-            };
-            
-            mapContainer.classList.remove('hidden');
-            await new Promise(resolve => setTimeout(resolve, 50)); // Small delay for rendering
-
-            state.mapInstance = new google.maps.Map(mapContainer, mapOptions);
+                styles: [ { "stylers": [ { "hue": "#ff1a00" }, { "invert_lightness": true }, { "saturation": -100 }, { "lightness": 33 }, { "gamma": 0.5 } ] }, { "featureType": "water", "elementType": "geometry", "stylers": [ { "color": "#2D333C" } ] } ]
+            });
             
             google.maps.event.trigger(state.mapInstance, 'resize');
             state.mapInstance.setCenter(pickupLocation);
@@ -594,24 +593,13 @@
                 position: pickupLocation,
                 map: state.mapInstance,
                 title: 'Ponto de Partida',
-                icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 8,
-                    fillColor: "#4285F4",
-                    fillOpacity: 1,
-                    strokeWeight: 2,
-                    strokeColor: "white",
-                }
+                icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#4285F4", fillOpacity: 1, strokeWeight: 2, strokeColor: "white" }
             });
 
             state.driverMarker = new google.maps.Marker({
                 map: state.mapInstance,
                 title: 'Motorista',
-                icon: {
-                    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="36px" height="36px"><path d="M0 0h24v24H0z" fill="none"/><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5S18.33 16 17.5 16zM5 11l1.5-4.5h11L19 11H5z"/></svg>'),
-                    scaledSize: new google.maps.Size(36, 36),
-                    anchor: new google.maps.Point(18, 18)
-                }
+                icon: { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="36px" height="36px"><path d="M0 0h24v24H0z" fill="none"/><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5S18.33 16 17.5 16zM5 11l1.5-4.5h11L19 11H5z"/></svg>'), scaledSize: new google.maps.Size(36, 36), anchor: new google.maps.Point(18, 18) }
             });
 
             listenForDriverLocation(ride.driver_id);
@@ -619,6 +607,10 @@
 
         function updateDriverLocationOnMap(locationString) {
             if (!state.mapInstance || !state.driverMarker || !locationString) return;
+            
+            const overlay = document.getElementById('map-overlay');
+            if(overlay) overlay.style.display = 'none';
+            
             const matches = locationString.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
             if (!matches) return;
             
@@ -626,27 +618,34 @@
             state.driverMarker.setPosition(driverLocation);
 
             const bounds = new google.maps.LatLngBounds();
-            bounds.extend(state.passengerMarker.getPosition());
-            bounds.extend(state.driverMarker.getPosition());
-            state.mapInstance.fitBounds(bounds, 50);
+            if(state.passengerMarker) bounds.extend(state.passengerMarker.getPosition());
+            bounds.extend(driverLocation);
+            state.mapInstance.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
         }
 
         function listenForDriverLocation(driverId) {
-            if (state.driverLocationSubscription) {
-                supabaseClient.removeChannel(state.driverLocationSubscription);
-            }
+            if (state.driverLocationSubscription) supabaseClient.removeChannel(state.driverLocationSubscription);
+
             state.driverLocationSubscription = supabaseClient
                 .channel(`driver-location-${driverId}`)
                 .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'driver_details', filter: `profile_id=eq.${driverId}` }, payload => {
-                    if (payload.new.current_location) {
-                        updateDriverLocationOnMap(payload.new.current_location);
-                    }
-                })
-                .subscribe();
+                    if (payload.new.current_location) updateDriverLocationOnMap(payload.new.current_location);
+                }).subscribe();
             
-            supabaseClient.from('driver_details').select('current_location').eq('profile_id', driverId).single().then(({data}) => {
+            setTimeout(() => {
+                const overlay = document.getElementById('map-overlay');
+                if (overlay && overlay.style.display !== 'none') {
+                    overlay.querySelector('p').textContent = 'Não foi possível obter a localização do motorista em tempo real.';
+                }
+            }, 20000);
+
+            supabaseClient.from('driver_details').select('current_location').eq('profile_id', driverId).single().then(({data, error}) => {
+                if (error) console.error("[listenForDriverLocation] Erro ao buscar localização inicial (RLS pode estar bloqueando):", error.message);
                 if (data && data.current_location) {
+                    console.log('[listenForDriverLocation] Localização inicial do motorista recebida.');
                     updateDriverLocationOnMap(data.current_location);
+                } else {
+                    console.log('[listenForDriverLocation] Localização inicial não disponível.');
                 }
             });
         }
@@ -671,10 +670,8 @@
             timelineContainer.innerHTML = '';
             const currentIndex = statusOrder.indexOf(currentStatus);
 
-            // Special handling for the missing "Motorista a caminho" step
             const rideAccepted = currentIndex >= statusOrder.indexOf('accepted');
 
-            // 1. Procurando motorista
             if(statusOrder.indexOf('requested') < statusOrder.length){
                  const item = document.createElement('div');
                 item.className = `timeline-item ${currentIndex >= 0 ? 'completed' : ''} ${currentStatus === 'requested' ? 'active' : ''}`;
@@ -682,7 +679,6 @@
                 timelineContainer.appendChild(item);
             }
 
-            // 2. Motorista encontrado
              if(statusOrder.indexOf('assigned') < statusOrder.length){
                 const item = document.createElement('div');
                 item.className = `timeline-item ${currentIndex >= 1 ? 'completed' : ''} ${currentStatus === 'assigned' ? 'active' : ''}`;
@@ -690,15 +686,13 @@
                 timelineContainer.appendChild(item);
              }
            
-            // 3. Motorista a caminho (Virtual Step)
-            if (currentIndex >= 1) { // Show if driver is assigned or further
+            if (currentIndex >= 1) { 
                 const item = document.createElement('div');
                 item.className = `timeline-item ${rideAccepted ? 'completed' : 'active'}`;
                 item.innerHTML = `<div class="timeline-icon">✅</div><p class="timeline-text">Motorista a caminho</p>`;
                 timelineContainer.appendChild(item);
             }
 
-            // 4. Motorista no local
             if (currentIndex >= 1) {
                 const config = timelineConfig['accepted'];
                 const item = document.createElement('div');
@@ -707,7 +701,6 @@
                 timelineContainer.appendChild(item);
             }
 
-            // 5. Viagem em andamento
             if (currentIndex >= 2) {
                 const config = timelineConfig['arrived_pickup'];
                 const item = document.createElement('div');
@@ -716,7 +709,6 @@
                 timelineContainer.appendChild(item);
             }
 
-            // 6. Viagem concluída
              if (currentIndex >= 3) {
                 const config = timelineConfig['in_progress'];
                 const item = document.createElement('div');
@@ -760,40 +752,37 @@
 
         function handleRideStateUpdate(ride) {
             if (!ride || !ride.status) return;
+            console.log(`[handleRideStateUpdate] Ride status: ${ride.status}, Driver ID: ${ride.driver_id}`);
             
-            const status = ride.status;
-            renderTimeline(status);
+            renderTimeline(ride.status);
             
-            // Update trip details card
             const destination = (ride.destinations && ride.destinations[0]) || 'N/A';
             updateTripDetails(ride.origin_address, destination, ride.created_at);
 
-            // Persist ride price on UI
             const tripPriceEl = document.getElementById('trip-price');
             if (tripPriceEl && ride.price) {
                 tripPriceEl.textContent = `R$ ${parseFloat(ride.price).toFixed(2).replace('.', ',')}`;
             }
 
-            // Manage cancel button visibility
             const cancelBtn = document.getElementById('cancel-ride-btn');
-            if (['in_progress', 'completed', 'canceled'].includes(status)) {
+            if (['in_progress', 'completed', 'canceled'].includes(ride.status)) {
                 cancelBtn.classList.add('hidden');
             } else {
                 cancelBtn.classList.remove('hidden');
             }
 
-            // Handle map visibility and initialization
-            if (ride.driver_id && ['assigned', 'accepted', 'in_progress'].includes(status)) {
+            if (ride.driver_id && ['assigned', 'accepted', 'in_progress'].includes(ride.status)) {
+                 console.log('[handleRideStateUpdate] Condições para inicializar o mapa atendidas.');
                 initializeMap(ride);
             } else {
+                 console.log('[handleRideStateUpdate] Condições para o mapa NÃO atendidas. Destruindo mapa, se existir.');
                 destroyMap();
             }
 
-            // If driver is assigned, load info. Otherwise, show searching state.
             if (ride.driver_id) {
                 loadDriverInfo(ride.driver_id);
             } else {
-                updateDriverPanel(null, null); // Resets to "searching"
+                updateDriverPanel(null, null);
                 document.getElementById('driver-details-panel').classList.add('active');
             }
         }
@@ -1249,16 +1238,16 @@
                             if(state.rideSubscription) supabaseClient.removeChannel(state.rideSubscription);
                             state.rideSubscription = null;
                             
-                            // DEBITAR VALOR DA CORRIDA SE COMPLETADA
                             if (updatedRide.status === 'completed' && updatedRide.price) {
                                 const ridePrice = parseFloat(updatedRide.price);
                                 debitWallet(ridePrice, `Corrida #${updatedRide.id} - ${updatedRide.origin_address} → ${updatedRide.destinations[0]}`);
                                 toast.show(`Corrida concluída! O valor de R$ ${ridePrice.toFixed(2)} foi debitado.`, 'success');
+                            } else if (updatedRide.status === 'canceled') {
+                                toast.show('A viagem foi cancelada.', 'info');
                             }
                             
-                            setTimeout(() => {
-                                showRideRequestForm();
-                            }, 5000); // Wait 5 seconds to show the final status
+                            // Reset UI immediately
+                            showRideRequestForm();
                         }
                     })
                     .subscribe(status => {
@@ -1305,19 +1294,25 @@
         // UI & ACTION TRIGGERS
         // =============================================================================
         function showRideRequestForm() {
+            console.log('Resetting UI for new ride request...');
             stopRidePolling();
             resetRideStatusUI();
             destroyMap();
+            
             document.getElementById('ride-request-container')?.classList.remove('hidden');
             document.getElementById('ride-status-container')?.classList.add('hidden');
             
-            // Explicitly clear form and state for a new ride
-            document.getElementById('origin').value = '';
-            document.getElementById('destination').value = '';
-            resetPriceEstimate();
+            const form = document.getElementById('ride-request-form');
+            if (form) form.reset();
+            
+            const tripPriceEl = document.getElementById('trip-price');
+            if(tripPriceEl) tripPriceEl.textContent = '-';
+            
+            state.currentRide = null;
             state.originPlace = null;
             state.destinationPlace = null;
-            state.currentRide = null;
+            state.currentEstimate = null;
+            resetPriceEstimate();
         }
 
         function showRideStatus() {
@@ -1606,6 +1601,22 @@
             initializeApp();
             setTimeout(initializeAutocomplete, 1500);
         });
+
+        // Make functions available in global scope for HTML onclick attributes
+        window.showScreen = showScreen;
+        window.handleSignOut = handleSignOut;
+        window.handleSignInWithProvider = handleSignInWithProvider;
+        window.addCredits = addCredits;
+        window.showTransactionHistory = showTransactionHistory;
+        window.useCurrentLocation = useCurrentLocation;
+        window.calculatePriceEstimate = calculatePriceEstimate;
+        window.calculateNewEstimate = calculateNewEstimate;
+        window.cancelRide = cancelRide;
+        window.getHelp = getHelp;
+        window.callDriver = callDriver;
+        window.messageDriver = messageDriver;
+        window.forceReload = forceReload;
+
     </script>
 </body>
 </html>
