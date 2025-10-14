@@ -551,8 +551,19 @@
             if (state.mapInstance) return;
 
             const mapContainer = document.getElementById('map-container');
+            
+            if (!ride.origin_location) {
+                console.error("Dados de localização de origem ausentes na corrida.");
+                toast.show("Não foi possível carregar a localização da partida.", "error");
+                return;
+            }
+            
             const matches = ride.origin_location.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
-            if (!matches) return console.error("Não foi possível parsear a localização de origem.");
+            if (!matches) {
+                console.error("Não foi possível parsear a localização de origem:", ride.origin_location);
+                toast.show("Erro ao carregar dados de localização.", "error");
+                return;
+            }
             
             const pickupLocation = { lng: parseFloat(matches[1]), lat: parseFloat(matches[2]) };
 
@@ -572,11 +583,10 @@
             };
             
             mapContainer.classList.remove('hidden');
-            await new Promise(resolve => setTimeout(resolve, 0));
+            await new Promise(resolve => setTimeout(resolve, 50)); // Small delay for rendering
 
             state.mapInstance = new google.maps.Map(mapContainer, mapOptions);
             
-            // FIX: Force map to resize and re-center after its container becomes visible.
             google.maps.event.trigger(state.mapInstance, 'resize');
             state.mapInstance.setCenter(pickupLocation);
 
@@ -1243,13 +1253,12 @@
                             if (updatedRide.status === 'completed' && updatedRide.price) {
                                 const ridePrice = parseFloat(updatedRide.price);
                                 debitWallet(ridePrice, `Corrida #${updatedRide.id} - ${updatedRide.origin_address} → ${updatedRide.destinations[0]}`);
-                                toast.show(`Corrida concluída! R$ ${ridePrice.toFixed(2)} debitado da sua carteira.`, 'success');
+                                toast.show(`Corrida concluída! O valor de R$ ${ridePrice.toFixed(2)} foi debitado.`, 'success');
                             }
                             
                             setTimeout(() => {
-                                state.currentRide = null;
                                 showRideRequestForm();
-                            }, 5000);
+                            }, 5000); // Wait 5 seconds to show the final status
                         }
                     })
                     .subscribe(status => {
@@ -1301,6 +1310,14 @@
             destroyMap();
             document.getElementById('ride-request-container')?.classList.remove('hidden');
             document.getElementById('ride-status-container')?.classList.add('hidden');
+            
+            // Explicitly clear form and state for a new ride
+            document.getElementById('origin').value = '';
+            document.getElementById('destination').value = '';
+            resetPriceEstimate();
+            state.originPlace = null;
+            state.destinationPlace = null;
+            state.currentRide = null;
         }
 
         function showRideStatus() {
