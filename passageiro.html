@@ -420,6 +420,8 @@
             mapInstance: null,
             driverMarker: null,
             passengerMarker: null,
+            directionsService: null,
+            directionsRenderer: null,
             driverLocationSubscription: null,
         };
         
@@ -532,7 +534,7 @@
         }
 
         // =============================================================================
-        // MAP FUNCTIONS
+        // MAP FUNCTIONS (UBER STYLE)
         // =============================================================================
         function destroyMap() {
             if (state.driverLocationSubscription) {
@@ -542,85 +544,112 @@
             const mapContainer = document.getElementById('map-container');
             if (mapContainer) {
                 mapContainer.classList.add('hidden');
-                mapContainer.innerHTML = ''; // Clear content to ensure clean re-initialization
+                mapContainer.innerHTML = ''; // Clear content
             }
             state.mapInstance = null;
             state.driverMarker = null;
             state.passengerMarker = null;
+            state.directionsService = null;
+            state.directionsRenderer = null;
         }
 
         async function initializeMap(ride) {
-            if (state.mapInstance) return;
-            console.log('[MAP_DEBUG] Attempting to initialize map...');
+            if (state.mapInstance) return; // Map already exists
 
             const mapContainer = document.getElementById('map-container');
-            if (!mapContainer) {
-                console.error('[MAP_DEBUG] Map container not found!');
-                return;
-            }
+            if (!mapContainer) return;
             mapContainer.innerHTML = `<div id="map-canvas" style="width: 100%; height: 100%;"></div>`;
-            
-            const matches = ride.origin_location?.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
-            if (!matches) {
-                console.error("[MAP_DEBUG] Invalid origin location format:", ride.origin_location);
-                return;
-            }
-            
-            const pickupLocation = { lng: parseFloat(matches[1]), lat: parseFloat(matches[2]) };
-            
             mapContainer.classList.remove('hidden');
 
-            // Defer map creation until the next browser paint to ensure the container has dimensions
-            await new Promise(resolve => setTimeout(resolve, 100));
+            const pickupLocation = parsePoint(ride.origin_location);
+            if (!pickupLocation) return; // Invalid location format
 
-            const mapCanvas = document.getElementById('map-canvas');
-            if (!mapCanvas || mapCanvas.clientHeight === 0) {
-                 console.error('[MAP_DEBUG] Map canvas not ready or not visible. Aborting map creation.');
-                 mapContainer.classList.add('hidden');
-                 return;
-            }
-            console.log(`[MAP_DEBUG] Map canvas is ready. Creating map object.`);
+            await new Promise(resolve => setTimeout(resolve, 50)); // Ensure container is visible
 
-            state.mapInstance = new google.maps.Map(mapCanvas, {
+            state.mapInstance = new google.maps.Map(document.getElementById('map-canvas'), {
                 center: pickupLocation,
-                zoom: 15,
+                zoom: 16,
                 disableDefaultUI: true,
-                styles: [ { "stylers": [ { "hue": "#ff1a00" }, { "invert_lightness": true }, { "saturation": -100 }, { "lightness": 33 }, { "gamma": 0.5 } ] }, { "featureType": "water", "elementType": "geometry", "stylers": [ { "color": "#2D333C" } ] } ]
+                styles: [
+                    { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+                    { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+                    { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+                    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+                    { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+                    { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
+                    { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
+                    { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
+                    { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
+                    { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
+                    { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#746855" }] },
+                    { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
+                    { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f3d19c" }] },
+                    { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
+                    { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+                    { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
+                    { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
+                    { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] }
+                ]
             });
             
-            google.maps.event.trigger(state.mapInstance, 'resize');
-            state.mapInstance.setCenter(pickupLocation);
-            console.log('[MAP_DEBUG] Map created and centered.');
+            state.directionsService = new google.maps.DirectionsService();
+            state.directionsRenderer = new google.maps.DirectionsRenderer({
+                map: state.mapInstance,
+                suppressMarkers: true, // We'll use our own custom markers
+                polylineOptions: {
+                    strokeColor: '#FFFFFF',
+                    strokeOpacity: 0.8,
+                    strokeWeight: 6
+                }
+            });
 
             state.passengerMarker = new google.maps.Marker({
                 position: pickupLocation,
                 map: state.mapInstance,
-                title: 'Ponto de Partida',
                 icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#4285F4", fillOpacity: 1, strokeWeight: 2, strokeColor: "white" }
             });
-
+            
+            // Driver's car icon
             state.driverMarker = new google.maps.Marker({
                 map: state.mapInstance,
-                title: 'Motorista',
-                icon: { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="36px" height="36px"><path d="M0 0h24v24H0z" fill="none"/><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5S18.33 16 17.5 16zM5 11l1.5-4.5h11L19 11H5z"/></svg>'), scaledSize: new google.maps.Size(36, 36), anchor: new google.maps.Point(18, 18) }
+                icon: {
+                    path: 'M21.71,5.29L20,7l-1.41-1.41l-1.3,1.3L15.59,5.2l-1.3,1.3l-1.7-1.71L10.5,7l-1.7-1.71l-1.3,1.3L5.8,5.2l-1.3,1.3L2.79,4.71 L2,4l1.71-1.71L5.5,4l1.3-1.3l1.71,1.71L10.5,2.71l1.71,1.71L14,2.71l1.71,1.71l1.3-1.3L18.5,5l1.71-1.71L22,5L21.71,5.29z M7.21,10.79 l-4,4C3.02,14.98,3,15.24,3,15.52V20c0,0.55,0.45,1,1,1h3.5c0.28,0,0.53-0.11,0.71-0.29l4-4L7.21,10.79z M21,11.5c0-0.55-0.45-1-1-1h-7.5l2-2H21V11.5z',
+                    scale: 1.5,
+                    fillColor: 'white',
+                    fillOpacity: 1,
+                    strokeWeight: 0,
+                    rotation: 0,
+                    anchor: new google.maps.Point(12, 12),
+                }
             });
 
             listenForDriverLocation(ride.driver_id);
+        }
+        
+        function drawRoute(driverLocation) {
+            if (!state.mapInstance || !state.passengerMarker || !driverLocation) return;
+            
+            const request = {
+                origin: driverLocation,
+                destination: state.passengerMarker.getPosition(),
+                travelMode: 'DRIVING'
+            };
+            
+            state.directionsService.route(request, (result, status) => {
+                if (status == 'OK') {
+                    state.directionsRenderer.setDirections(result);
+                }
+            });
         }
 
         function updateDriverLocationOnMap(locationString) {
             if (!state.mapInstance || !state.driverMarker || !locationString) return;
             
-            const matches = locationString.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
-            if (!matches) return;
+            const driverLocation = parsePoint(locationString);
+            if (!driverLocation) return;
             
-            const driverLocation = { lng: parseFloat(matches[1]), lat: parseFloat(matches[2]) };
             state.driverMarker.setPosition(driverLocation);
-
-            const bounds = new google.maps.LatLngBounds();
-            if(state.passengerMarker) bounds.extend(state.passengerMarker.getPosition());
-            bounds.extend(driverLocation);
-            state.mapInstance.fitBounds(bounds, 100); // 100px padding
+            drawRoute(driverLocation);
         }
 
         function listenForDriverLocation(driverId) {
@@ -629,19 +658,25 @@
             state.driverLocationSubscription = supabaseClient
                 .channel(`driver-location-${driverId}`)
                 .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'driver_details', filter: `profile_id=eq.${driverId}` }, payload => {
-                    if (payload.new.current_location) updateDriverLocationOnMap(payload.new.current_location);
+                    if (payload.new.current_location) {
+                        updateDriverLocationOnMap(payload.new.current_location);
+                    }
                 }).subscribe();
             
-            // Fetch initial location in case we missed the first update
-            supabaseClient.from('driver_details').select('current_location').eq('profile_id', driverId).single().then(({data, error}) => {
-                if (error) console.error("[listenForDriverLocation] Erro ao buscar localização inicial (RLS pode estar bloqueando):", error.message);
+            // Fetch initial location
+            supabaseClient.from('driver_details').select('current_location').eq('profile_id', driverId).single().then(({data}) => {
                 if (data && data.current_location) {
-                    console.log('[listenForDriverLocation] Localização inicial do motorista recebida.');
                     updateDriverLocationOnMap(data.current_location);
                 } else {
-                    console.log('[listenForDriverLocation] Localização inicial não disponível.');
+                    toast.show("Aguardando localização do motorista...", "info");
                 }
             });
+        }
+        
+        function parsePoint(locationString) {
+            const matches = locationString?.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
+            if (!matches) return null;
+            return { lng: parseFloat(matches[1]), lat: parseFloat(matches[2]) };
         }
 
         // =============================================================================
@@ -663,7 +698,6 @@
 
             timelineContainer.innerHTML = '';
             const currentIndex = statusOrder.indexOf(currentStatus);
-
             const rideAccepted = currentIndex >= statusOrder.indexOf('accepted');
 
             if(statusOrder.indexOf('requested') < statusOrder.length){
