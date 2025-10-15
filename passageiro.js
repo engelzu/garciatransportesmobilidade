@@ -414,8 +414,7 @@ async function loadWalletBalance() {
         const { data, error } = await supabaseClient
             .from('wallet_transactions')
             .select('amount, transaction_type')
-            .eq('profile_id', state.user.id)
-            .eq('status', 'completed'); // Only count completed transactions
+            .eq('profile_id', state.user.id);
 
         if (error) throw error;
         
