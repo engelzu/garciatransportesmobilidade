@@ -3,6 +3,9 @@
 const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const STRIPE_PUBLIC_KEY = 'pk_test_51SEJCBFyO4P04Uv0YubWfXu6UD8rmVBuA1AGNlygxvLTTivCfdnmaAewkyT7H1mfgMBuOJhpvPPbraIC2iIMO8OG00KHO8HO7v';
+const stripe = Stripe(STRIPE_PUBLIC_KEY);
+
 
 const state = { 
     user: null, 
@@ -103,6 +106,7 @@ async function loadUserProfile(userId) {
         state.profile = data;
         document.getElementById('welcome-message').textContent = `Olá, ${state.profile.full_name.split(' ')[0]}!`;
         await loadWalletBalance();
+        await checkPaymentStatus();
         await checkPendingRide();
     } catch (error) { 
         console.error('❌ Erro ao carregar perfil:', error.message); 
@@ -402,34 +406,97 @@ function showRideStatus() {
 
 
 // =============================================================================
-// WALLET
+// WALLET - RESTORED TO ORIGINAL WORKING LOGIC
 // =============================================================================
 async function loadWalletBalance() {
     if (!state.user) return;
     try {
-        const { data, error } = await supabaseClient.rpc('get_wallet_balance', { p_user_id: state.user.id });
+        const { data, error } = await supabaseClient
+            .from('wallet_transactions')
+            .select('amount, transaction_type')
+            .eq('profile_id', state.user.id)
+            .eq('status', 'completed'); // Only count completed transactions
+
         if (error) throw error;
-        state.walletBalance = data || 0;
-        document.getElementById('wallet-balance').textContent = `R$ ${state.walletBalance.toFixed(2).replace('.', ',')}`;
-    } catch (error) { console.error('Erro ao carregar saldo:', error); }
+        
+        let balance = 0;
+        if (data) {
+            data.forEach(transaction => {
+                if (transaction.transaction_type === 'credit') {
+                    balance += parseFloat(transaction.amount);
+                } else if (transaction.transaction_type === 'debit') {
+                    balance -= parseFloat(transaction.amount);
+                }
+            });
+        }
+        
+        state.walletBalance = balance;
+        document.getElementById('wallet-balance').textContent = `R$ ${balance.toFixed(2).replace('.', ',')}`;
+
+    } catch (error) {
+        console.error('Erro ao carregar saldo:', error);
+        toast.show('Não foi possível carregar o saldo da carteira.', 'error');
+    }
 }
 
+
 async function addCredits() {
-    const amountString = prompt("Qual valor você deseja adicionar? (ex: 50,00)", "50.00");
-    if (!amountString) return; 
-    const amount = parseFloat(amountString.replace(',', '.'));
-    if (isNaN(amount) || amount <= 0) return toast.show('Valor inválido.', 'error');
-    
+    const amount = prompt('Quanto você deseja adicionar? (ex: 50)');
+    if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+        return toast.show('Valor inválido', 'error');
+    }
+
     showLoading('add-credits-btn');
+    toast.show('Redirecionando para pagamento...', 'info');
+
     try {
-        const { error } = await supabaseClient.from('wallet_transactions').insert({
-            profile_id: state.user.id, amount: amount, transaction_type: 'credit', description: `Crédito via App.`, status: 'completed'
+        const response = await fetch('/.netlify/functions/stripe-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                amount: parseFloat(amount),
+                userId: state.user.id,
+                userEmail: state.user.email,
+            }),
         });
-        if (error) throw error;
-        await loadWalletBalance(); 
-        toast.show(`Créditos adicionados!`, 'success');
-    } catch (error) { toast.show('Não foi possível adicionar créditos.', 'error');
-    } finally { hideLoading('add-credits-btn'); }
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Erro do servidor: ${errorText}`);
+        }
+
+        const { sessionId, url } = await response.json();
+        
+        if (url) {
+            window.location.href = url;
+        } else if (sessionId) {
+            const { error } = await stripe.redirectToCheckout({ sessionId });
+            if (error) throw error;
+        } else {
+            throw new Error('Resposta do servidor inválida.');
+        }
+
+    } catch (error) {
+        console.error('Erro ao processar pagamento:', error);
+        toast.show(`Erro no pagamento: ${error.message}`, 'error');
+        hideLoading('add-credits-btn');
+    }
+}
+
+async function checkPaymentStatus() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get('payment');
+
+    if (paymentStatus === 'success') {
+        toast.show('Pagamento bem-sucedido! Atualizando saldo...', 'success');
+        setTimeout(() => {
+            loadWalletBalance();
+        }, 2000); // Wait 2s for webhook to potentially complete
+        window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (paymentStatus === 'cancel') {
+        toast.show('Pagamento cancelado.', 'warning');
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
 }
 
 
