@@ -1,7 +1,7 @@
 // @ts-nocheck
 
 const SUPABASE_URL = 'https://emhxlsmukcwgukcsxhrr.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzINiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtaHhsc211a2N3Z3VrY3N4aHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjU4NDAsImV4cCI6MjA3NDYwMTg0MH0.iqUWK2wJHuofA76u3wjbT1DBN_m3dqz60vPZ-dF9wYM';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const state = { 
@@ -454,6 +454,48 @@ function initializeApp() {
     supabaseClient.auth.getSession().then(({ data: { session } }) => {
         if (!session) showScreen('login-screen');
     });
+}
+
+function initializeAutocomplete() {
+    try {
+        const options = { types: ['address'], componentRestrictions: { 'country': 'br' } };
+        const originInput = document.getElementById('origin');
+        const destinationInput = document.getElementById('destination');
+
+        const originAutocomplete = new google.maps.places.Autocomplete(originInput, options);
+        originAutocomplete.addListener('place_changed', () => { state.originPlace = originAutocomplete.getPlace(); });
+
+        const destinationAutocomplete = new google.maps.places.Autocomplete(destinationInput, options);
+        destinationAutocomplete.addListener('place_changed', () => { state.destinationPlace = destinationAutocomplete.getPlace(); });
+        
+    } catch (error) { console.error('❌ Erro ao inicializar autocomplete:', error); }
+}
+
+function useCurrentLocation() {
+    if (!navigator.geolocation) return toast.show('Geolocalização não suportada.', 'error');
+    
+    document.getElementById('origin').value = 'Obtendo localização...';
+    
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const { latitude: lat, longitude: lng } = position.coords;
+            const latLng = new google.maps.LatLng(lat, lng);
+            
+            new google.maps.Geocoder().geocode({ 'location': latLng }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                    document.getElementById('origin').value = results[0].formatted_address;
+                    state.originPlace = {
+                        formatted_address: results[0].formatted_address,
+                        geometry: { location: latLng },
+                    };
+                }
+            });
+        },
+        () => {
+            toast.show('Não foi possível obter sua localização.', 'error');
+            document.getElementById('origin').value = '';
+        }
+    );
 }
 
 document.addEventListener('DOMContentLoaded', () => {
