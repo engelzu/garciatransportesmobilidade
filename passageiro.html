@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -534,7 +535,7 @@
         }
 
         // =============================================================================
-        // MAP FUNCTIONS (UBER STYLE)
+        // MAP FUNCTIONS (UBER STYLE) - REVISED
         // =============================================================================
         function destroyMap() {
             if (state.driverLocationSubscription) {
@@ -544,7 +545,7 @@
             const mapContainer = document.getElementById('map-container');
             if (mapContainer) {
                 mapContainer.classList.add('hidden');
-                mapContainer.innerHTML = ''; // Clear content
+                mapContainer.innerHTML = ''; // Clear content to ensure re-initialization
             }
             state.mapInstance = null;
             state.driverMarker = null;
@@ -554,79 +555,74 @@
         }
 
         async function initializeMap(ride) {
-            if (state.mapInstance) return; // Map already exists
+            if (state.mapInstance && document.getElementById('map-canvas')) return; // Map already exists
 
             const mapContainer = document.getElementById('map-container');
             if (!mapContainer) return;
-            mapContainer.innerHTML = `<div id="map-canvas" style="width: 100%; height: 100%;"></div>`;
+            
+            mapContainer.innerHTML = `<div id="map-canvas" style="width: 100%; height: 100%; border-radius: 0.75rem;"></div>`;
             mapContainer.classList.remove('hidden');
 
             const pickupLocation = parsePoint(ride.origin_location);
-            if (!pickupLocation) return; // Invalid location format
+            if (!pickupLocation) {
+                toast.show("Local de partida inválido.", "error");
+                return;
+            }
 
-            await new Promise(resolve => setTimeout(resolve, 50)); // Ensure container is visible
+            // Wait for the browser to render the now-visible container
+            await new Promise(resolve => setTimeout(resolve, 100));
 
-            state.mapInstance = new google.maps.Map(document.getElementById('map-canvas'), {
-                center: pickupLocation,
-                zoom: 16,
-                disableDefaultUI: true,
-                styles: [
-                    { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-                    { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-                    { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-                    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-                    { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-                    { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
-                    { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
-                    { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
-                    { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
-                    { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
-                    { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#746855" }] },
-                    { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
-                    { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f3d19c" }] },
-                    { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
-                    { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-                    { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
-                    { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
-                    { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] }
-                ]
-            });
-            
-            state.directionsService = new google.maps.DirectionsService();
-            state.directionsRenderer = new google.maps.DirectionsRenderer({
-                map: state.mapInstance,
-                suppressMarkers: true, // We'll use our own custom markers
-                polylineOptions: {
-                    strokeColor: '#FFFFFF',
-                    strokeOpacity: 0.8,
-                    strokeWeight: 6
-                }
-            });
+            try {
+                const mapCanvas = document.getElementById('map-canvas');
+                if (!mapCanvas) throw new Error("Elemento do mapa não encontrado após a criação.");
 
-            state.passengerMarker = new google.maps.Marker({
-                position: pickupLocation,
-                map: state.mapInstance,
-                icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#4285F4", fillOpacity: 1, strokeWeight: 2, strokeColor: "white" }
-            });
-            
-            // Driver's car icon
-            state.driverMarker = new google.maps.Marker({
-                map: state.mapInstance,
-                icon: {
-                    path: 'M21.71,5.29L20,7l-1.41-1.41l-1.3,1.3L15.59,5.2l-1.3,1.3l-1.7-1.71L10.5,7l-1.7-1.71l-1.3,1.3L5.8,5.2l-1.3,1.3L2.79,4.71 L2,4l1.71-1.71L5.5,4l1.3-1.3l1.71,1.71L10.5,2.71l1.71,1.71L14,2.71l1.71,1.71l1.3-1.3L18.5,5l1.71-1.71L22,5L21.71,5.29z M7.21,10.79 l-4,4C3.02,14.98,3,15.24,3,15.52V20c0,0.55,0.45,1,1,1h3.5c0.28,0,0.53-0.11,0.71-0.29l4-4L7.21,10.79z M21,11.5c0-0.55-0.45-1-1-1h-7.5l2-2H21V11.5z',
-                    scale: 1.5,
-                    fillColor: 'white',
-                    fillOpacity: 1,
-                    strokeWeight: 0,
-                    rotation: 0,
-                    anchor: new google.maps.Point(12, 12),
-                }
-            });
+                state.mapInstance = new google.maps.Map(mapCanvas, {
+                    center: pickupLocation,
+                    zoom: 16,
+                    disableDefaultUI: true,
+                    styles: [ { "elementType": "geometry", "stylers": [ { "color": "#242f3e" } ] }, { "elementType": "labels.text.fill", "stylers": [ { "color": "#746855" } ] }, { "elementType": "labels.text.stroke", "stylers": [ { "color": "#242f3e" } ] }, { "featureType": "administrative.locality", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] }, { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] }, { "featureType": "poi.park", "elementType": "geometry", "stylers": [ { "color": "#263c3f" } ] }, { "featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [ { "color": "#6b9a76" } ] }, { "featureType": "road", "elementType": "geometry", "stylers": [ { "color": "#38414e" } ] }, { "featureType": "road", "elementType": "geometry.stroke", "stylers": [ { "color": "#212a37" } ] }, { "featureType": "road", "elementType": "labels.text.fill", "stylers": [ { "color": "#9ca5b3" } ] }, { "featureType": "road.highway", "elementType": "geometry", "stylers": [ { "color": "#746855" } ] }, { "featureType": "road.highway", "elementType": "geometry.stroke", "stylers": [ { "color": "#1f2835" } ] }, { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [ { "color": "#f3d19c" } ] }, { "featureType": "transit", "elementType": "geometry", "stylers": [ { "color": "#2f3948" } ] }, { "featureType": "transit.station", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] }, { "featureType": "water", "elementType": "geometry", "stylers": [ { "color": "#17263c" } ] }, { "featureType": "water", "elementType": "labels.text.fill", "stylers": [ { "color": "#515c6d" } ] }, { "featureType": "water", "elementType": "labels.text.stroke", "stylers": [ { "color": "#17263c" } ] } ]
+                });
+                
+                // CRITICAL FIX: This tells the map to re-render itself, fixing the gray box problem.
+                google.maps.event.trigger(state.mapInstance, 'resize');
+                state.mapInstance.setCenter(pickupLocation);
 
-            listenForDriverLocation(ride.driver_id);
+                state.directionsService = new google.maps.DirectionsService();
+                state.directionsRenderer = new google.maps.DirectionsRenderer({
+                    map: state.mapInstance,
+                    suppressMarkers: true,
+                    polylineOptions: { strokeColor: '#FFFFFF', strokeOpacity: 0.8, strokeWeight: 6 }
+                });
+
+                state.passengerMarker = new google.maps.Marker({
+                    position: pickupLocation,
+                    map: state.mapInstance,
+                    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#4285F4", fillOpacity: 1, strokeWeight: 2, strokeColor: "white" }
+                });
+                
+                state.driverMarker = new google.maps.Marker({
+                    map: state.mapInstance,
+                    icon: {
+                        path: 'M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z', // Arrow icon
+                        scale: 1.5,
+                        fillColor: 'white',
+                        fillOpacity: 1,
+                        strokeWeight: 1,
+                        strokeColor: '#333',
+                        rotation: 0,
+                        anchor: new google.maps.Point(12, 12),
+                    }
+                });
+
+                listenForDriverLocation(ride.driver_id);
+
+            } catch (e) {
+                console.error("Erro ao inicializar o mapa do Google:", e);
+                toast.show("Ocorreu um erro ao carregar o mapa.", "error");
+            }
         }
         
-        function drawRoute(driverLocation) {
+        function drawRouteAndFitBounds(driverLocation) {
             if (!state.mapInstance || !state.passengerMarker || !driverLocation) return;
             
             const request = {
@@ -638,6 +634,7 @@
             state.directionsService.route(request, (result, status) => {
                 if (status == 'OK') {
                     state.directionsRenderer.setDirections(result);
+                    state.mapInstance.fitBounds(result.routes[0].bounds);
                 }
             });
         }
@@ -649,7 +646,7 @@
             if (!driverLocation) return;
             
             state.driverMarker.setPosition(driverLocation);
-            drawRoute(driverLocation);
+            drawRouteAndFitBounds(driverLocation);
         }
 
         function listenForDriverLocation(driverId) {
@@ -663,7 +660,6 @@
                     }
                 }).subscribe();
             
-            // Fetch initial location
             supabaseClient.from('driver_details').select('current_location').eq('profile_id', driverId).single().then(({data}) => {
                 if (data && data.current_location) {
                     updateDriverLocationOnMap(data.current_location);
