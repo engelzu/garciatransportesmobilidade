@@ -315,22 +315,33 @@ function cleanupRideSubscriptions() {
 // =============================================================================
 // PRICE & REQUEST
 // =============================================================================
-async function calculatePriceEstimate() {
+function calculatePriceEstimate() {
     if (!state.originPlace || !state.destinationPlace) {
         return toast.show('Preencha origem e destino usando as sugestões.', 'warning');
     }
     showLoading('estimate-btn');
-    try {
-        const service = new google.maps.DistanceMatrixService();
-        const { rows, status } = await service.getDistanceMatrix({
-            origins: [state.originPlace.geometry.location],
-            destinations: [state.destinationPlace.geometry.location],
-            travelMode: 'DRIVING',
-        });
-        if (status !== 'OK' || !rows[0].elements[0].distance) throw new Error('Rota não encontrada.');
+    
+    const service = new google.maps.DistanceMatrixService();
+    service.getDistanceMatrix({
+        origins: [state.originPlace.geometry.location],
+        destinations: [state.destinationPlace.geometry.location],
+        travelMode: 'DRIVING',
+    }, (response, status) => {
+        hideLoading('estimate-btn');
+        if (status !== 'OK') {
+            if (status === 'REQUEST_DENIED') {
+                return toast.show('Cálculo bloqueado. Ative a "Distance Matrix API" no painel do Google Cloud.', 'error');
+            }
+            return toast.show(`Erro ao buscar rota: ${status}`, 'error');
+        }
 
-        const distanceKm = rows[0].elements[0].distance.value / 1000;
-        const timeMinutes = Math.round(rows[0].elements[0].duration.value / 60);
+        const element = response.rows[0].elements[0];
+        if (element.status !== 'OK') {
+             return toast.show('Não foi possível encontrar uma rota entre os locais selecionados.', 'error');
+        }
+
+        const distanceKm = element.distance.value / 1000;
+        const timeMinutes = Math.round(element.duration.value / 60);
         const price = Math.max( PRICING_CONFIG.minimumFare, (PRICING_CONFIG.baseFare + (distanceKm * PRICING_CONFIG.pricePerKm) + (timeMinutes * PRICING_CONFIG.pricePerMinute)) * PRICING_CONFIG.surgePricing );
         
         state.currentEstimate = { total: price, distance: distanceKm, time: timeMinutes };
@@ -341,9 +352,7 @@ async function calculatePriceEstimate() {
         document.getElementById('estimated-time').textContent = `${timeMinutes} min`;
         document.getElementById('estimated-distance').textContent = `${distanceKm.toFixed(1)} km`;
         document.getElementById('request-btn').disabled = false;
-
-    } catch (error) { toast.show(error.message, 'error');
-    } finally { hideLoading('estimate-btn'); }
+    });
 }
 
 async function requestRide() {
