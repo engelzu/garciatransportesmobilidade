@@ -34,7 +34,7 @@ const MAP_STYLES = [ // Dark map style
 const CAR_ICON_SVG = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11C5.84 5 5.28 5.42 5.08 6.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z" fill="white"/><circle cx="12" cy="12" r="10" fill="black" fill-opacity="0.2"/></svg>';
 
 
-// = a===========================================================================
+// =============================================================================
 // TOAST & UTILITIES
 // =============================================================================
 class ToastManager {
@@ -80,6 +80,13 @@ async function handleSignIn(email, password) {
         if (error) throw error;
     } catch (error) { toast.show('Erro no login: ' + error.message, 'error');
     } finally { hideLoading('login-btn'); }
+}
+
+async function handleSignInWithProvider(provider) {
+    try {
+        const { error } = await supabaseClient.auth.signInWithOAuth({ provider });
+        if (error) throw error;
+    } catch (error) { toast.show(`Erro no login com ${provider}: ` + error.message, 'error'); }
 }
 
 async function handleSignUp(fullName, email, phone, password) {
@@ -205,7 +212,7 @@ async function checkPendingRide() {
             subscribeToRideUpdates(state.currentRide.id);
         } else {
             showRideRequestForm();
-            showScreen('user-screen');
+            showScreen('user-screen'); // <-- THIS WAS THE MISSING LINE
         }
     } catch (error) {
         console.error('❌ Erro em checkPendingRide:', error);
@@ -369,11 +376,22 @@ async function requestRide() {
             status: 'requested',
             price: state.currentEstimate.total,
         };
-        const { data, error } = await supabaseClient.from('rides').insert(rideData).select().single();
+        const { data: newRide, error } = await supabaseClient.from('rides').insert(rideData).select().single();
         if (error) throw error;
-        // The subscription will handle the UI update
-    } catch (error) { toast.show('Erro ao solicitar corrida.', 'error');
-    } finally { hideLoading('request-btn'); }
+        
+        // Update state and UI immediately
+        state.currentRide = newRide;
+        showRideStatus();
+        handleRideStateUpdate(newRide);
+        subscribeToRideUpdates(newRide.id);
+        toast.show('Corrida solicitada! Procurando motorista...', 'info');
+
+    } catch (error) { 
+        toast.show('Erro ao solicitar corrida.', 'error');
+        showRideRequestForm(); // Go back to form on failure
+    } finally { 
+        hideLoading('request-btn'); 
+    }
 }
 
 async function cancelRide() {
@@ -595,3 +613,4 @@ window.useCurrentLocation = useCurrentLocation;
 window.calculatePriceEstimate = calculatePriceEstimate;
 window.requestRide = requestRide;
 window.cancelRide = cancelRide;
+window.handleSignInWithProvider = handleSignInWithProvider; // Make sure this is exposed
