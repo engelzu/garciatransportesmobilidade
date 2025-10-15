@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -555,22 +554,27 @@
         }
 
         async function initializeMap(ride) {
-            if (state.mapInstance && document.getElementById('map-canvas')) return; // Map already exists
+            // Guard against re-initialization if map already exists
+            if (state.mapInstance && document.getElementById('map-canvas')) {
+                google.maps.event.trigger(state.mapInstance, 'resize');
+                return;
+            }
 
             const mapContainer = document.getElementById('map-container');
             if (!mapContainer) return;
             
+            // Ensure container is clean and ready
             mapContainer.innerHTML = `<div id="map-canvas" style="width: 100%; height: 100%; border-radius: 0.75rem;"></div>`;
             mapContainer.classList.remove('hidden');
 
             const pickupLocation = parsePoint(ride.origin_location);
             if (!pickupLocation) {
-                toast.show("Local de partida inválido.", "error");
+                toast.show("Local de partida da corrida é inválido.", "error");
                 return;
             }
 
-            // Wait for the browser to render the now-visible container
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // More robust wait: use requestAnimationFrame to wait for the browser to be ready to paint
+            await new Promise(resolve => requestAnimationFrame(resolve));
 
             try {
                 const mapCanvas = document.getElementById('map-canvas');
@@ -583,7 +587,7 @@
                     styles: [ { "elementType": "geometry", "stylers": [ { "color": "#242f3e" } ] }, { "elementType": "labels.text.fill", "stylers": [ { "color": "#746855" } ] }, { "elementType": "labels.text.stroke", "stylers": [ { "color": "#242f3e" } ] }, { "featureType": "administrative.locality", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] }, { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] }, { "featureType": "poi.park", "elementType": "geometry", "stylers": [ { "color": "#263c3f" } ] }, { "featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [ { "color": "#6b9a76" } ] }, { "featureType": "road", "elementType": "geometry", "stylers": [ { "color": "#38414e" } ] }, { "featureType": "road", "elementType": "geometry.stroke", "stylers": [ { "color": "#212a37" } ] }, { "featureType": "road", "elementType": "labels.text.fill", "stylers": [ { "color": "#9ca5b3" } ] }, { "featureType": "road.highway", "elementType": "geometry", "stylers": [ { "color": "#746855" } ] }, { "featureType": "road.highway", "elementType": "geometry.stroke", "stylers": [ { "color": "#1f2835" } ] }, { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [ { "color": "#f3d19c" } ] }, { "featureType": "transit", "elementType": "geometry", "stylers": [ { "color": "#2f3948" } ] }, { "featureType": "transit.station", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] }, { "featureType": "water", "elementType": "geometry", "stylers": [ { "color": "#17263c" } ] }, { "featureType": "water", "elementType": "labels.text.fill", "stylers": [ { "color": "#515c6d" } ] }, { "featureType": "water", "elementType": "labels.text.stroke", "stylers": [ { "color": "#17263c" } ] } ]
                 });
                 
-                // CRITICAL FIX: This tells the map to re-render itself, fixing the gray box problem.
+                // CRITICAL FIX: This forces the map to recalculate its size and render.
                 google.maps.event.trigger(state.mapInstance, 'resize');
                 state.mapInstance.setCenter(pickupLocation);
 
@@ -603,14 +607,9 @@
                 state.driverMarker = new google.maps.Marker({
                     map: state.mapInstance,
                     icon: {
-                        path: 'M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z', // Arrow icon
-                        scale: 1.5,
-                        fillColor: 'white',
-                        fillOpacity: 1,
-                        strokeWeight: 1,
-                        strokeColor: '#333',
-                        rotation: 0,
-                        anchor: new google.maps.Point(12, 12),
+                        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="28px" height="28px"><path d="M0 0h24v24H0z" fill="none"/><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>'),
+                        scaledSize: new google.maps.Size(28, 28),
+                        anchor: new google.maps.Point(14, 14),
                     }
                 });
 
@@ -634,7 +633,8 @@
             state.directionsService.route(request, (result, status) => {
                 if (status == 'OK') {
                     state.directionsRenderer.setDirections(result);
-                    state.mapInstance.fitBounds(result.routes[0].bounds);
+                    // Don't fit bounds on every update, it's jarring. Let the map stay centered.
+                    // state.mapInstance.fitBounds(result.routes[0].bounds);
                 }
             });
         }
@@ -645,8 +645,13 @@
             const driverLocation = parsePoint(locationString);
             if (!driverLocation) return;
             
+            const oldPosition = state.driverMarker.getPosition();
             state.driverMarker.setPosition(driverLocation);
-            drawRouteAndFitBounds(driverLocation);
+
+            // Center map on first update
+            if (!oldPosition) {
+                 drawRouteAndFitBounds(driverLocation);
+            }
         }
 
         function listenForDriverLocation(driverId) {
