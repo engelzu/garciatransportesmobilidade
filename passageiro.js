@@ -84,7 +84,12 @@ async function handleSignIn(email, password) {
 
 async function handleSignInWithProvider(provider) {
     try {
-        const { error } = await supabaseClient.auth.signInWithOAuth({ provider });
+        const { error } = await supabaseClient.auth.signInWithOAuth({
+            provider: provider,
+            options: {
+                redirectTo: window.location.href
+            }
+        });
         if (error) throw error;
     } catch (error) { toast.show(`Erro no login com ${provider}: ` + error.message, 'error'); }
 }
