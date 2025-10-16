@@ -7,10 +7,10 @@ const STRIPE_PUBLIC_KEY = 'pk_test_51SEJCBFyO4P04Uv0YubWfXu6UD8rmVBuA1AGNlygxvLT
 const stripe = Stripe(STRIPE_PUBLIC_KEY);
 
 
-const state = { 
-    user: null, 
-    profile: null, 
-    currentRide: null, 
+const state = {
+    user: null,
+    profile: null,
+    currentRide: null,
     rideSubscription: null,
     driverLocationSubscription: null,
     isInitializing: false,
@@ -92,8 +92,8 @@ async function handleSignInWithProvider(provider) {
 async function handleSignUp(fullName, email, phone, password) {
     showLoading('signup-btn');
     try {
-        const { error } = await supabaseClient.auth.signUp({ 
-            email, password, options: { data: { full_name: fullName, phone_number: phone, user_type: 'passenger' } } 
+        const { error } = await supabaseClient.auth.signUp({
+            email, password, options: { data: { full_name: fullName, phone_number: phone, user_type: 'passenger' } }
         });
         if (error) throw error;
         toast.show('Cadastro realizado! Verifique seu e-mail.', 'success');
@@ -115,8 +115,8 @@ async function loadUserProfile(userId) {
         await loadWalletBalance();
         await checkPaymentStatus();
         await checkPendingRide();
-    } catch (error) { 
-        console.error('❌ Erro ao carregar perfil:', error.message); 
+    } catch (error) {
+        console.error('❌ Erro ao carregar perfil:', error.message);
         handleSignOut();
     }
 }
@@ -143,7 +143,7 @@ function initializeMap(originCoords) {
             map: state.mapInstance,
             title: 'Você está aqui',
         });
-        
+
         // This is the key to fix the gray box issue on dynamic elements
         setTimeout(() => {
              google.maps.event.trigger(state.mapInstance, 'resize');
@@ -223,7 +223,7 @@ async function checkPendingRide() {
 
 function handleRideStateUpdate(ride) {
     if (!ride || !ride.status) return;
-    
+
     const statusMessages = {
         'requested': 'Procurando motorista...',
         'assigned': 'Motorista a caminho!',
@@ -240,15 +240,13 @@ function handleRideStateUpdate(ride) {
     } else {
         cancelBtn.classList.remove('hidden');
     }
-    
+
     if (ride.driver_id && ['assigned', 'accepted', 'in_progress'].includes(ride.status)) {
         loadDriverInfo(ride.driver_id);
         subscribeToDriverLocationUpdates(ride.driver_id);
-        
-        // AJUSTE: Garante que o mapa seja inicializado se houver uma corrida ativa e o mapa não estiver visível.
+
         if (!state.mapInstance && ride.origin_location) {
             try {
-                // Extrai as coordenadas do ponto de origem da corrida
                 const [lng, lat] = ride.origin_location.match(/-?\d+\.?\d+/g).map(parseFloat);
                 initializeMap({ lat, lng });
             } catch(e) {
@@ -268,7 +266,7 @@ async function loadDriverInfo(driverId) {
         if (error) throw error;
         const { data: details, error: detailsError } = await supabaseClient.from('driver_details').select('car_model, license_plate, car_color, selfie_with_id_url').eq('profile_id', driverId).single();
         if (detailsError) throw detailsError;
-        
+
         document.getElementById('driver-name').textContent = data.full_name;
         document.getElementById('driver-car').textContent = `${details.car_model} (${details.car_color})`;
         document.getElementById('driver-plate').textContent = details.license_plate;
@@ -283,15 +281,15 @@ async function loadDriverInfo(driverId) {
 
 function subscribeToRideUpdates(rideId) {
     if (state.rideSubscription) supabaseClient.removeChannel(state.rideSubscription);
-    
+
     state.rideSubscription = supabaseClient
         .channel(`ride-${rideId}`)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rides', filter: `id=eq.${rideId}` }, 
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rides', filter: `id=eq.${rideId}` },
         payload => {
             const updatedRide = payload.new;
             state.currentRide = updatedRide;
             handleRideStateUpdate(updatedRide);
-            
+
             if (['completed', 'canceled'].includes(updatedRide.status)) {
                 if (updatedRide.status === 'completed' && updatedRide.price) {
                     toast.show(`Corrida concluída!`, 'success');
@@ -338,7 +336,7 @@ function calculatePriceEstimate() {
         return toast.show('Preencha origem e destino usando as sugestões.', 'warning');
     }
     showLoading('estimate-btn');
-    
+
     const service = new google.maps.DistanceMatrixService();
     service.getDistanceMatrix({
         origins: [state.originPlace.geometry.location],
@@ -361,9 +359,9 @@ function calculatePriceEstimate() {
         const distanceKm = element.distance.value / 1000;
         const timeMinutes = Math.round(element.duration.value / 60);
         const price = Math.max( PRICING_CONFIG.minimumFare, (PRICING_CONFIG.baseFare + (distanceKm * PRICING_CONFIG.pricePerKm) + (timeMinutes * PRICING_CONFIG.pricePerMinute)) * PRICING_CONFIG.surgePricing );
-        
+
         state.currentEstimate = { total: price, distance: distanceKm, time: timeMinutes };
-        
+
         const container = document.getElementById('price-estimate-container');
         container.classList.remove('hidden');
         document.getElementById('estimated-price').textContent = `R$ ${price.toFixed(2).replace('.', ',')}`;
@@ -389,7 +387,7 @@ async function requestRide() {
         };
         const { data: newRide, error } = await supabaseClient.from('rides').insert(rideData).select().single();
         if (error) throw error;
-        
+
         // Update state and UI immediately
         state.currentRide = newRide;
         showRideStatus();
@@ -397,11 +395,11 @@ async function requestRide() {
         subscribeToRideUpdates(newRide.id);
         toast.show('Corrida solicitada! Procurando motorista...', 'info');
 
-    } catch (error) { 
+    } catch (error) {
         toast.show('Erro ao solicitar corrida.', 'error');
         showRideRequestForm(); // Go back to form on failure
-    } finally { 
-        hideLoading('request-btn'); 
+    } finally {
+        hideLoading('request-btn');
     }
 }
 
@@ -425,12 +423,12 @@ function showRideRequestForm() {
     const statusContainer = document.getElementById('ride-status-container');
     requestContainer.classList.remove('hidden');
     statusContainer.classList.add('hidden');
-    
+
     document.getElementById('origin').value = '';
     document.getElementById('destination').value = '';
     document.getElementById('price-estimate-container').classList.add('hidden');
     document.getElementById('request-btn').disabled = true;
-    
+
     state.originPlace = null;
     state.destinationPlace = null;
     state.currentEstimate = null;
@@ -455,7 +453,7 @@ async function loadWalletBalance() {
             .eq('profile_id', state.user.id);
 
         if (error) throw error;
-        
+
         let balance = 0;
         if (data) {
             data.forEach(transaction => {
@@ -466,7 +464,7 @@ async function loadWalletBalance() {
                 }
             });
         }
-        
+
         state.walletBalance = balance;
         document.getElementById('wallet-balance').textContent = `R$ ${balance.toFixed(2).replace('.', ',')}`;
 
@@ -503,7 +501,7 @@ async function addCredits() {
         }
 
         const { sessionId, url } = await response.json();
-        
+
         if (url) {
             window.location.href = url;
         } else if (sessionId) {
@@ -538,6 +536,7 @@ async function checkPaymentStatus() {
 
 
 
+// =============================================================================
 // INITIALIZATION
 // =============================================================================
 async function initializeApp() {
@@ -558,10 +557,7 @@ async function initializeApp() {
     });
 
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session) {
-        state.user = session.user;
-        await loadUserProfile(session.user.id);
-    } else {
+    if (!session) {
         showScreen('login-screen');
     }
 }
@@ -577,20 +573,20 @@ function initializeAutocomplete() {
 
         const destinationAutocomplete = new google.maps.places.Autocomplete(destinationInput, options);
         destinationAutocomplete.addListener('place_changed', () => { state.destinationPlace = destinationAutocomplete.getPlace(); });
-        
+
     } catch (error) { console.error('❌ Erro ao inicializar autocomplete:', error); }
 }
 
 function useCurrentLocation() {
     if (!navigator.geolocation) return toast.show('Geolocalização não suportada.', 'error');
-    
+
     document.getElementById('origin').value = 'Obtendo localização...';
-    
+
     navigator.geolocation.getCurrentPosition(
         (position) => {
             const { latitude: lat, longitude: lng } = position.coords;
             const latLng = new google.maps.LatLng(lat, lng);
-            
+
             new google.maps.Geocoder().geocode({ 'location': latLng }, (results, status) => {
                 if (status === 'OK' && results[0]) {
                     document.getElementById('origin').value = results[0].formatted_address;
@@ -609,22 +605,30 @@ function useCurrentLocation() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Inicia a lógica principal do aplicativo (autenticação, etc.)
     initializeApp();
 
+    // Inicia o recurso de autocompletar do Google Places
+    initializeAutocomplete();
+
+    // Configura os listeners dos formulários
     document.getElementById('login-form').addEventListener('submit', (e) => {
         e.preventDefault();
         handleSignIn(e.target.elements['login-email'].value, e.target.elements['login-password'].value);
     });
+
     document.getElementById('signup-form').addEventListener('submit', (e) => {
         e.preventDefault();
-        handleSignUp( e.target.elements['signup-fullname'].value, e.target.elements['signup-email'].value, e.target.elements['signup-phone'].value, e.target.elements['signup-password'].value );
+        handleSignUp(
+            e.target.elements['signup-fullname'].value,
+            e.target.elements['signup-email'].value,
+            e.target.elements['signup-phone'].value,
+            e.target.elements['signup-password'].value
+        );
     });
-
-    
-    initializeAutocomplete();
 });
 
-// Expose functions to global scope
+// Expor funções para o escopo global para que os atributos onclick do HTML funcionem
 window.showScreen = showScreen;
 window.handleSignOut = handleSignOut;
 window.addCredits = addCredits;
