@@ -244,11 +244,21 @@ function handleRideStateUpdate(ride) {
     if (ride.driver_id && ['assigned', 'accepted', 'in_progress'].includes(ride.status)) {
         loadDriverInfo(ride.driver_id);
         subscribeToDriverLocationUpdates(ride.driver_id);
+        
+        // AJUSTE: Garante que o mapa seja inicializado se houver uma corrida ativa e o mapa não estiver visível.
+        if (!state.mapInstance && ride.origin_location) {
+            try {
+                // Extrai as coordenadas do ponto de origem da corrida
+                const [lng, lat] = ride.origin_location.match(/-?\d+\.?\d+/g).map(parseFloat);
+                initializeMap({ lat, lng });
+            } catch(e) {
+                console.error("Falha ao processar a localização de origem para o mapa.", e);
+            }
+        }
     }
 
-    if (ride.status === 'assigned' && !state.mapInstance) {
-        const [lng, lat] = ride.origin_location.match(/-?\d+\.?\d+/g).map(parseFloat);
-        initializeMap({ lat, lng });
+    if (ride.status === 'completed' || ride.status === 'canceled') {
+        cleanupMap();
     }
 }
 
@@ -554,26 +564,11 @@ async function initializeApp() {
     } else {
         showScreen('login-screen');
     }
-    
-    supabaseClient.auth.onAuthStateChange((event, session) => {
-        if (session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
-            state.user = session.user;
-            loadUserProfile(session.user.id);
-        } else if (event === 'SIGNED_OUT') {
-            state.user = null;
-            state.profile = null;
-            showScreen('login-screen');
-        }
-    });
+}
 
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session) {
-        state.user = session.user;
-        await loadUserProfile(session.user.id);
-    } else {
-        showScreen('login-screen');
-    }
-}ypes: ['address'], componentRestrictions: { 'country': 'br' } };
+function initializeAutocomplete() {
+    try {
+        const options = { types: ['address'], componentRestrictions: { 'country': 'br' } };
         const originInput = document.getElementById('origin');
         const destinationInput = document.getElementById('destination');
 
@@ -614,8 +609,8 @@ function useCurrentLocation() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    
-    initializeAutocomplete();
+    initializeApp();
+
     document.getElementById('login-form').addEventListener('submit', (e) => {
         e.preventDefault();
         handleSignIn(e.target.elements['login-email'].value, e.target.elements['login-password'].value);
@@ -637,4 +632,4 @@ window.useCurrentLocation = useCurrentLocation;
 window.calculatePriceEstimate = calculatePriceEstimate;
 window.requestRide = requestRide;
 window.cancelRide = cancelRide;
-window.handleSignInWithProvider = handleSignInWithProvider; // Make sure this is exposed
+window.handleSignInWithProvider = handleSignInWithProvider;
