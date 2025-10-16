@@ -245,12 +245,21 @@ function handleRideStateUpdate(ride) {
         loadDriverInfo(ride.driver_id);
         subscribeToDriverLocationUpdates(ride.driver_id);
 
+        // AJUSTE CRÍTICO: Lê o formato GeoJSON que vem do Supabase
         if (!state.mapInstance && ride.origin_location) {
             try {
-                const [lng, lat] = ride.origin_location.match(/-?\d+\.?\d+/g).map(parseFloat);
-                initializeMap({ lat, lng });
-            } catch(e) {
-                console.error("Falha ao processar a localização de origem para o mapa.", e);
+                // O Supabase retorna um objeto GeoJSON. A estrutura é:
+                // { type: "Point", coordinates: [longitude, latitude] }
+                if (ride.origin_location.type === 'Point' && ride.origin_location.coordinates) {
+                    const [lng, lat] = ride.origin_location.coordinates;
+                    initializeMap({ lat, lng });
+                } else {
+                    console.error("Formato de 'origin_location' inesperado:", ride.origin_location);
+                    toast.show("Erro ao ler as coordenadas da corrida.", "error");
+                }
+            } catch (e) {
+                console.error("Falha CRÍTICA ao processar a localização de origem para o mapa.", e);
+                toast.show("Erro fatal nas coordenadas.", "error");
             }
         }
     }
@@ -307,9 +316,10 @@ function subscribeToDriverLocationUpdates(driverId) {
         .channel(`driver-location-${driverId}`)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'driver_details', filter: `profile_id=eq.${driverId}`},
         payload => {
-            const locationString = payload.new.current_location;
-            if (locationString) {
-                 const [lng, lat] = locationString.match(/-?\d+\.?\d+/g).map(parseFloat);
+            const locationData = payload.new.current_location;
+            // A localização do motorista também virá como GeoJSON
+            if (locationData && locationData.type === 'Point' && locationData.coordinates) {
+                 const [lng, lat] = locationData.coordinates;
                  updateDriverOnMap({lat, lng});
             }
         })
@@ -536,7 +546,6 @@ async function checkPaymentStatus() {
 
 
 
-// =============================================================================
 // INITIALIZATION
 // =============================================================================
 async function initializeApp() {
@@ -557,7 +566,10 @@ async function initializeApp() {
     });
 
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) {
+    if (session) {
+        state.user = session.user;
+        await loadUserProfile(session.user.id);
+    } else {
         showScreen('login-screen');
     }
 }
@@ -605,30 +617,22 @@ function useCurrentLocation() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Inicia a lógica principal do aplicativo (autenticação, etc.)
     initializeApp();
-
-    // Inicia o recurso de autocompletar do Google Places
-    initializeAutocomplete();
-
-    // Configura os listeners dos formulários
+    
     document.getElementById('login-form').addEventListener('submit', (e) => {
         e.preventDefault();
         handleSignIn(e.target.elements['login-email'].value, e.target.elements['login-password'].value);
     });
-
     document.getElementById('signup-form').addEventListener('submit', (e) => {
         e.preventDefault();
-        handleSignUp(
-            e.target.elements['signup-fullname'].value,
-            e.target.elements['signup-email'].value,
-            e.target.elements['signup-phone'].value,
-            e.target.elements['signup-password'].value
-        );
+        handleSignUp( e.target.elements['signup-fullname'].value, e.target.elements['signup-email'].value, e.target.elements['signup-phone'].value, e.target.elements['signup-password'].value );
     });
+
+
+    initializeAutocomplete();
 });
 
-// Expor funções para o escopo global para que os atributos onclick do HTML funcionem
+// Expose functions to global scope
 window.showScreen = showScreen;
 window.handleSignOut = handleSignOut;
 window.addCredits = addCredits;
