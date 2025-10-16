@@ -212,11 +212,12 @@ async function checkPendingRide() {
             subscribeToRideUpdates(state.currentRide.id);
         } else {
             showRideRequestForm();
-            showScreen('user-screen'); // <-- THIS WAS THE MISSING LINE
+            showScreen('user-screen');
         }
     } catch (error) {
         console.error('❌ Erro em checkPendingRide:', error);
         showRideRequestForm();
+        showScreen('user-screen');
     }
 }
 
@@ -240,7 +241,7 @@ function handleRideStateUpdate(ride) {
         cancelBtn.classList.remove('hidden');
     }
     
-    if (ride.driver_id) {
+    if (ride.driver_id && ['assigned', 'accepted', 'in_progress'].includes(ride.status)) {
         loadDriverInfo(ride.driver_id);
         subscribeToDriverLocationUpdates(ride.driver_id);
     }
@@ -526,32 +527,53 @@ async function checkPaymentStatus() {
 }
 
 
-// =============================================================================
+
 // INITIALIZATION
 // =============================================================================
-function initializeApp() {
+async function initializeApp() {
     if (state.isInitializing) return;
     state.isInitializing = true;
+
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+        if (session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+            state.user = session.user;
+            loadUserProfile(session.user.id);
+        } else if (event === 'SIGNED_OUT') {
+            state.user = null;
+            state.profile = null;
+            cleanupRideSubscriptions();
+            cleanupMap();
+            showScreen('login-screen');
+        }
+    });
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+        state.user = session.user;
+        await loadUserProfile(session.user.id);
+    } else {
+        showScreen('login-screen');
+    }
     
     supabaseClient.auth.onAuthStateChange((event, session) => {
         if (session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
             state.user = session.user;
             loadUserProfile(session.user.id);
         } else if (event === 'SIGNED_OUT') {
-            state.user = state.profile = null;
-            cleanupRideSubscriptions();
+            state.user = null;
+            state.profile = null;
             showScreen('login-screen');
         }
     });
 
-    supabaseClient.auth.getSession().then(({ data: { session } }) => {
-        if (!session) showScreen('login-screen');
-    });
-}
-
-function initializeAutocomplete() {
-    try {
-        const options = { types: ['address'], componentRestrictions: { 'country': 'br' } };
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+        state.user = session.user;
+        await loadUserProfile(session.user.id);
+    } else {
+        showScreen('login-screen');
+    }
+}ypes: ['address'], componentRestrictions: { 'country': 'br' } };
         const originInput = document.getElementById('origin');
         const destinationInput = document.getElementById('destination');
 
@@ -592,6 +614,8 @@ function useCurrentLocation() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    
+    initializeAutocomplete();
     document.getElementById('login-form').addEventListener('submit', (e) => {
         e.preventDefault();
         handleSignIn(e.target.elements['login-email'].value, e.target.elements['login-password'].value);
@@ -601,7 +625,7 @@ document.addEventListener('DOMContentLoaded', () => {
         handleSignUp( e.target.elements['signup-fullname'].value, e.target.elements['signup-email'].value, e.target.elements['signup-phone'].value, e.target.elements['signup-password'].value );
     });
 
-    initializeApp();
+    
     initializeAutocomplete();
 });
 
