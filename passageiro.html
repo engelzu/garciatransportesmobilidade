@@ -10,16 +10,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyADSCUHjzyFUwjfcui_lk6vDSQ3PU0bu7g&libraries=places"></script>
-    
+
     <style>
         body { font-family: 'Poppins', sans-serif; background-color: black; color: white; }
         .screen { display: none; }
         .screen.active { display: block; }
         .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #6d28d9; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
+
         /* Autocomplete Google Maps Styling */
         .pac-container { background-color: #1F2937; border-radius: 8px; border: 1px solid #4B5563; z-index: 9999 !important; }
         .pac-item { padding: 10px; font-size: 14px; color: #D1D5DB; cursor: pointer; border-top: 1px solid #374151;}
@@ -29,8 +29,8 @@
 
         /* Toast Notifications */
         .toast-container { position: fixed; top: 20px; right: 20px; z-index: 1000; }
-        .toast { 
-            background: #1f2937; border-left: 4px solid; color: white; padding: 16px; border-radius: 8px; 
+        .toast {
+            background: #1f2937; border-left: 4px solid; color: white; padding: 16px; border-radius: 8px;
             margin-bottom: 10px; min-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
             transform: translateX(400px); transition: all 0.3s ease;
         }
@@ -65,16 +65,15 @@
             border-radius: 12px;
             overflow: hidden;
         }
-        
+
         /* Responsividade */
         @media (max-width: 480px) {
             .toast { min-width: 280px; }
         }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen">
+<body class="flex justify-center min-h-screen pt-8">
 
-    <!-- Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
     <div id="app-container" class="w-full max-w-md mx-auto p-4">
@@ -94,7 +93,7 @@
         <div id="login-screen" class="screen space-y-3">
             <img src="images/logogarcia.png" alt="Logo Garcia Transportes" class="mx-auto h-16 w-auto mb-6">
             <h2 class="text-3xl font-bold text-center">Login</h2>
-            
+
             <div class="space-y-3 pt-2">
                 <button onclick="handleSignInWithProvider('google')" class="w-full py-3 font-semibold rounded-lg bg-white text-gray-800 hover:bg-gray-200 flex items-center justify-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.222,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.988,36.635,44,31.023,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
@@ -119,10 +118,10 @@
                 </div>
                 <button type="submit" id="login-btn" class="w-full py-3 font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700">ENTRAR</button>
             </form>
-            
+
             <p class="text-center text-sm">Não tem uma conta? <a href="#" onclick="showScreen('signup-screen')" class="font-semibold text-indigo-400">Cadastre-se</a></p>
         </div>
-        
+
         <div id="signup-screen" class="screen space-y-3">
             <h2 class="text-3xl font-bold text-center">Cadastro</h2>
             <form id="signup-form" class="space-y-3">
@@ -157,8 +156,7 @@
             </div>
 
             <p id="welcome-message" class="text-lg"></p>
-            
-            <!-- CARTEIRA PRÉ-PAGA -->
+
             <div class="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-xl shadow-lg">
                 <div class="flex justify-between items-start mb-4">
                     <div>
@@ -170,8 +168,7 @@
                     </button>
                 </div>
             </div>
-            
-            <!-- FORMULÁRIO DE SOLICITAÇÃO -->
+
             <div id="ride-request-container">
                 <form onsubmit="event.preventDefault(); requestRide();" class="space-y-4">
                     <div>
@@ -185,14 +182,14 @@
                         <label for="destination" class="block mb-2 text-sm font-medium">Destino</label>
                         <input type="text" id="destination" class="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:outline-none focus:border-indigo-500" placeholder="Digite o destino" required>
                     </div>
-                    
+
                     <div id="price-estimate-container" class="hidden bg-gray-800 p-4 rounded-xl">
                          <p id="estimated-price" class="text-2xl font-bold text-center text-green-400">R$ 0,00</p>
                          <p class="text-sm text-gray-400 text-center">
                             <span id="estimated-time">-- min</span> / <span id="estimated-distance">-- km</span>
                          </p>
                     </div>
-                    
+
                     <div class="flex gap-3">
                         <button type="button" onclick="calculatePriceEstimate()" id="estimate-btn" class="flex-1 py-3 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors">
                             💰 VER PREÇO
@@ -204,7 +201,6 @@
                 </form>
             </div>
 
-            <!-- CONTAINER DE STATUS DA CORRIDA -->
             <div id="ride-status-container" class="hidden space-y-4">
                 <div id="map-container" class="hidden"></div>
                 <div id="driver-details-panel" class="bg-gray-800 p-4 rounded-xl space-y-3">
