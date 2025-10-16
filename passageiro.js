@@ -109,6 +109,7 @@ async function handleSignUp(fullName, email, phone, password) {
 
 async function handleSignOut() {
     await supabaseClient.auth.signOut();
+    window.location.reload(); // Adicione esta linha para recarregar a página
 }
 
 async function loadUserProfile(userId) {
